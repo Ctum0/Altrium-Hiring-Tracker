@@ -22,6 +22,14 @@ DEFAULT_PASSWORD = 'testpass123'
 class Command(BaseCommand):
     help = 'Seed the three standard role accounts (HR, Interviewer, Management).'
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--noinput',
+            '--no-input',
+            action='store_true',
+            help='Accepted for compatibility with deploy pipelines.',
+        )
+
     def handle(self, *args, **options):
         created = 0
         existed = 0
