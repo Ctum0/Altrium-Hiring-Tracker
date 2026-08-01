@@ -1,0 +1,20 @@
+# Render Blueprint - Altrium Tracker
+# See https://render.com/docs/blueprint-spec for the schema.
+
+services:
+  - type: web
+    name: altrium-tracker
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn altrium_tracker.wsgi:application --bind 0.0.0.0:$PORT --workers 3 --timeout 120
+    preDeployCommand: python manage.py migrate --noinput && python manage.py collectstatic --noinput
+    envVars:
+      - key: DJANGO_DEBUG
+        value: "false"
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DJANGO_ALLOWED_HOSTS
+        value: .onrender.com
+      - key: GROQ_API_KEY
+        sync: false
