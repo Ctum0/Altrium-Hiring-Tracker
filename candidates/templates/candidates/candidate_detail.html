@@ -1,0 +1,111 @@
+{% extends 'base.html' %}
+{% block title %}{{ candidate.full_name }} | Altrium Tracker{% endblock %}
+{% block page_title %}{{ candidate.full_name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <p class="page-sub">
+      {% if candidate.email %}{{ candidate.email }}{% endif %}
+      {% if candidate.phone %}&middot; {{ candidate.phone }}{% endif %}
+      &middot; Added {{ candidate.created_at|date:'M j, Y' }}
+    </p>
+  </div>
+  <div class="page-actions">
+    <a href="{% url 'candidates:list' %}" class="btn btn-secondary">All candidates</a>
+  </div>
+</div>
+
+<div class="grid-2">
+  <div class="panel panel-pad">
+    <h3 style="font-size:var(--text-base);font-weight:650;margin-bottom:var(--sp-2)">Profile</h3>
+    <dl style="display:grid;grid-template-columns:max-content 1fr;gap:var(--sp-2) var(--sp-4);font-size:var(--text-sm)">
+      <dt class="text-muted">Email</dt>
+      <dd>{{ candidate.email }}</dd>
+      <dt class="text-muted">Phone</dt>
+      <dd>{{ candidate.phone|default:'-' }}</dd>
+      <dt class="text-muted">Source</dt>
+      <dd>{{ candidate.source|default:'Uploaded CV' }}</dd>
+    </dl>
+
+    {% if is_hr %}
+    <h3 style="font-size:var(--text-base);font-weight:650;margin:var(--sp-5) 0 var(--sp-2)">Shortlist score</h3>
+    <form method="post" action="{% url 'candidates:score' candidate.pk %}" class="flex gap-3" style="align-items:flex-end">
+      {% csrf_token %}
+      <div style="width:140px">
+        <label class="form-label" for="score">Score (0-100)</label>
+        <input class="form-input mono" type="number" id="score" name="score" min="0" max="100" value="{% if candidate.score is not None %}{{ candidate.score }}{% endif %}" placeholder="None">
+      </div>
+      <button type="submit" class="btn btn-primary">Save score</button>
+      {% if candidate.score is not None %}
+      <button type="submit" class="btn btn-ghost" name="score" value="">Clear</button>
+      {% endif %}
+    </form>
+    {% else %}
+    <dl style="display:grid;grid-template-columns:max-content 1fr;gap:var(--sp-2) var(--sp-4);font-size:var(--text-sm);margin-top:var(--sp-3)">
+      <dt class="text-muted">Score</dt>
+      <dd>{% if candidate.score is not None %}<span class="score-chip has-score">{{ candidate.score }}</span>{% else %}<span class="text-muted">Not scored</span>{% endif %}</dd>
+    </dl>
+    {% endif %}
+
+    {% if candidate.skills %}
+    <h3 style="font-size:var(--text-base);font-weight:650;margin:var(--sp-5) 0 var(--sp-2)">Skills</h3>
+    <div class="flex gap-2" style="flex-wrap:wrap">
+      {% for skill in candidate.skills_list %}
+      <span class="badge badge-role">{{ skill }}</span>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if candidate.resume_file %}
+    <p class="mt-4">
+      <a class="btn btn-secondary btn-sm" href="{{ candidate.resume_file.url }}" target="_blank" rel="noopener">View resume</a>
+    </p>
+    {% endif %}
+  </div>
+
+  <div class="panel panel-pad">
+    <h3 style="font-size:var(--text-base);font-weight:650;margin-bottom:var(--sp-2)">Applications</h3>
+    {% if applications %}
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Position</th>
+            <th>Stage</th>
+            <th>Assigned to</th>
+            {% if is_hr %}<th>Assign</th>{% endif %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for app in applications %}
+          <tr>
+            <td class="strong">{{ app.job.title }}</td>
+            <td>
+              <span class="badge badge-{{ app.status }}">{{ app.get_status_display }}</span>
+            </td>
+            <td>{% if app.assigned_to %}{{ app.assigned_to.get_full_name|default:app.assigned_to.username }}{% else %}Unassigned{% endif %}</td>
+            {% if is_hr %}
+            <td>
+              <form method="post" action="{% url 'candidates:assign' app.pk %}" class="flex gap-2">
+                {% csrf_token %}
+                <select class="form-select" name="interviewer" style="width:auto;padding:var(--sp-1) var(--sp-2);font-size:var(--text-xs)" required>
+                  <option value="">Select...</option>
+                  {% for iv in interviewers %}
+                  <option value="{{ iv.pk }}" {% if app.assigned_to_id == iv.pk %}selected{% endif %}>{{ iv.get_full_name|default:iv.username }}</option>
+                  {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-primary btn-sm">Assign</button>
+              </form>
+            </td>
+            {% endif %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="text-sm text-muted">No applications yet.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,107 @@
+{% extends 'base.html' %}
+{% block title %}{{ job.title }} | Altrium Tracker{% endblock %}
+{% block page_title %}{{ job.title }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <p class="page-sub">
+      Created {{ job.created_at|date:'M j, Y' }} by {{ job.created_by.get_full_name|default:job.created_by.username }}
+      {% if job.is_active %}&middot; <span class="badge badge-progress">Active</span>{% else %}&middot; <span class="badge badge-hold">Closed</span>{% endif %}
+    </p>
+  </div>
+  <div class="page-actions">
+    <a href="{% url 'pipeline:board' job.pk %}" class="btn btn-primary">Pipeline board</a>
+    <a href="{% url 'jobs:list' %}" class="btn btn-secondary">All jobs</a>
+  </div>
+</div>
+
+<div class="grid-2">
+  <div class="panel panel-pad">
+    <h3 style="font-size:var(--text-base);font-weight:650;margin-bottom:var(--sp-2)">Description</h3>
+    {% if job.description %}
+    <p class="text-sm text-muted" style="white-space:pre-line;max-width:65ch">{{ job.description }}</p>
+    {% else %}
+    <p class="text-sm text-muted">No description provided.</p>
+    {% endif %}
+  </div>
+
+  <div class="panel panel-pad">
+    <h3 style="font-size:var(--text-base);font-weight:650;margin-bottom:var(--sp-1)">Details</h3>
+    <dl style="display:grid;grid-template-columns:max-content 1fr;gap:var(--sp-2) var(--sp-4);font-size:var(--text-sm);margin-top:var(--sp-2)">
+      <dt class="text-muted">Hiring manager</dt>
+      <dd>{% if job.hiring_manager %}{{ job.hiring_manager.get_full_name|default:job.hiring_manager.username }}{% else %}-{% endif %}</dd>
+      <dt class="text-muted">Candidates</dt>
+      <dd class="mono">{{ job.candidate_count }}</dd>
+      <dt class="text-muted">Rounds</dt>
+      <dd class="mono">{{ rounds|length }}</dd>
+    </dl>
+  </div>
+</div>
+
+<div class="panel panel-pad" style="margin-top:var(--sp-6)">
+  <div class="flex items-center justify-between" style="margin-bottom:var(--sp-4)">
+    <h3 style="font-size:var(--text-base);font-weight:650">Interview rounds</h3>
+    <span class="text-sm text-muted">Candidates move through these stages on the Kanban board.</span>
+  </div>
+
+  {% if rounds %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Order</th>
+          <th>Round name</th>
+          <th>Type</th>
+          {% if can_edit %}<th></th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for round in rounds %}
+        <tr>
+          <td class="mono">{{ round.order }}</td>
+          <td class="strong">{{ round.name }}</td>
+          <td>
+            {% if round.is_final %}
+            <span class="badge badge-hold">Final state</span>
+            {% else %}
+            <span class="badge badge-new">Interview stage</span>
+            {% endif %}
+          </td>
+          {% if can_edit %}
+          <td style="text-align:right">
+            <form method="post" action="{% url 'jobs:round_delete' round.pk %}" onsubmit="return confirm('Remove this round? Candidates in it will keep their history.');">
+              {% csrf_token %}
+              <button type="submit" class="btn-ghost btn-icon" title="Remove round" aria-label="Remove round">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </form>
+          </td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <p class="empty-state-title">No interview rounds configured</p>
+    <p class="empty-state-body">Add stages such as Phone Screen, Technical Test, or Final Interview. Final states like Hired and Rejected are added later.</p>
+  </div>
+  {% endif %}
+
+  {% if can_edit %}
+  <form method="post" action="{% url 'jobs:round_create' job.pk %}" class="flex gap-3" style="margin-top:var(--sp-4);align-items:flex-end">
+    {% csrf_token %}
+    <div style="flex:1;min-width:200px">
+      <label class="form-label" for="{{ round_form.name.id_for_label }}">New round</label>
+      {{ round_form.name }}
+    </div>
+    <div style="width:110px">
+      <label class="form-label" for="{{ round_form.order.id_for_label }}">Order</label>
+      {{ round_form.order }}
+    </div>
+    <button type="submit" class="btn btn-primary">Add round</button>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

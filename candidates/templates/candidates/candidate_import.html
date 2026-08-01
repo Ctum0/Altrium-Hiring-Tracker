@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% block title %}Import candidate | Altrium Tracker{% endblock %}
+{% block page_title %}Import candidate{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h2 class="page-title">Import from an external source</h2>
+    <p class="page-sub">Paste a profile from LinkedIn, a job board, or an email. The system extracts the details and files the candidate under a position.</p>
+  </div>
+</div>
+
+<form method="post" novalidate>
+  {% csrf_token %}
+  <div class="form-card" style="max-width:640px">
+    {% if form.non_field_errors %}
+    <div class="alert alert-error">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    <div class="form-field">
+      <label class="form-label" for="{{ form.job.id_for_label }}">Position</label>
+      {{ form.job }}
+      {% if form.job.errors %}<p class="form-error">{{ form.job.errors.0 }}</p>{% endif %}
+    </div>
+
+    <div class="form-field">
+      <label class="form-label" for="{{ form.source.id_for_label }}">Source</label>
+      {{ form.source }}
+      {% if form.source.errors %}<p class="form-error">{{ form.source.errors.0 }}</p>{% endif %}
+    </div>
+
+    <div class="form-field">
+      <label class="form-label" for="{{ form.profile_text.id_for_label }}">Profile text</label>
+      {{ form.profile_text }}
+      {% if form.profile_text.errors %}<p class="form-error">{{ form.profile_text.errors.0 }}</p>{% endif %}
+      <p class="form-help">{{ form.profile_text.help_text }}</p>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">Import candidate</button>
+      <a href="{% url 'candidates:list' %}" class="btn btn-secondary">Cancel</a>
+    </div>
+  </div>
+</form>
+{% endblock %}

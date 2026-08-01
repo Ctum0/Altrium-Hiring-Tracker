@@ -1,0 +1,133 @@
+{% extends 'base.html' %}
+{% block title %}Candidates | Altrium Tracker{% endblock %}
+{% block page_title %}Candidates{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h2 class="page-title">
+      {% if user.is_interviewer %}My candidates{% else %}Candidate pipeline{% endif %}
+    </h2>
+    <p class="page-sub">Profiles linked to positions, with current stage and assignment.</p>
+  </div>
+  <div class="page-actions">
+    {% if user.is_hr %}
+    <a href="{% url 'candidates:import' %}" class="btn btn-secondary">Import</a>
+    <a href="{% url 'candidates:upload' %}" class="btn btn-primary">Upload CVs</a>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Filters -->
+<form method="get" class="panel panel-pad" style="margin-bottom:var(--sp-6)">
+  <div class="form-row">
+    <div class="form-field" style="margin-bottom:0">
+      <label class="form-label" for="q">Search</label>
+      <input class="form-input" type="search" id="q" name="q" value="{{ filter_q }}" placeholder="Name, email, skill, or role">
+    </div>
+    <div class="form-field" style="margin-bottom:0">
+      <label class="form-label" for="job">Position</label>
+      <select class="form-select" id="job" name="job">
+        <option value="">All positions</option>
+        {% for job_id, job_title in jobs %}
+        <option value="{{ job_id }}" {% if filter_job == job_id|stringformat:'s' %}selected{% endif %}>{{ job_title }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-field" style="margin-bottom:0">
+      <label class="form-label" for="stage">Stage</label>
+      <select class="form-select" id="stage" name="stage">
+        <option value="">All stages</option>
+        {% for value, label in stages %}
+        <option value="{{ value }}" {% if filter_stage == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-field" style="margin-bottom:0">
+      <label class="form-label" for="min_score">Min. score</label>
+      <input class="form-input mono" type="number" id="min_score" name="min_score" min="0" max="100" value="{{ filter_min_score }}" placeholder="Any">
+    </div>
+    <div class="form-field" style="margin-bottom:0;display:flex;align-items:flex-end">
+      <button type="submit" class="btn btn-secondary">Filter</button>
+      {% if filter_q or filter_job or filter_stage or filter_min_score %}
+      <a href="{% url 'candidates:list' %}" class="btn btn-ghost">Clear</a>
+      {% endif %}
+    </div>
+  </div>
+</form>
+
+{% if applications %}
+<div class="table-wrap">
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Candidate</th>
+        <th>Position</th>
+        <th>Stage</th>
+        <th>Score</th>
+        <th>Assigned to</th>
+        <th>Applied</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for app in applications %}
+      <tr>
+        <td class="strong">
+          <a href="{% url 'candidates:detail' app.candidate.pk %}">{{ app.candidate.full_name }}</a>
+          <div class="text-xs text-muted">{{ app.candidate.email }}</div>
+        </td>
+        <td>{{ app.job.title }}</td>
+        <td>
+          <span class="badge badge-{{ app.status }}">{{ app.get_status_display }}</span>
+          {% if app.current_round %}<div class="text-xs text-muted">{{ app.current_round.name }}</div>{% endif %}
+        </td>
+        <td>
+          {% if app.candidate.score is not None %}
+          <span class="score-chip has-score">{{ app.candidate.score }}</span>
+          {% else %}
+          <span class="text-muted">-</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if app.assigned_to %}{{ app.assigned_to.get_full_name|default:app.assigned_to.username }}{% else %}Unassigned{% endif %}
+        </td>
+        <td class="text-muted">{{ app.created_at|date:'M j, Y' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if is_paginated %}
+<nav class="pagination" aria-label="Pagination">
+  {% if page_obj.has_previous %}
+  <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if filter_q %}&q={{ filter_q }}{% endif %}{% if filter_job %}&job={{ filter_job }}{% endif %}{% if filter_stage %}&stage={{ filter_stage }}{% endif %}{% if filter_min_score %}&min_score={{ filter_min_score }}{% endif %}">Previous</a>
+  {% endif %}
+  <span class="text-sm text-muted">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }} &middot; {{ page_obj.paginator.count }} candidates</span>
+  {% if page_obj.has_next %}
+  <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if filter_q %}&q={{ filter_q }}{% endif %}{% if filter_job %}&job={{ filter_job }}{% endif %}{% if filter_stage %}&stage={{ filter_stage }}{% endif %}{% if filter_min_score %}&min_score={{ filter_min_score }}{% endif %}">Next</a>
+  {% endif %}
+</nav>
+{% endif %}
+
+{% elif filter_q or filter_job or filter_stage or filter_min_score %}
+<div class="empty-state">
+  <p class="empty-state-title">No candidates match your filters</p>
+  <p class="empty-state-body">Try widening the search, removing the score threshold, or clearing filters.</p>
+  <a href="{% url 'candidates:list' %}" class="btn btn-secondary">Clear filters</a>
+</div>
+
+{% else %}
+<div class="empty-state">
+  <p class="empty-state-title">No candidates yet</p>
+  {% if user.is_hr %}
+  <p class="empty-state-body">Upload candidate CVs to parse their details automatically, or import from an external source.</p>
+  <div class="flex gap-3" style="justify-content:center">
+    <a href="{% url 'candidates:upload' %}" class="btn btn-primary">Upload CVs</a>
+    <a href="{% url 'candidates:import' %}" class="btn btn-secondary">Import</a>
+  </div>
+  {% else %}
+  <p class="empty-state-body">Candidates assigned to you will appear here once HR assigns them.</p>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

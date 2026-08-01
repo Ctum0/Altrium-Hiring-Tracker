@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% block title %}Add round | Altrium Tracker{% endblock %}
+{% block page_title %}Add round{% endblock %}
+{% block content %}
+<form method="post" novalidate>
+  {% csrf_token %}
+  <div class="form-card">
+    <div class="form-field">
+      <label class="form-label" for="{{ form.name.id_for_label }}">Round name</label>
+      {{ form.name }}
+      {% if form.name.errors %}<p class="form-error">{{ form.name.errors.0 }}</p>{% endif %}
+    </div>
+    <div class="form-field">
+      <label class="form-label" for="{{ form.order.id_for_label }}">Order</label>
+      {{ form.order }}
+      {% if form.order.errors %}<p class="form-error">{{ form.order.errors.0 }}</p>{% endif %}
+      <p class="form-help">Lower numbers appear first on the Kanban board.</p>
+    </div>
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">Add round</button>
+      <a href="{% url 'jobs:detail' job.pk %}" class="btn btn-secondary">Cancel</a>
+    </div>
+  </div>
+</form>
+{% endblock %}

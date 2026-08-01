@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% block title %}Upload CVs | Altrium Tracker{% endblock %}
+{% block page_title %}Upload CVs{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h2 class="page-title">Upload candidate CVs</h2>
+    <p class="page-sub">The system reads each CV and extracts name, email, and skills automatically. Uploading multiple files is supported.</p>
+  </div>
+</div>
+
+<div class="panel panel-pad" style="max-width:640px">
+  <form method="post" enctype="multipart/form-data" novalidate>
+    {% csrf_token %}
+    <div class="form-field">
+      <label class="form-label" for="job">Position</label>
+      <select class="form-select" id="job" name="job" required>
+        <option value="">Select a position</option>
+        {% for job in jobs %}
+        <option value="{{ job.pk }}">{{ job.title }}</option>
+        {% endfor %}
+      </select>
+      <p class="form-help">CVs will be filed under this position automatically.</p>
+    </div>
+
+    <div class="form-field">
+      <label class="form-label" for="files">CV files</label>
+      <input class="form-input" type="file" id="files" name="files" accept=".pdf,.doc,.docx" multiple required>
+      <p class="form-help">PDF or DOCX. You can select multiple files at once.</p>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">Upload and parse</button>
+      <a href="{% url 'candidates:list' %}" class="btn btn-secondary">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

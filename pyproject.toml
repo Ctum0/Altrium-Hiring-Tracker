@@ -1,0 +1,10 @@
+[tool.ruff]
+line-length = 100
+exclude = [".venv", "migrations", "staticfiles", "media"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = [
+    "BLE001",   # blind except is intentional for AI fallback robustness
+    "RUF012",   # Django Meta ordering/constraints use mutable class attrs by design
+]

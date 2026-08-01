@@ -1,0 +1,140 @@
+{% extends 'base.html' %}
+{% block title %}Pipeline: {{ job.title }} | Altrium Tracker{% endblock %}
+{% block page_title %}{{ job.title }}{% endblock %}
+{% block content_class %}wide{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h2 class="page-title">Pipeline board</h2>
+    <p class="page-sub">
+      {{ job.title }} &middot; {{ columns|length }} stages &middot;
+      {% if job.is_active %}<span class="badge badge-progress">Active</span>{% else %}<span class="badge badge-hold">Closed</span>{% endif %}
+    </p>
+  </div>
+  <div class="page-actions">
+    <a href="{% url 'jobs:detail' job.pk %}" class="btn btn-secondary">Job details</a>
+  </div>
+</div>
+
+{% if not can_move %}
+<div class="alert alert-info">You are viewing this pipeline in read-only mode. Drag-and-drop is available to HR.</div>
+{% endif %}
+
+{% csrf_token %}
+
+{% if columns %}
+<div class="kanban" id="kanban" data-move-url="{% url 'pipeline:move' 0 %}">
+  {% for column in columns %}
+  <div class="kanban-column {% if column.kind == 'final' %}kanban-column-final{% endif %}">
+    <div class="kanban-column-header">
+      <span class="kanban-column-title">
+        {% if column.kind == 'round' %}{{ column.round.name }}{% else %}{{ column.label }}{% endif %}
+      </span>
+      <span class="kanban-column-count">{{ column.applications|length }}</span>
+    </div>
+    {% if column.kind == 'round' %}
+    {% include 'pipeline/_column_cards.html' with kind='round' round=column.round applications=column.applications status='' %}
+    {% else %}
+    {% include 'pipeline/_column_cards.html' with kind='final' status=column.status applications=column.applications label=column.label %}
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+  <p class="empty-state-title">No stages configured</p>
+  <p class="empty-state-body">Add interview rounds to this job before candidates can move through the pipeline.</p>
+  <a href="{% url 'jobs:detail' job.pk %}" class="btn btn-primary">Configure rounds</a>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  var canMove = {{ can_move|yesno:'true,false' }};
+  var csrf = document.querySelector('[name=csrfmiddlewaretoken]');
+
+  function columnData(el) {
+    return {
+      kind: el.getAttribute('data-kind'),
+      round: el.getAttribute('data-round'),
+      status: el.getAttribute('data-status'),
+    };
+  }
+
+  function onEnd(evt) {
+    var item = evt.item;
+    var from = evt.from;
+    var to = evt.to;
+    if (from === to) {
+      // Restore original order; the pipeline sorts by recency, not manual.
+      from.insertBefore(item, from.children[evt.oldIndex] || null);
+      return;
+    }
+    var target = columnData(to);
+    var source = columnData(from);
+    var body = new URLSearchParams();
+    if (target.kind === 'round') {
+      body.set('round', target.round);
+    } else {
+      body.set('status', target.status);
+    }
+    body.set('source_round', source.round);
+    body.set('source_status', source.status);
+    body.set('csrfmiddlewaretoken', csrf.value);
+
+    var moveUrl = document.getElementById('kanban').getAttribute('data-move-url');
+    moveUrl = moveUrl.replace(/0\/$/, item.getAttribute('data-app-id') + '/');
+
+    fetch(moveUrl, {
+      method: 'POST',
+      body: body,
+      headers: {'X-Requested-With': 'XMLHttpRequest'},
+    }).then(function (resp) {
+      if (resp.status === 403) {
+        from.insertBefore(item, from.children[evt.oldIndex] || null);
+        return;
+      }
+      if (!resp.ok) {
+        from.insertBefore(item, from.children[evt.oldIndex] || null);
+        return;
+      }
+      return resp.text();
+    }).then(function (html) {
+      if (html) {
+        var replacement = document.createElement('div');
+        replacement.innerHTML = html.trim();
+        var newList = replacement.firstElementChild;
+        if (newList) {
+          from.replaceWith(newList);
+          initColumn(newList);
+        }
+      }
+    }).catch(function () {
+      from.insertBefore(item, from.children[evt.oldIndex] || null);
+    });
+  }
+
+  function initColumn(el) {
+    if (el.__sortable) { el.__sortable.destroy(); }
+    el.__sortable = new Sortable(el, {
+      group: 'kanban',
+      animation: 150,
+      ghostClass: 'sorted-ghost',
+      chosenClass: 'sorted-chosen',
+      draggable: '.kanban-card',
+      disabled: !canMove,
+      filter: 'input, select, button, a, textarea',
+      onEnd: onEnd,
+    });
+  }
+
+  document.querySelectorAll('[data-sortable-column]').forEach(initColumn);
+})();
+</script>
+{% endblock %}

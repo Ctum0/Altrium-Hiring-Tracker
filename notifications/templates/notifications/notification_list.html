@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+{% block title %}Notifications | Altrium Tracker{% endblock %}
+{% block page_title %}Notifications{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h2 class="page-title">Notifications</h2>
+    <p class="page-sub">Updates on assignments and pipeline activity.</p>
+  </div>
+  <div class="page-actions">
+    <a href="{% url 'notifications:list' %}" class="btn btn-secondary {% if not request.GET.unread %}btn-primary{% endif %}">All</a>
+    <a href="?unread=1" class="btn btn-secondary {% if request.GET.unread == '1' %}btn-primary{% endif %}">Unread</a>
+  </div>
+</div>
+
+{% if notifications %}
+<div class="panel" style="overflow:hidden">
+  {% for n in notifications %}
+  <div class="flex items-center justify-between gap-4 {% if not forloop.last %}" style="border-bottom:1px solid var(--border){% endif %};padding:var(--sp-4) var(--sp-5)">
+    <div>
+      {% if n.link %}<a href="{{ n.link }}" class="strong">{{ n.message }}</a>
+      {% else %}<span class="strong">{{ n.message }}</span>{% endif %}
+      <div class="text-xs text-muted">{{ n.created_at|date:'M j, Y H:i' }}</div>
+    </div>
+    {% if not n.is_read %}
+    <form method="post" action="{% url 'notifications:mark_read' n.pk %}" hx-post="{% url 'notifications:mark_read' n.pk %}" hx-swap="none">
+      {% csrf_token %}
+      <button type="submit" class="btn-ghost btn-icon" title="Mark as read" aria-label="Mark as read">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      </button>
+    </form>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+
+{% if is_paginated %}
+<nav class="pagination" aria-label="Pagination">
+  {% if page_obj.has_previous %}
+  <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.unread %}&unread=1{% endif %}">Previous</a>
+  {% endif %}
+  <span class="text-sm text-muted">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+  {% if page_obj.has_next %}
+  <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.unread %}&unread=1{% endif %}">Next</a>
+  {% endif %}
+</nav>
+{% endif %}
+
+{% else %}
+<div class="empty-state">
+  <p class="empty-state-title">No notifications</p>
+  <p class="empty-state-body">When a candidate is assigned to you, you will be notified here.</p>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% block title %}New job | Altrium Tracker{% endblock %}
+{% block page_title %}New job{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h2 class="page-title">Create a job posting</h2>
+    <p class="page-sub">Define the role first; interview rounds can be configured next.</p>
+  </div>
+</div>
+
+<form method="post" novalidate>
+  {% csrf_token %}
+  <div class="form-card">
+    {% if form.non_field_errors %}
+    <div class="alert alert-error">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    <div class="form-field">
+      <label class="form-label" for="{{ form.title.id_for_label }}">Title</label>
+      {{ form.title }}
+      {% if form.title.errors %}<p class="form-error">{{ form.title.errors.0 }}</p>{% endif %}
+    </div>
+
+    <div class="form-field">
+      <label class="form-label" for="{{ form.description.id_for_label }}">Description</label>
+      {{ form.description }}
+      {% if form.description.errors %}<p class="form-error">{{ form.description.errors.0 }}</p>{% endif %}
+      <p class="form-help">Share the responsibilities, team, and what you are looking for.</p>
+    </div>
+
+    <div class="form-field">
+      <label class="form-label" for="{{ form.hiring_manager.id_for_label }}">Hiring manager</label>
+      {{ form.hiring_manager }}
+      {% if form.hiring_manager.errors %}<p class="form-error">{{ form.hiring_manager.errors.0 }}</p>{% endif %}
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">Create job</button>
+      <a href="{% url 'jobs:list' %}" class="btn btn-secondary">Cancel</a>
+    </div>
+  </div>
+</form>
+{% endblock %}

@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+{% block title %}Jobs | Altrium Tracker{% endblock %}
+{% block page_title %}Jobs{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h2 class="page-title">Job postings</h2>
+    <p class="page-sub">Active roles and their pipelines.</p>
+  </div>
+  <div class="page-actions">
+    {% if user.is_hr %}
+    <a href="{% url 'jobs:create' %}" class="btn btn-primary">New job</a>
+    {% endif %}
+  </div>
+</div>
+
+{% if jobs %}
+<div class="table-wrap">
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Title</th>
+        <th>Hiring manager</th>
+        <th>Candidates</th>
+        <th>Created</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for job in jobs %}
+      <tr>
+        <td class="strong"><a href="{% url 'jobs:detail' job.pk %}">{{ job.title }}</a></td>
+        <td>{% if job.hiring_manager %}{{ job.hiring_manager.get_full_name|default:job.hiring_manager.username }}{% else %}-{% endif %}</td>
+        <td class="mono">{{ job.num_applications }}</td>
+        <td>{{ job.created_at|date:'M j, Y' }}</td>
+        <td>
+          {% if job.is_active %}
+          <span class="badge badge-progress">Active</span>
+          {% else %}
+          <span class="badge badge-hold">Closed</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if is_paginated %}
+<nav class="pagination" aria-label="Pagination">
+  {% if page_obj.has_previous %}
+  <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Previous</a>
+  {% endif %}
+  <span class="text-sm text-muted">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+  {% if page_obj.has_next %}
+  <a class="page-link" href="?page={{ page_obj.next_page_number }}">Next</a>
+  {% endif %}
+</nav>
+{% endif %}
+{% else %}
+<div class="empty-state">
+  <p class="empty-state-title">No jobs yet</p>
+  <p class="empty-state-body">Create your first job posting to start configuring interview rounds and accepting CVs.</p>
+  {% if user.is_hr %}
+  <a href="{% url 'jobs:create' %}" class="btn btn-primary">Create a job</a>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}
