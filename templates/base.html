@@ -79,17 +79,91 @@
 
     <main class="main-content {% block content_class %}{% endblock %}" id="main-content">
       {% if messages %}
+        <div class="messages-stack">
         {% for message in messages %}
-        <div class="alert alert-{{ message.tags|default:'info' }}" role="alert">
+        <div class="alert alert-{{ message.tags|default:'info' }}" role="alert" data-auto-dismiss="{{ message.tags|default:'info' }}">
           <span>{{ message }}</span>
-          <button class="alert-dismiss" onclick="this.parentElement.remove()" aria-label="Dismiss">&times;</button>
+          <button class="alert-dismiss" onclick="dismissAlert(this.parentElement)" aria-label="Dismiss">&times;</button>
         </div>
         {% endfor %}
+        </div>
       {% endif %}
       {% block content %}{% endblock %}
     </main>
   </div>
 </div>
 {% block scripts %}{% endblock %}
+<div class="modal-overlay" id="confirm-modal" hidden aria-hidden="true">
+  <div class="modal-box">
+    <h2 id="confirm-title"></h2>
+    <p id="confirm-body"></p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="confirm-cancel">Cancel</button>
+      <button class="btn btn-danger" id="confirm-ok">Confirm</button>
+    </div>
+  </div>
+</div>
+<script>
+(function() {
+  var overlay = document.getElementById('confirm-modal');
+  var title = document.getElementById('confirm-title');
+  var body = document.getElementById('confirm-body');
+  var okBtn = document.getElementById('confirm-ok');
+  var cancelBtn = document.getElementById('confirm-cancel');
+  var targetForm = null;
+
+  window.confirmAction = function(formEl, titleText, bodyText) {
+    targetForm = formEl;
+    title.textContent = titleText;
+    body.textContent = bodyText;
+    overlay.removeAttribute('hidden');
+    overlay.removeAttribute('aria-hidden');
+    okBtn.focus();
+  };
+
+  cancelBtn.addEventListener('click', function() {
+    overlay.setAttribute('hidden', '');
+    overlay.setAttribute('aria-hidden', 'true');
+    targetForm = null;
+  });
+
+  overlay.addEventListener('click', function(e) {
+    if (e.target === overlay) {
+      cancelBtn.click();
+    }
+  });
+
+  okBtn.addEventListener('click', function() {
+    if (targetForm) {
+      targetForm.submit();
+    }
+  });
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && targetForm) {
+      cancelBtn.click();
+    }
+  });
+
+  // Message auto-dismiss for success/info alerts (5s)
+  function dismissAlert(el) {
+    el.style.transition = 'opacity 300ms ease, height 300ms ease, padding 300ms ease, margin 300ms ease';
+    el.style.opacity = '0';
+    el.style.height = '0';
+    el.style.padding = '0';
+    el.style.margin = '0';
+    el.style.overflow = 'hidden';
+    setTimeout(function() { el.remove(); }, 300);
+  }
+  window.dismissAlert = dismissAlert;
+
+  document.querySelectorAll('.alert[data-auto-dismiss]').forEach(function(el) {
+    var tag = el.getAttribute('data-auto-dismiss');
+    if (tag === 'success' || tag === 'info') {
+      setTimeout(function() { if (el.parentNode) dismissAlert(el); }, 5000);
+    }
+  });
+})();
+</script>
 </body>
 </html>
