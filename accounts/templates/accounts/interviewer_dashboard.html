@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+{% block title %}My Candidates | Altrium Tracker{% endblock %}
+{% block page_title %}My Candidates{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h2 class="page-title">Assigned candidates</h2>
+    <p class="page-sub">Candidates assigned to you for interview and feedback.</p>
+  </div>
+</div>
+
+{% if assigned_apps %}
+<div class="panel panel-pad" style="margin-bottom:var(--sp-4)">
+  <div class="flex items-center gap-3">
+    <span class="text-sm strong">{{ assigned_apps|length }} assigned</span>
+    {% if pending_feedback %}
+    <span class="badge badge-rejected">{{ pending_feedback }} pending feedback</span>
+    {% endif %}
+  </div>
+</div>
+
+<div class="table-wrap">
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Candidate</th>
+        <th>Position</th>
+        <th>Round</th>
+        <th>Feedback</th>
+        <th>Score</th>
+        <th>Updated</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for app in assigned_apps %}
+      <tr>
+        <td class="strong">
+          <a href="{% url 'candidates:detail' app.candidate.pk %}">{{ app.candidate.full_name }}</a>
+          <div class="text-xs text-muted">{{ app.candidate.email }}</div>
+        </td>
+        <td>{{ app.job.title }}</td>
+        <td>{% if app.current_round %}<span class="badge badge-in_progress">{{ app.current_round.name }}</span>{% else %}-{% endif %}</td>
+        <td>
+          {% if app.feedback_submitted %}
+          <span class="badge badge-hired">Submitted</span>
+          {% elif app.current_round %}
+          <a href="{% url 'feedback:form' app.pk app.current_round.pk %}" class="btn btn-primary btn-sm">Give feedback</a>
+          {% else %}
+          <span class="text-muted">-</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if app.candidate.score is not None %}<span class="score-chip has-score">{{ app.candidate.score }}</span>
+          {% else %}<span class="text-muted">-</span>{% endif %}
+        </td>
+        <td class="text-muted">{{ app.updated_at|date:'M j, Y' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty-state">
+  <p class="empty-state-title">No candidates assigned</p>
+  <p class="empty-state-body">When HR assigns candidates to you, they will appear here.</p>
+</div>
+{% endif %}
+{% endblock %}

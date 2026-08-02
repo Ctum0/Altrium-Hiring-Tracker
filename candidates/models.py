@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 from django.conf import settings
 from django.db import models
 
@@ -10,7 +12,7 @@ class Candidate(models.Model):
     skills = models.TextField(
         blank=True, help_text='Comma-separated skills extracted from the CV.'
     )
-    resume_file = models.FileField(upload_to='resumes/', blank=True)
+    resume_file = models.FileField(upload_to='cvs/', blank=True)
     resume_text = models.TextField(
         blank=True, help_text='Raw text extracted from the CV.'
     )
@@ -32,6 +34,12 @@ class Candidate(models.Model):
     def __str__(self):
         name = self.full_name
         return f'{name} <{self.email}>'
+
+    def save(self, *args, **kwargs):
+        if self.resume_file and hasattr(self.resume_file, 'name') and self.resume_file.name:
+            ext = self.resume_file.name.rsplit('.', 1)[-1].lower()
+            self.resume_file.name = f'{uuid4().hex}.{ext}'
+        super().save(*args, **kwargs)
 
     @property
     def full_name(self):
@@ -69,6 +77,14 @@ class JobApplication(models.Model):
         null=True,
         blank=True,
         related_name='assigned_applications',
+    )
+    interview_details = models.TextField(
+        blank=True,
+        help_text='Google Meet link and scheduling notes (visible to assigned interviewer).',
+    )
+    feedback_submitted = models.BooleanField(
+        default=False,
+        help_text='True once at least one feedback is submitted for the current round.',
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

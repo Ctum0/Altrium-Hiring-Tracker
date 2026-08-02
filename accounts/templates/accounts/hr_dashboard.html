@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% block title %}HR Dashboard | Altrium Tracker{% endblock %}
+{% block page_title %}HR Dashboard{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h2 class="page-title">Job postings</h2>
+    <p class="page-sub">Manage your open positions, upload CVs, and track candidates.</p>
+  </div>
+  <div class="page-actions">
+    <a href="{% url 'jobs:create' %}" class="btn btn-primary">Create new job</a>
+  </div>
+</div>
+
+{% if jobs %}
+<div class="grid-2">
+  {% for job in jobs %}
+  <div class="card card-pad">
+    <div class="flex items-center justify-between" style="margin-bottom:var(--sp-2)">
+      <h3 style="font-size:var(--text-lg);font-weight:650;letter-spacing:-0.01em">{{ job.title }}</h3>
+      <span class="badge badge-in_progress">{{ job.department|default:'No dept' }}</span>
+    </div>
+    <p class="text-muted text-sm" style="margin-bottom:var(--sp-3);max-width:48ch">{{ job.description|truncatewords:20 }}</p>
+    <div class="flex items-center gap-3" style="margin-bottom:var(--sp-3)">
+      <span class="text-xs text-muted">{{ job.candidate_count }} candidates</span>
+      {% if job.auto_reject_score %}<span class="text-xs text-muted">Auto-reject ≤ {{ job.auto_reject_score }}</span>{% endif %}
+    </div>
+    <div class="flex gap-2">
+      <a href="{% url 'jobs:detail' job.pk %}" class="btn btn-secondary btn-sm">Details</a>
+      <a href="{% url 'pipeline:board' job.pk %}" class="btn btn-primary btn-sm">Pipeline</a>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+  <p class="empty-state-title">No active jobs</p>
+  <p class="empty-state-body">Create your first job posting to start receiving candidates.</p>
+  <a href="{% url 'jobs:create' %}" class="btn btn-primary">Create new job</a>
+</div>
+{% endif %}
+{% endblock %}
