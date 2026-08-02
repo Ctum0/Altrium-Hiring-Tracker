@@ -11,7 +11,14 @@
   </div>
   <div class="page-actions">
     <a href="{% url 'pipeline:board' job.pk %}" class="btn btn-primary">Pipeline board</a>
+    {% if can_edit %}<a href="{% url 'jobs:edit' job.pk %}" class="btn btn-secondary">Edit</a>{% endif %}
     <a href="{% url 'jobs:list' %}" class="btn btn-secondary">All jobs</a>
+    {% if can_edit and job.is_active %}
+    <form method="post" action="{% url 'jobs:close' job.pk %}" style="display:inline" onsubmit="return confirm('Close this job and reject all remaining candidates?');">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-danger">Close job</button>
+    </form>
+    {% endif %}
   </div>
 </div>
 
@@ -22,6 +29,15 @@
     <p class="text-sm text-muted" style="white-space:pre-line;max-width:65ch">{{ job.description }}</p>
     {% else %}
     <p class="text-sm text-muted">No description provided.</p>
+    {% endif %}
+
+    {% if job.requirements %}
+    <h3 style="font-size:var(--text-base);font-weight:650;margin:var(--sp-4) 0 var(--sp-2)">Required skills</h3>
+    <div class="flex gap-2" style="flex-wrap:wrap">
+      {% for skill in job.requirements.split %}
+      <span class="badge badge-role">{{ skill }}</span>
+      {% endfor %}
+    </div>
     {% endif %}
   </div>
 
@@ -34,6 +50,10 @@
       <dd class="mono">{{ job.candidate_count }}</dd>
       <dt class="text-muted">Rounds</dt>
       <dd class="mono">{{ rounds|length }}</dd>
+      {% if job.auto_reject_score %}
+      <dt class="text-muted">Auto-reject</dt>
+      <dd class="mono">Score below {{ job.auto_reject_score }}</dd>
+      {% endif %}
     </dl>
   </div>
 </div>

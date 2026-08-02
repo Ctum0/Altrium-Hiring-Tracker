@@ -1,9 +1,13 @@
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Count
-from django.shortcuts import redirect
+from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
-from django.views.generic import CreateView, DeleteView, DetailView, ListView
+from django.utils import timezone
+from django.views import View
+from django.views.generic import CreateView, DeleteView, DetailView, ListView, UpdateView
+
+from candidates.models import JobApplication
 
 from .forms import JobForm, RoundForm
 from .models import InterviewRound, Job
@@ -53,6 +57,49 @@ class JobCreateView(LoginRequiredMixin, CreateView):
         form.instance.created_by = self.request.user
         messages.success(self.request, f'Job "{form.instance.title}" created.')
         return super().form_valid(form)
+
+
+class JobEditView(LoginRequiredMixin, UpdateView):
+    model = Job
+    form_class = JobForm
+    template_name = 'jobs/job_form.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_hr():
+            return redirect('jobs:list')
+        return super().dispatch(request, *args, **kwargs)
+
+    def form_valid(self, form):
+        messages.success(self.request, f'Job "{form.instance.title}" updated.')
+        return super().form_valid(form)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['is_edit'] = True
+        return context
+
+
+class JobCloseView(LoginRequiredMixin, View):
+    """Close a job and reject all remaining active candidates."""
+
+    def post(self, request, pk):
+        job = get_object_or_404(Job, pk=pk)
+        if not request.user.is_hr():
+            return redirect('jobs:list')
+
+        job.is_active = False
+        job.closed_at = timezone.now()
+        job.save()
+
+        rejected = job.applications.exclude(
+            status__in=[JobApplication.Status.HIRED, JobApplication.Status.REJECTED]
+        ).update(status=JobApplication.Status.REJECTED)
+
+        messages.success(
+            request,
+            f'Job "{job.title}" closed. {rejected} candidate(s) marked as rejected.',
+        )
+        return redirect('jobs:detail', pk=job.pk)
 
 
 class JobDetailView(LoginRequiredMixin, DetailView):

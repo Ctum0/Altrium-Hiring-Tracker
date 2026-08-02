@@ -10,6 +10,7 @@ from django.views import View
 from django.views.generic import DetailView, ListView
 
 from ai.cv_parser import extract_text
+from ai.matching import auto_apply
 from ai.services import parse_cv
 from jobs.models import Job
 from notifications.models import Notification
@@ -44,7 +45,13 @@ class CandidateListView(LoginRequiredMixin, ListView):
         job_pk = self.request.GET.get('job')
         stage = self.request.GET.get('stage')
         min_score = self.request.GET.get('min_score', '').strip()
+        show_all = self.request.GET.get('all') == '1'
         q = self.request.GET.get('q', '').strip()
+
+        # Default: show only active candidates (exclude hired and rejected),
+        # unless explicitly showing all or filtering by a final status.
+        if not show_all and stage not in ('hired', 'rejected'):
+            qs = qs.exclude(status__in=['hired', 'rejected'])
 
         if job_pk:
             qs = qs.filter(job_id=job_pk)
@@ -78,6 +85,7 @@ class CandidateListView(LoginRequiredMixin, ListView):
         context['filter_stage'] = self.request.GET.get('stage', '')
         context['filter_min_score'] = self.request.GET.get('min_score', '')
         context['filter_q'] = self.request.GET.get('q', '')
+        context['show_all'] = self.request.GET.get('all') == '1'
         context['jobs'] = (
             JobApplication.objects.values_list('job_id', 'job__title').distinct()
         )
@@ -210,6 +218,16 @@ class CandidateUploadView(LoginRequiredMixin, View):
             if app_created:
                 linked += 1
 
+            # Auto-score and optionally auto-reject based on job requirements.
+            if job.requirements:
+                score = auto_apply(candidate, job)
+                app = JobApplication.objects.filter(
+                    candidate=candidate, job=job
+                ).first()
+                if app and job.auto_reject_score and score <= job.auto_reject_score:
+                    app.status = JobApplication.Status.REJECTED
+                    app.save(update_fields=['status', 'updated_at'])
+
         summary = f'{created} candidate(s) created, {linked} linked to "{job.title}".'
         if duplicates:
             summary += f' {duplicates} duplicate(s) matched an existing profile.'
@@ -285,6 +303,16 @@ class CandidateImportView(LoginRequiredMixin, View):
             defaults={'status': JobApplication.Status.NEW},
         )
 
+        # Auto-score and optionally auto-reject for imports too.
+        if job.requirements:
+            score = auto_apply(candidate, job)
+            app = JobApplication.objects.filter(
+                candidate=candidate, job=job
+            ).first()
+            if app and job.auto_reject_score and score <= job.auto_reject_score:
+                app.status = JobApplication.Status.REJECTED
+                app.save(update_fields=['status', 'updated_at'])
+
         if was_created and app_created:
             messages.success(request, f'Imported {candidate.full_name} for {job.title}.')
         elif not was_created:
@@ -341,6 +369,15 @@ class AssignApplicationView(LoginRequiredMixin, View):
             return redirect('candidates:detail', pk=app.candidate_id)
 
         interviewer_id = request.POST.get('interviewer')
+        previous = app.assigned_to
+
+        # Unassign: empty interviewer_id when a candidate is already assigned.
+        if not interviewer_id and previous:
+            app.assigned_to = None
+            app.save(update_fields=['assigned_to', 'updated_at'])
+            messages.success(request, f'Unassigned {app.candidate.full_name}.')
+            return redirect('candidates:detail', pk=app.candidate_id)
+
         if not interviewer_id:
             messages.error(request, 'Choose an interviewer to assign.')
             return redirect('candidates:detail', pk=app.candidate_id)

@@ -26,8 +26,15 @@ ALLOWED_HOSTS = _env(
     default='localhost,127.0.0.1,testserver',
     cast=lambda v: [h.strip() for h in v.split(',') if h.strip()],
 )
+ALLOWED_HOSTS = [
+    "localhost",
+    "127.0.0.1",
+    ".trycloudflare.com",
+]
 
-
+CSRF_TRUSTED_ORIGINS = [
+    "https://*.trycloudflare.com",
+]
 # Application definition
 
 INSTALLED_APPS = [
