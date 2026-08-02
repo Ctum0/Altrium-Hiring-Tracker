@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 {% block title %}Pipeline: {{ job.title }} | Altrium Tracker{% endblock %}
 {% block page_title %}{{ job.title }}{% endblock %}
 {% block content_class %}wide{% endblock %}
@@ -50,7 +51,7 @@
 {% endblock %}
 
 {% block head %}
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<script src="{% static 'vendor/sortable.min.js' %}"></script>
 {% endblock %}
 
 {% block scripts %}

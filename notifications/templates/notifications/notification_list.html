@@ -16,14 +16,17 @@
 {% if notifications %}
 <div class="panel" style="overflow:hidden">
   {% for n in notifications %}
-  <div class="flex items-center justify-between gap-4" style="{% if not forloop.last %}border-bottom:1px solid var(--border);{% endif %}padding:var(--sp-4) var(--sp-5)">
+  <div class="flex items-center justify-between gap-4 notification-row" style="{% if not forloop.last %}border-bottom:1px solid var(--border);{% endif %}padding:var(--sp-4) var(--sp-5)">
     <div>
       {% if n.link %}<a href="{{ n.link }}" class="strong">{{ n.message }}</a>
       {% else %}<span class="strong">{{ n.message }}</span>{% endif %}
       <div class="text-xs text-muted">{{ n.created_at|date:'M j, Y H:i' }}</div>
     </div>
     {% if not n.is_read %}
-    <form method="post" action="{% url 'notifications:mark_read' n.pk %}" hx-post="{% url 'notifications:mark_read' n.pk %}" hx-swap="none">
+    <form method="post" action="{% url 'notifications:mark_read' n.pk %}"
+          hx-post="{% url 'notifications:mark_read' n.pk %}"
+          hx-target="closest .notification-row"
+          hx-swap="outerHTML">
       {% csrf_token %}
       <button type="submit" class="btn-ghost btn-icon" title="Mark as read" aria-label="Mark as read">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
@@ -34,12 +37,18 @@
   {% endfor %}
 </div>
 
-{% if is_paginated %}
+{% if is_paginated and page_obj.paginator.num_pages > 1 %}
 <nav class="pagination" aria-label="Pagination">
   {% if page_obj.has_previous %}
   <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.unread %}&unread=1{% endif %}">Previous</a>
   {% endif %}
-  <span class="text-sm text-muted">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+  {% for num in page_obj.paginator.page_range %}
+    {% if num == page_obj.number %}
+    <span class="page-link current">{{ num }}</span>
+    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+    <a class="page-link" href="?page={{ num }}{% if request.GET.unread %}&unread=1{% endif %}">{{ num }}</a>
+    {% endif %}
+  {% endfor %}
   {% if page_obj.has_next %}
   <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.unread %}&unread=1{% endif %}">Next</a>
   {% endif %}
