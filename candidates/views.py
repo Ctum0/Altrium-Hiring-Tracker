@@ -2,8 +2,10 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Q
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils.text import get_valid_filename
 from django.views import View
 from django.views.generic import DetailView, ListView
 
@@ -89,16 +91,27 @@ class CandidateDetailView(LoginRequiredMixin, DetailView):
     template_name = 'candidates/candidate_detail.html'
     context_object_name = 'candidate'
 
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_interviewer():
+            candidate = self.get_object()
+            assigned = JobApplication.objects.filter(
+                candidate=candidate, assigned_to=request.user
+            ).exists()
+            if not assigned:
+                return HttpResponse('You can only view assigned candidates.', status=403)
+
+        return super().dispatch(request, *args, **kwargs)
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['active_nav'] = 'candidates'
         context['applications'] = self.object.applications.select_related(
             'job', 'current_round', 'assigned_to'
         )
+        context['is_hr'] = self.request.user.is_hr()
         context['interviewers'] = User.objects.filter(role='IV').order_by(
             'first_name', 'last_name'
         )
-        context['is_hr'] = self.request.user.is_hr()
         return context
 
 
@@ -156,6 +169,8 @@ class CandidateUploadView(LoginRequiredMixin, View):
         unparsed = []
 
         for f in files:
+            # Sanitize filename before saving.
+            f.name = get_valid_filename(f.name)
             text = extract_text(f)
             parsed = parse_cv(text)
             email = (parsed.get('email') or '').strip().lower()
@@ -289,6 +304,8 @@ class ScoreUpdateView(LoginRequiredMixin, View):
 
     def post(self, request, pk):
         candidate = get_object_or_404(Candidate, pk=pk)
+        if request.user.is_management():
+            return HttpResponse('Management has read-only access.', status=403)
         if not request.user.is_hr():
             messages.error(request, 'Only HR can score candidates.')
             return redirect('candidates:detail', pk=pk)
@@ -317,6 +334,8 @@ class AssignApplicationView(LoginRequiredMixin, View):
 
     def post(self, request, pk):
         app = get_object_or_404(JobApplication, pk=pk)
+        if request.user.is_management():
+            return HttpResponse('Management has read-only access.', status=403)
         if not request.user.is_hr():
             messages.error(request, 'Only HR can assign candidates.')
             return redirect('candidates:detail', pk=app.candidate_id)

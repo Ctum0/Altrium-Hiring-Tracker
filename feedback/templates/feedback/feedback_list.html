@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+{% block title %}Feedback | Altrium Tracker{% endblock %}
+{% block page_title %}Feedback{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h2 class="page-title">
+      {% if feedbacks.0.application %}
+        {{ feedbacks.0.application.candidate.full_name }}
+      {% else %}
+        All feedback
+      {% endif %}
+    </h2>
+    <p class="page-sub">Interview feedback across all candidates and rounds.</p>
+  </div>
+</div>
+
+{% if feedbacks %}
+<div class="table-wrap">
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Candidate</th>
+        <th>Position</th>
+        <th>Round</th>
+        <th>Score</th>
+        <th>Interviewer</th>
+        <th>Submitted</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for fb in feedbacks %}
+      <tr>
+        <td class="strong">
+          <a href="{% url 'feedback:detail' fb.pk %}">{{ fb.application.candidate.full_name }}</a>
+        </td>
+        <td>{{ fb.application.job.title }}</td>
+        <td>{{ fb.round.name }}</td>
+        <td><span class="score-chip has-score">{{ fb.score }}</span></td>
+        <td>{{ fb.interviewer.get_full_name|default:fb.interviewer.username }}</td>
+        <td class="text-muted">{{ fb.submitted_at|date:'M j, Y' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if is_paginated %}
+<nav class="pagination" aria-label="Pagination">
+  {% if page_obj.has_previous %}
+  <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.application %}&application={{ request.GET.application }}{% endif %}">Previous</a>
+  {% endif %}
+  <span class="text-sm text-muted">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+  {% if page_obj.has_next %}
+  <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.application %}&application={{ request.GET.application }}{% endif %}">Next</a>
+  {% endif %}
+</nav>
+{% endif %}
+
+{% else %}
+<div class="empty-state">
+  <p class="empty-state-title">No feedback yet</p>
+  <p class="empty-state-body">When interviewers submit feedback, it will appear here.</p>
+</div>
+{% endif %}
+{% endblock %}

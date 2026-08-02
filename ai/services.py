@@ -8,12 +8,11 @@ import json
 import logging
 
 import httpx
-from decouple import config
+from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
 GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions'
-MODEL = config('GROQ_MODEL', default='mixtral-8x7b-32768')
 
 SYSTEM_PARSE = (
     'You extract structured data from resume text. '
@@ -37,7 +36,8 @@ SYSTEM_REJECTION = (
 
 def _chat(system: str, user: str, temperature: float = 0.2) -> str:
     """Single chat completion call. Returns empty string on any failure."""
-    api_key = config('GROQ_API_KEY', default='')
+    api_key = getattr(settings, 'GROQ_API_KEY', '')
+    model = getattr(settings, 'GROQ_MODEL', 'llama-3.3-70b-versatile')
     if not api_key:
         logger.warning('GROQ_API_KEY is not set; skipping AI call.')
         return ''
@@ -47,7 +47,7 @@ def _chat(system: str, user: str, temperature: float = 0.2) -> str:
             GROQ_API_URL,
             headers={'Authorization': f'Bearer {api_key}'},
             json={
-                'model': MODEL,
+                'model': model,
                 'messages': [
                     {'role': 'system', 'content': system},
                     {'role': 'user', 'content': user},
@@ -79,6 +79,17 @@ def parse_cv(text: str) -> dict:
         return result
 
     try:
+        # Llama models sometimes wrap JSON in markdown code fences.
+        content = content.strip()
+        if content.startswith('```'):
+            lines = content.split('\n')
+            # Remove opening ``` (and optional json language tag)
+            if lines[0].startswith('```'):
+                lines = lines[1:]
+            # Remove closing ```
+            if lines and lines[-1].startswith('```'):
+                lines = lines[:-1]
+            content = '\n'.join(lines).strip()
         parsed = json.loads(content)
         for key in result:
             if key == 'skills':

@@ -5,6 +5,10 @@ from django.urls import reverse
 
 class Job(models.Model):
     title = models.CharField(max_length=200)
+    department = models.CharField(
+        max_length=100, blank=True, default='',
+        help_text='e.g. Engineering, Design, Marketing',
+    )
     description = models.TextField(blank=True)
     hiring_manager = models.ForeignKey(
         settings.AUTH_USER_MODEL,

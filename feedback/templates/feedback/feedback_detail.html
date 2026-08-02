@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+{% block title %}Feedback: {{ feedback.application.candidate.full_name }} | Altrium Tracker{% endblock %}
+{% block page_title %}Feedback detail{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h2 class="page-title">{{ feedback.application.candidate.full_name }}</h2>
+    <p class="page-sub">
+      {{ feedback.application.job.title }} &middot; {{ feedback.round.name }}
+      &middot; Submitted {{ feedback.submitted_at|date:'M j, Y H:i' }}
+    </p>
+  </div>
+  <div class="page-actions">
+    {% if user == feedback.interviewer %}
+    <a href="{% url 'feedback:form' feedback.application_id feedback.round_id %}" class="btn btn-secondary">Edit</a>
+    {% endif %}
+    <a href="{% url 'feedback:history' feedback.pk %}" class="btn btn-ghost">View history</a>
+    <a href="{% url 'feedback:list' %}" class="btn btn-secondary">All feedback</a>
+  </div>
+</div>
+
+<div class="panel panel-pad">
+  <div class="flex items-center justify-between" style="margin-bottom:var(--sp-3)">
+    <span class="text-sm text-muted">
+      Score: <span class="score-chip has-score">{{ feedback.score }}</span>
+      &middot; Interviewer: {{ feedback.interviewer.get_full_name|default:feedback.interviewer.username }}
+    </span>
+  </div>
+
+  <div style="white-space:pre-line;line-height:1.6;max-width:72ch">{{ feedback.notes }}</div>
+
+  {% if feedback.raw_notes %}
+  <details style="margin-top:var(--sp-4)">
+    <summary style="cursor:pointer;font-size:var(--text-sm);color:var(--muted)">Original raw notes</summary>
+    <div style="white-space:pre-line;margin-top:var(--sp-2);padding:var(--sp-3);background:var(--surface-2);border-radius:var(--radius);font-size:var(--text-sm);color:var(--ink-secondary)">
+      {{ feedback.raw_notes }}
+    </div>
+  </details>
+  {% endif %}
+</div>
+{% endblock %}

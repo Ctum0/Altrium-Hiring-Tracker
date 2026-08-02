@@ -56,7 +56,10 @@ class KanbanBoardView(LoginRequiredMixin, DetailView):
 
 
 class PipelineMoveView(LoginRequiredMixin, View):
-    """HTMX endpoint: move a candidate card between columns."""
+    """HTMX endpoint: move a candidate card between columns.
+
+    Blocks advancement if the current round has no submitted feedback.
+    """
 
     def post(self, request, pk):
         app = get_object_or_404(JobApplication, pk=pk)
@@ -71,6 +74,17 @@ class PipelineMoveView(LoginRequiredMixin, View):
 
         if to_round_id:
             to_round = get_object_or_404(InterviewRound, pk=to_round_id, job=app.job)
+
+            # Feedback validation: if moving TO a NEW round, the CURRENT round
+            # (from_round) must have submitted feedback.
+            if from_round and from_round != to_round:
+                has_feedback = app.feedbacks.filter(round=from_round).exists()
+                if not has_feedback:
+                    return HttpResponse(
+                        'Feedback required to advance candidate.',
+                        status=409,
+                    )
+
             app.current_round = to_round
             app.status = JobApplication.Status.IN_PROGRESS
         else:

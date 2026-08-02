@@ -4,6 +4,7 @@ from django.urls import reverse
 
 from accounts.models import Role
 from candidates.models import Candidate, JobApplication
+from feedback.models import InterviewFeedback
 from jobs.models import InterviewRound, Job
 from pipeline.models import PipelineMove
 
@@ -24,6 +25,15 @@ class PipelineTests(TestCase):
         self.cand = Candidate.objects.create(email='a@example.com', first_name='Anna')
         self.app = JobApplication.objects.create(candidate=self.cand, job=self.job)
 
+    def _add_feedback(self, round_obj, score=5):
+        return InterviewFeedback.objects.create(
+            application=self.app,
+            round=round_obj,
+            interviewer=self.iv,
+            score=score,
+            notes='Test feedback.',
+        )
+
     def test_board_renders_columns_and_final_states(self):
         assert self.client.login(username='hr', password='pass12345')
         r = self.client.get(reverse('pipeline:board', args=[self.job.pk]))
@@ -38,6 +48,7 @@ class PipelineTests(TestCase):
         assert self.client.login(username='hr', password='pass12345')
         self.app.current_round = self.round1
         self.app.save()
+        self._add_feedback(self.round1)  # required for advancement
         r = self.client.post(reverse('pipeline:move', args=[self.app.pk]), {
             'round': self.round2.pk,
             'source_round': self.round1.pk,
@@ -100,11 +111,14 @@ class PipelineTests(TestCase):
 
     def test_audit_log_records_every_move(self):
         assert self.client.login(username='hr', password='pass12345')
+        # Move into round1 (no feedback needed — from_round is None)
         self.client.post(reverse('pipeline:move', args=[self.app.pk]), {
             'round': self.round1.pk,
             'source_round': '',
             'source_status': '',
         })
+        # Add feedback, then move round1 -> round2
+        self._add_feedback(self.round1)
         self.client.post(reverse('pipeline:move', args=[self.app.pk]), {
             'round': self.round2.pk,
             'source_round': self.round1.pk,

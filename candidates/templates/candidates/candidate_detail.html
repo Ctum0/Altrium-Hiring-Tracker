@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 {% block title %}{{ candidate.full_name }} | Altrium Tracker{% endblock %}
 {% block page_title %}{{ candidate.full_name }}{% endblock %}
 {% block content %}
@@ -105,6 +106,11 @@
     </div>
     {% else %}
     <p class="text-sm text-muted">No applications yet.</p>
+    {% endif %}
+    {% if is_hr %}
+    <div style="margin-top:var(--sp-3)">
+      <a href="{% url 'candidates:import' %}" class="btn btn-secondary btn-sm">Link to another job</a>
+    </div>
     {% endif %}
   </div>
 </div>
