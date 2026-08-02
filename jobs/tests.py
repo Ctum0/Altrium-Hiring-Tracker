@@ -60,13 +60,15 @@ class JobRoundTests(JobsBaseTestCase):
         self.login('hr')
         from jobs.models import Job
         job = Job.objects.create(title='Dev', created_by=self.hr)
+        # Signal auto-creates 3 default stages (Screening, Interview, Offer)
+        self.assertEqual(job.rounds.count(), 3)
+        # Add a custom stage
         r = self.client.post(reverse('jobs:round_create', args=[job.pk]), {
             'name': 'Phone Screen',
             'order': 1,
         })
         self.assertEqual(r.status_code, 302)
-        self.assertEqual(job.rounds.count(), 1)
-        self.assertEqual(job.rounds.first().name, 'Phone Screen')
+        self.assertEqual(job.rounds.count(), 4)
 
     def test_round_delete(self):
         self.login('hr')
@@ -75,7 +77,8 @@ class JobRoundTests(JobsBaseTestCase):
         round_ = InterviewRound.objects.create(job=job, name='Tech Test', order=1)
         r = self.client.post(reverse('jobs:round_delete', args=[round_.pk]))
         self.assertEqual(r.status_code, 302)
-        self.assertEqual(job.rounds.count(), 0)
+        # Only the custom-added round was deleted; 3 default stages remain
+        self.assertEqual(job.rounds.count(), 3)
 
     def test_round_delete_requires_hr(self):
         self.login('iv')
@@ -84,7 +87,8 @@ class JobRoundTests(JobsBaseTestCase):
         round_ = InterviewRound.objects.create(job=job, name='Tech Test', order=1)
         r = self.client.post(reverse('jobs:round_delete', args=[round_.pk]))
         self.assertEqual(r.status_code, 302)  # redirected, not deleted
-        self.assertEqual(job.rounds.count(), 1)
+        # 3 defaults + 1 custom = 4 rounds
+        self.assertEqual(job.rounds.count(), 4)
 
     def test_duplicate_round_name_rejected(self):
         from django.db import IntegrityError

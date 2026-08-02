@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block title %}Management Dashboard | Altrium Tracker{% endblock %}
+{% block page_title %}Management Dashboard{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h2 class="page-title">Overview</h2>
+    <p class="page-sub">High-level hiring metrics. Sprint 2 will add live KPI dashboards and escalation flags.</p>
+  </div>
+</div>
+
+<div class="grid-2">
+  <div class="card card-pad">
+    <h3 style="font-size:var(--text-lg);font-weight:650;letter-spacing:-0.01em;margin-bottom:var(--sp-1)">Open positions</h3>
+    <p class="mono" style="font-size:var(--text-3xl);margin-bottom:var(--sp-4)">{{ total_jobs }}</p>
+    <a href="{% url 'jobs:list' %}" class="btn btn-secondary btn-sm">View all jobs</a>
+  </div>
+  <div class="card card-pad">
+    <h3 style="font-size:var(--text-lg);font-weight:650;letter-spacing:-0.01em;margin-bottom:var(--sp-1)">Active candidates</h3>
+    <p class="mono" style="font-size:var(--text-3xl);margin-bottom:var(--sp-4)">{{ total_candidates }}</p>
+    <a href="{% url 'candidates:list' %}" class="btn btn-secondary btn-sm">View candidates</a>
+  </div>
+</div>
+{% endblock %}
