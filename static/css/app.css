@@ -1129,6 +1129,66 @@ a:hover {
   gap: var(--sp-4);
 }
 
+/* ===== Modal / confirmation dialog ===== */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  background: oklch(0 0 0 / 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-4);
+}
+
+.modal-overlay[hidden] { display: none; }
+
+.modal-overlay:not([hidden]) {
+  animation: fadeIn 150ms ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal-box {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--sp-6);
+  max-width: 420px;
+  width: 100%;
+  box-shadow: var(--shadow-lg);
+}
+
+.modal-box h2 {
+  font-size: var(--text-lg);
+  font-weight: 650;
+  margin-bottom: var(--sp-2);
+}
+
+.modal-box p {
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+  margin-bottom: var(--sp-4);
+  max-width: 52ch;
+}
+
+.modal-box .modal-actions {
+  display: flex;
+  gap: var(--sp-3);
+  justify-content: flex-end;
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .modal-overlay:not([hidden]) {
+    animation: none;
+  }
+}
+
 /* Skeleton loading */
 .skeleton {
   border-radius: var(--radius);
