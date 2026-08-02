@@ -9,14 +9,14 @@
   </div>
   <div class="page-actions">
     <a href="{% url 'notifications:list' %}" class="btn btn-secondary {% if not request.GET.unread %}btn-primary{% endif %}">All</a>
-    <a href="?unread=1" class="btn btn-secondary {% if request.GET.unread == '1' %}btn-primary{% endif %}">Unread</a>
+    <a href="?unread=1" class="btn btn-sm {% if request.GET.unread == '1' %}btn-primary{% else %}btn-secondary{% endif %}">Unread</a>
   </div>
 </div>
 
 {% if notifications %}
 <div class="panel" style="overflow:hidden">
   {% for n in notifications %}
-  <div class="flex items-center justify-between gap-4 {% if not forloop.last %}" style="border-bottom:1px solid var(--border){% endif %};padding:var(--sp-4) var(--sp-5)">
+  <div class="flex items-center justify-between gap-4" style="{% if not forloop.last %}border-bottom:1px solid var(--border);{% endif %}padding:var(--sp-4) var(--sp-5)">
     <div>
       {% if n.link %}<a href="{{ n.link }}" class="strong">{{ n.message }}</a>
       {% else %}<span class="strong">{{ n.message }}</span>{% endif %}

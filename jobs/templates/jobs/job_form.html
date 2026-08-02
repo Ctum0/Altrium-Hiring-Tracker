@@ -1,11 +1,11 @@
 {% extends 'base.html' %}
-{% block title %}New job | Altrium Tracker{% endblock %}
-{% block page_title %}New job{% endblock %}
+{% block title %}{% if is_edit %}Edit{% else %}New{% endif %} job | Altrium Tracker{% endblock %}
+{% block page_title %}{% if is_edit %}Edit job{% else %}New job{% endif %}{% endblock %}
 {% block content %}
 <div class="page-header">
   <div>
-    <h2 class="page-title">Create a job posting</h2>
-    <p class="page-sub">Define the role first; interview rounds can be configured next.</p>
+    <h2 class="page-title">{% if is_edit %}Edit job posting{% else %}Create a job posting{% endif %}</h2>
+    <p class="page-sub">{% if is_edit %}Update the role details; interview rounds can be managed next.{% else %}Define the role first; interview rounds can be configured next.{% endif %}</p>
   </div>
 </div>
 
@@ -36,13 +36,27 @@
     </div>
 
     <div class="form-field">
+      <label class="form-label" for="{{ form.requirements.id_for_label }}">Required skills</label>
+      {{ form.requirements }}
+      {% if form.requirements.errors %}<p class="form-error">{{ form.requirements.errors.0 }}</p>{% endif %}
+      <p class="form-help">Comma-separated skills candidates must have. Used for automated scoring.</p>
+    </div>
+
+    <div class="form-field">
+      <label class="form-label" for="{{ form.auto_reject_score.id_for_label }}">Auto-reject threshold</label>
+      {{ form.auto_reject_score }}
+      {% if form.auto_reject_score.errors %}<p class="form-error">{{ form.auto_reject_score.errors.0 }}</p>{% endif %}
+      <p class="form-help">Optional. Candidates scoring below this are automatically rejected on upload.</p>
+    </div>
+
+    <div class="form-field">
       <label class="form-label" for="{{ form.hiring_manager.id_for_label }}">Hiring manager</label>
       {{ form.hiring_manager }}
       {% if form.hiring_manager.errors %}<p class="form-error">{{ form.hiring_manager.errors.0 }}</p>{% endif %}
     </div>
 
     <div class="form-actions">
-      <button type="submit" class="btn btn-primary">Create job</button>
+      <button type="submit" class="btn btn-primary">{% if is_edit %}Save changes{% else %}Create job{% endif %}</button>
       <a href="{% url 'jobs:list' %}" class="btn btn-secondary">Cancel</a>
     </div>
   </div>

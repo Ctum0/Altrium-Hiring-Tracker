@@ -17,6 +17,18 @@
   </div>
 </div>
 
+<!-- Quick-filter tabs -->
+<div class="flex gap-2" style="margin-bottom:var(--sp-4)">
+  <a href="{% url 'candidates:list' %}{% if filter_q %}?q={{ filter_q }}{% endif %}"
+     class="btn btn-sm {% if not show_all and filter_stage != 'hired' and filter_stage != 'rejected' %}btn-primary{% else %}btn-secondary{% endif %}">Active</a>
+  <a href="?all=1{% if filter_q %}&q={{ filter_q }}{% endif %}"
+     class="btn btn-sm {% if show_all %}btn-primary{% else %}btn-secondary{% endif %}">All candidates</a>
+  <a href="?stage=hired{% if filter_q %}&q={{ filter_q }}{% endif %}"
+     class="btn btn-sm {% if filter_stage == 'hired' %}btn-primary{% else %}btn-secondary{% endif %}">Hired</a>
+  <a href="?stage=rejected{% if filter_q %}&q={{ filter_q }}{% endif %}"
+     class="btn btn-sm {% if filter_stage == 'rejected' %}btn-primary{% else %}btn-secondary{% endif %}">Rejected</a>
+</div>
+
 <!-- Filters -->
 <form method="get" class="panel panel-pad" style="margin-bottom:var(--sp-6)">
   <div class="form-row">

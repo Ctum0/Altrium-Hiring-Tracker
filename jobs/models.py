@@ -10,6 +10,14 @@ class Job(models.Model):
         help_text='e.g. Engineering, Design, Marketing',
     )
     description = models.TextField(blank=True)
+    requirements = models.TextField(
+        blank=True,
+        help_text='Comma-separated required skills for auto-scoring (e.g. Python, Docker, SQL).',
+    )
+    auto_reject_score = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text='If set, candidates scoring below this are auto-rejected on upload/import.',
+    )
     hiring_manager = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,

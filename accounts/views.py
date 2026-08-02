@@ -66,5 +66,6 @@ class HomeView(TemplateView):
                 },
             ]
 
+        context['has_content'] = bool(context.get('cards'))
         context['active_nav'] = 'dashboard'
         return context

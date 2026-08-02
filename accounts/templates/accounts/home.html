@@ -9,6 +9,7 @@
   </div>
 </div>
 
+{% if cards %}
 <div class="grid-2">
   {% for card in cards %}
   <div class="card card-pad">
@@ -18,4 +19,10 @@
   </div>
   {% endfor %}
 </div>
+{% else %}
+<div class="empty-state">
+  <p class="empty-state-title">Welcome to Altrium Tracker</p>
+  <p class="empty-state-body">Your dashboard will show relevant actions here.</p>
+</div>
+{% endif %}
 {% endblock %}
