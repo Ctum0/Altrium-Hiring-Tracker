@@ -23,6 +23,12 @@
     </div>
 
     <div class="form-field">
+      <label class="form-label" for="{{ form.department.id_for_label }}">Department</label>
+      {{ form.department }}
+      {% if form.department.errors %}<p class="form-error">{{ form.department.errors.0 }}</p>{% endif %}
+    </div>
+
+    <div class="form-field">
       <label class="form-label" for="{{ form.description.id_for_label }}">Description</label>
       {{ form.description }}
       {% if form.description.errors %}<p class="form-error">{{ form.description.errors.0 }}</p>{% endif %}

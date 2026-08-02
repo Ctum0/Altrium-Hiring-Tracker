@@ -1,6 +1,6 @@
 from unittest.mock import patch
 
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, override_settings
 
 from ai import services
 
@@ -23,7 +23,7 @@ class GroqClientTests(SimpleTestCase):
             '"email": "jane@example.com", "phone": "+1 555", '
             '"skills": ["Python", "Django"]}'
         )
-        with patch.object(services, 'config', return_value='key'), \
+        with override_settings(GROQ_API_KEY='key'), \
              patch.object(services.httpx, 'post', return_value=_FakeResp(payload)):
             result = services.parse_cv('resume text')
         self.assertEqual(result['first_name'], 'Jane')
@@ -31,7 +31,7 @@ class GroqClientTests(SimpleTestCase):
         self.assertIn('Django', result['skills'])
 
     def test_parse_cv_malformed_json_falls_back(self):
-        with patch.object(services, 'config', return_value='key'), \
+        with override_settings(GROQ_API_KEY='key'), \
              patch.object(services.httpx, 'post', return_value=_FakeResp('not json')):
             result = services.parse_cv('resume text')
         self.assertEqual(result['first_name'], '')
@@ -39,7 +39,7 @@ class GroqClientTests(SimpleTestCase):
 
     def test_parse_cv_missing_skills_key(self):
         payload = '{"first_name": "Jane", "email": "jane@example.com"}'
-        with patch.object(services, 'config', return_value='key'), \
+        with override_settings(GROQ_API_KEY='key'), \
              patch.object(services.httpx, 'post', return_value=_FakeResp(payload)):
             result = services.parse_cv('resume text')
         self.assertEqual(result['first_name'], 'Jane')
@@ -50,12 +50,12 @@ class GroqClientTests(SimpleTestCase):
         self.assertEqual(result['skills'], [])
 
     def test_no_api_key_returns_empty(self):
-        with patch.object(services, 'config', return_value=''):
+        with override_settings(GROQ_API_KEY=''):
             result = services.parse_cv('resume text')
         self.assertEqual(result['first_name'], '')
 
     def test_polish_notes_returns_text(self):
-        with patch.object(services, 'config', return_value='key'), \
+        with override_settings(GROQ_API_KEY='key'), \
              patch.object(services.httpx, 'post', return_value=_FakeResp('Polished summary.')):
             result = services.polish_notes('good at java')
         self.assertEqual(result, 'Polished summary.')
@@ -64,19 +64,19 @@ class GroqClientTests(SimpleTestCase):
         self.assertEqual(services.polish_notes(''), '')
 
     def test_generate_rejection_email(self):
-        with patch.object(services, 'config', return_value='key'), \
+        with override_settings(GROQ_API_KEY='key'), \
              patch.object(services.httpx, 'post', return_value=_FakeResp('Dear Jane, ...')):
             result = services.generate_rejection_email('Jane Smith', 'Backend Engineer')
         self.assertIn('Jane', result)
 
     def test_generate_rejection_no_name_fallback(self):
-        with patch.object(services, 'config', return_value='key'), \
+        with override_settings(GROQ_API_KEY='key'), \
              patch.object(services.httpx, 'post', return_value=_FakeResp('Dear Candidate, ...')):
             result = services.generate_rejection_email('', 'Backend Engineer')
         self.assertEqual(result, 'Dear Candidate, ...')
 
     def test_httpx_failure_returns_empty(self):
-        with patch.object(services, 'config', return_value='key'), \
+        with override_settings(GROQ_API_KEY='key'), \
              patch.object(services.httpx, 'post', side_effect=Exception('network down')):
             result = services.parse_cv('resume text')
         self.assertEqual(result['first_name'], '')

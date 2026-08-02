@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+{% block title %}Edit history: {{ feedback.application.candidate.full_name }} | Altrium Tracker{% endblock %}
+{% block page_title %}Edit history{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h2 class="page-title">{{ feedback.application.candidate.full_name }}</h2>
+    <p class="page-sub">
+      {{ feedback.application.job.title }} &middot; {{ feedback.round.name }}
+    </p>
+  </div>
+  <div class="page-actions">
+    <a href="{% url 'feedback:detail' feedback.pk %}" class="btn btn-secondary">Current version</a>
+  </div>
+</div>
+
+<div class="panel panel-pad" style="margin-bottom:var(--sp-4)">
+  <h3 style="font-size:var(--text-base);font-weight:650;margin-bottom:var(--sp-2)">Current version</h3>
+  <span class="score-chip has-score" style="margin-bottom:var(--sp-2)">{{ feedback.score }}</span>
+  <div style="white-space:pre-line;max-width:72ch;margin-bottom:var(--sp-3)">{{ feedback.notes }}</div>
+  <span class="text-xs text-muted">Created {{ feedback.submitted_at|date:'M j, Y H:i' }}</span>
+</div>
+
+<h3 style="font-size:var(--text-base);font-weight:650;margin-bottom:var(--sp-3)">Revision history ({{ history|length }})</h3>
+
+{% if history %}
+{% for entry in history %}
+<div class="panel panel-pad" style="margin-bottom:var(--sp-3)">
+  <span class="text-xs text-muted">
+    Edited {{ entry.edited_at|date:'M j, Y H:i' }}
+    {% if entry.edited_by %}by {{ entry.edited_by.get_full_name|default:entry.edited_by.username }}{% endif %}
+  </span>
+  <div style="margin-top:var(--sp-2);margin-bottom:var(--sp-2)">
+    <span class="score-chip has-score">{{ entry.old_score }}</span>
+  </div>
+  <div style="white-space:pre-line;max-width:72ch;color:var(--ink-secondary);font-size:var(--text-sm)">
+    {{ entry.old_notes }}
+  </div>
+</div>
+{% endfor %}
+{% else %}
+<div class="empty-state">
+  <p class="empty-state-title">No revisions yet</p>
+  <p class="empty-state-body">When feedback is edited, previous versions will appear here.</p>
+</div>
+{% endif %}
+{% endblock %}

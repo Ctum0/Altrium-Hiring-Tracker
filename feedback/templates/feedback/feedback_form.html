@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+{% block title %}Feedback: {{ application.candidate.full_name }} | Altrium Tracker{% endblock %}
+{% block page_title %}
+  Feedback: {{ application.candidate.full_name }} — {{ round.name }}
+{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <p class="page-sub">
+      {{ application.job.title }} &middot; {{ round.name }}
+      &middot; Assigned to {{ application.assigned_to.get_full_name|default:application.assigned_to.username }}
+    </p>
+  </div>
+  <div class="page-actions">
+    <a href="{% url 'feedback:list' %}" class="btn btn-secondary">All feedback</a>
+  </div>
+</div>
+
+<form method="post" novalidate>
+  {% csrf_token %}
+  <div class="form-card">
+
+    <div class="form-field">
+      <label class="form-label" for="{{ form.score.id_for_label }}">Score</label>
+      {{ form.score }}
+      {% if form.score.errors %}<p class="form-error">{{ form.score.errors.0 }}</p>{% endif %}
+      <p class="form-help">e.g. 8 out of 10 for strong Python skills.</p>
+    </div>
+
+    <div class="form-field">
+      <label class="form-label" for="{{ form.raw_notes.id_for_label }}">Raw notes</label>
+      {{ form.raw_notes }}
+      {% if form.raw_notes.errors %}<p class="form-error">{{ form.raw_notes.errors.0 }}</p>{% endif %}
+      <p class="form-help">Paste messy notes; use Summarize to polish them below.</p>
+      <div style="margin-top:var(--sp-2)">
+        <button type="button" id="ai-polish-btn" class="btn btn-secondary btn-sm"
+                hx-post="{% url 'feedback:ai_polish' %}"
+                hx-include="[name='raw_notes']"
+                hx-target="#{{ form.notes.id_for_label }}"
+                hx-indicator="#ai-polish-btn"
+                hx-swap="innerHTML">
+          Summarize with AI
+        </button>
+        <span class="text-xs text-muted" style="margin-left:var(--sp-2)">
+          AI will turn messy notes into a polished summary.
+        </span>
+      </div>
+    </div>
+
+    <div class="form-field">
+      <label class="form-label" for="{{ form.notes.id_for_label }}">Feedback</label>
+      {{ form.notes }}
+      {% if form.notes.errors %}<p class="form-error">{{ form.notes.errors.0 }}</p>{% endif %}
+      <p class="form-help">Your polished feedback for the recruitment record.</p>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">
+        {% if is_edit %}Update feedback{% else %}Submit feedback{% endif %}
+      </button>
+      <a href="{% url 'feedback:list' %}" class="btn btn-secondary">Cancel</a>
+    </div>
+
+  </div>
+</form>
+{% endblock %}

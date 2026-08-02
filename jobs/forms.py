@@ -6,11 +6,15 @@ from .models import InterviewRound, Job
 class JobForm(forms.ModelForm):
     class Meta:
         model = Job
-        fields = ['title', 'description', 'hiring_manager']
+        fields = ['title', 'department', 'description', 'hiring_manager']
         widgets = {
             'title': forms.TextInput(attrs={
                 'class': 'form-input',
                 'placeholder': 'e.g. Senior Backend Engineer',
+            }),
+            'department': forms.TextInput(attrs={
+                'class': 'form-input',
+                'placeholder': 'e.g. Engineering, Design, Marketing',
             }),
             'description': forms.Textarea(attrs={
                 'class': 'form-textarea',

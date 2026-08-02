@@ -11,6 +11,7 @@ urlpatterns = [
     path('candidates/', include('candidates.urls')),
     path('notifications/', include('notifications.urls')),
     path('pipeline/', include('pipeline.urls')),
+    path('feedback/', include('feedback.urls')),
 ]
 
 if settings.DEBUG:
