@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Altrium Tracker{% endblock %}</title>
   <link rel="stylesheet" href="{% static 'css/app.css' %}">
-  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+  <script src="{% static 'vendor/htmx.min.js' %}"></script>
   {% block head %}{% endblock %}
 </head>
 <body>
@@ -80,7 +80,10 @@
     <main class="main-content {% block content_class %}{% endblock %}" id="main-content">
       {% if messages %}
         {% for message in messages %}
-        <div class="alert alert-{{ message.tags|default:'info' }}" role="alert">{{ message }}</div>
+        <div class="alert alert-{{ message.tags|default:'info' }}" role="alert">
+          <span>{{ message }}</span>
+          <button class="alert-dismiss" onclick="this.parentElement.remove()" aria-label="Dismiss">&times;</button>
+        </div>
         {% endfor %}
       {% endif %}
       {% block content %}{% endblock %}

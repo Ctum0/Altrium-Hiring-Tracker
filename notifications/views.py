@@ -1,5 +1,6 @@
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import HttpResponse
+from django.shortcuts import render
 from django.views import View
 from django.views.generic import ListView
 
@@ -46,4 +47,7 @@ class MarkReadView(LoginRequiredMixin, View):
         notification = Notification.objects.filter(pk=pk, recipient=request.user).first()
         if notification:
             notification.mark_read()
+            return render(request, 'notifications/_notification_row.html', {
+                'n': notification,
+            })
         return HttpResponse(status=204)

@@ -109,12 +109,18 @@
   </table>
 </div>
 
-{% if is_paginated %}
+{% if is_paginated and page_obj.paginator.num_pages > 1 %}
 <nav class="pagination" aria-label="Pagination">
   {% if page_obj.has_previous %}
   <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if filter_q %}&q={{ filter_q }}{% endif %}{% if filter_job %}&job={{ filter_job }}{% endif %}{% if filter_stage %}&stage={{ filter_stage }}{% endif %}{% if filter_min_score %}&min_score={{ filter_min_score }}{% endif %}">Previous</a>
   {% endif %}
-  <span class="text-sm text-muted">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }} &middot; {{ page_obj.paginator.count }} candidates</span>
+  {% for num in page_obj.paginator.page_range %}
+    {% if num == page_obj.number %}
+    <span class="page-link current">{{ num }}</span>
+    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+    <a class="page-link" href="?page={{ num }}{% if filter_q %}&q={{ filter_q }}{% endif %}{% if filter_job %}&job={{ filter_job }}{% endif %}{% if filter_stage %}&stage={{ filter_stage }}{% endif %}{% if filter_min_score %}&min_score={{ filter_min_score }}{% endif %}">{{ num }}</a>
+    {% endif %}
+  {% endfor %}
   {% if page_obj.has_next %}
   <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if filter_q %}&q={{ filter_q }}{% endif %}{% if filter_job %}&job={{ filter_job }}{% endif %}{% if filter_stage %}&stage={{ filter_stage }}{% endif %}{% if filter_min_score %}&min_score={{ filter_min_score }}{% endif %}">Next</a>
   {% endif %}

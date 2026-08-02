@@ -37,7 +37,7 @@ class NotificationTests(TestCase):
         n = Notification.objects.create(recipient=self.iv1, message='hello')
         assert self.client.login(username='iv1', password='pass12345')
         r = self.client.post(reverse('notifications:mark_read', args=[n.pk]))
-        self.assertEqual(r.status_code, 204)
+        self.assertEqual(r.status_code, 200)  # now returns a rendered row
         n.refresh_from_db()
         self.assertTrue(n.is_read)
 

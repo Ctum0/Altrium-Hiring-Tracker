@@ -1,0 +1,8 @@
+<div class="flex items-center justify-between gap-4" style="padding:var(--sp-4) var(--sp-5);opacity:0.5">
+  <div>
+    {% if n.link %}<a href="{{ n.link }}" class="strong">{{ n.message }}</a>
+    {% else %}<span class="strong">{{ n.message }}</span>{% endif %}
+    <div class="text-xs text-muted">{{ n.created_at|date:'M j, Y H:i' }}</div>
+  </div>
+  <span class="text-xs text-muted">Read</span>
+</div>
