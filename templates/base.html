@@ -10,7 +10,7 @@
   {% block head %}{% endblock %}
 </head>
 <body>
-<a href="#main-content" class="sr-only" style="position:absolute;left:0;top:0;z-index:999">Skip to content</a>
+<a href="#main-content" class="skip-link">Skip to content</a>
 <div class="app-shell">
   <aside class="sidebar">
     <a href="{% url 'accounts:home' %}" class="brand" style="text-decoration:none">
@@ -93,7 +93,7 @@
   </div>
 </div>
 {% block scripts %}{% endblock %}
-<div class="modal-overlay" id="confirm-modal" hidden aria-hidden="true">
+<dialog class="modal-overlay" id="confirm-modal" aria-labelledby="confirm-title">
   <div class="modal-box">
     <h2 id="confirm-title"></h2>
     <p id="confirm-body"></p>
@@ -102,48 +102,53 @@
       <button class="btn btn-danger" id="confirm-ok">Confirm</button>
     </div>
   </div>
-</div>
+</dialog>
 <script>
 (function() {
-  var overlay = document.getElementById('confirm-modal');
+  var dialog = document.getElementById('confirm-modal');
   var title = document.getElementById('confirm-title');
   var body = document.getElementById('confirm-body');
   var okBtn = document.getElementById('confirm-ok');
   var cancelBtn = document.getElementById('confirm-cancel');
   var targetForm = null;
+  var returnFocus = null;
 
   window.confirmAction = function(formEl, titleText, bodyText) {
     targetForm = formEl;
+    returnFocus = document.activeElement;
     title.textContent = titleText;
     body.textContent = bodyText;
-    overlay.removeAttribute('hidden');
-    overlay.removeAttribute('aria-hidden');
+    dialog.showModal();
     okBtn.focus();
   };
 
-  cancelBtn.addEventListener('click', function() {
-    overlay.setAttribute('hidden', '');
-    overlay.setAttribute('aria-hidden', 'true');
+  function closeModal() {
+    dialog.close();
     targetForm = null;
-  });
+    if (returnFocus && document.contains(returnFocus)) {
+      returnFocus.focus();
+    }
+    returnFocus = null;
+  }
 
-  overlay.addEventListener('click', function(e) {
-    if (e.target === overlay) {
-      cancelBtn.click();
+  cancelBtn.addEventListener('click', closeModal);
+
+  dialog.addEventListener('click', function(e) {
+    if (e.target === dialog) {
+      closeModal();
     }
   });
 
   okBtn.addEventListener('click', function() {
-    if (targetForm) {
-      targetForm.submit();
+    var form = targetForm;
+    closeModal();
+    if (form) {
+      form.submit();
     }
   });
 
-  document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape' && targetForm) {
-      cancelBtn.click();
-    }
-  });
+  // Escape is handled natively by <dialog>. Cancel event closes it.
+  dialog.addEventListener('cancel', closeModal);
 
   // Message auto-dismiss for success/info alerts (5s)
   function dismissAlert(el) {

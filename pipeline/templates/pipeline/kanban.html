@@ -68,6 +68,44 @@
     };
   }
 
+  function moveUrlFor(appId) {
+    var moveUrl = document.getElementById('kanban').getAttribute('data-move-url');
+    return moveUrl.replace(/0\/$/, appId + '/');
+  }
+
+  function moveApplication(appId, fromEl, target, item) {
+    var body = new URLSearchParams();
+    if (target.kind === 'round') {
+      body.set('round', target.round);
+    } else {
+      body.set('status', target.status);
+    }
+    var source = columnData(fromEl);
+    body.set('source_round', source.round);
+    body.set('source_status', source.status);
+    body.set('csrfmiddlewaretoken', csrf.value);
+
+    fetch(moveUrlFor(appId), {
+      method: 'POST',
+      body: body,
+      headers: {'X-Requested-With': 'XMLHttpRequest'},
+    }).then(function (resp) {
+      if (!resp.ok) { throw new Error(resp.status); }
+      return resp.text();
+    }).then(function (html) {
+      var replacement = document.createElement('div');
+      replacement.innerHTML = html.trim();
+      var newList = replacement.firstElementChild;
+      if (newList) {
+        fromEl.replaceWith(newList);
+        initColumn(newList);
+        initMoveSelects();
+      }
+    }).catch(function () {
+      window.location.reload();
+    });
+  }
+
   function onEnd(evt) {
     var item = evt.item;
     var from = evt.from;
@@ -78,46 +116,50 @@
       return;
     }
     var target = columnData(to);
-    var source = columnData(from);
-    var body = new URLSearchParams();
-    if (target.kind === 'round') {
-      body.set('round', target.round);
-    } else {
-      body.set('status', target.status);
-    }
-    body.set('source_round', source.round);
-    body.set('source_status', source.status);
-    body.set('csrfmiddlewaretoken', csrf.value);
+    moveApplication(item.getAttribute('data-app-id'), from, target, item);
+  }
 
-    var moveUrl = document.getElementById('kanban').getAttribute('data-move-url');
-    moveUrl = moveUrl.replace(/0\/$/, item.getAttribute('data-app-id') + '/');
-
-    fetch(moveUrl, {
-      method: 'POST',
-      body: body,
-      headers: {'X-Requested-With': 'XMLHttpRequest'},
-    }).then(function (resp) {
-      if (resp.status === 403) {
-        from.insertBefore(item, from.children[evt.oldIndex] || null);
-        return;
-      }
-      if (!resp.ok) {
-        from.insertBefore(item, from.children[evt.oldIndex] || null);
-        return;
-      }
-      return resp.text();
-    }).then(function (html) {
-      if (html) {
-        var replacement = document.createElement('div');
-        replacement.innerHTML = html.trim();
-        var newList = replacement.firstElementChild;
-        if (newList) {
-          from.replaceWith(newList);
-          initColumn(newList);
-        }
-      }
-    }).catch(function () {
-      from.insertBefore(item, from.children[evt.oldIndex] || null);
+  function initMoveSelects() {
+    if (!canMove) { return; }
+    var columns = [];
+    document.querySelectorAll('[data-sortable-column]').forEach(function (el) {
+      var col = columnData(el);
+      var titleEl = el.closest('.kanban-column').querySelector('.kanban-column-title');
+      col.title = titleEl ? titleEl.textContent.trim() : '';
+      columns.push(col);
+    });
+    document.querySelectorAll('.kanban-card').forEach(function (card) {
+      if (card.querySelector('.kanban-card-move')) { return; }
+      var label = document.createElement('label');
+      label.className = 'kanban-card-move';
+      label.setAttribute('aria-label', 'Move candidate to a different stage');
+      var select = document.createElement('select');
+      select.className = 'kanban-move-select';
+      var current = card.closest('[data-sortable-column]');
+      var source = columnData(current);
+      var placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = 'Move to\u2026';
+      select.appendChild(placeholder);
+      columns.forEach(function (col, i) {
+        var isSource = (col.kind === source.kind) &&
+          (col.round === source.round) &&
+          (col.status === source.status);
+        var opt = document.createElement('option');
+        opt.value = String(i);
+        opt.textContent = col.title;
+        opt.disabled = isSource;
+        select.appendChild(opt);
+      });
+      select.addEventListener('change', function () {
+        var idx = select.value;
+        if (idx === '') { return; }
+        var target = columns[parseInt(idx, 10)];
+        select.value = '';
+        moveApplication(card.getAttribute('data-app-id'), current, target, card);
+      });
+      label.appendChild(select);
+      card.appendChild(label);
     });
   }
 
@@ -136,6 +178,7 @@
   }
 
   document.querySelectorAll('[data-sortable-column]').forEach(initColumn);
+  initMoveSelects();
 })();
 </script>
 {% endblock %}

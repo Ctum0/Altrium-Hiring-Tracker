@@ -14,7 +14,7 @@
     {% if can_edit %}<a href="{% url 'jobs:edit' job.pk %}" class="btn btn-secondary">Edit</a>{% endif %}
     <a href="{% url 'jobs:list' %}" class="btn btn-secondary">All jobs</a>
     {% if can_edit and job.is_active %}
-    <form method="post" action="{% url 'jobs:close' job.pk %}" style="display:inline" onsubmit="event.preventDefault();confirmAction(this,'Close this job?','All remaining active candidates will be marked as rejected.')">
+    <form method="post" action="{% url 'jobs:close' job.pk %}" style="display:inline" onsubmit="event.preventDefault();confirmAction(this,'Close job','Close this job? All remaining active candidates will be marked Rejected. You can reopen the job to undo this.')">
       {% csrf_token %}
       <button type="submit" class="btn btn-danger">Close job</button>
     </form>
@@ -89,7 +89,7 @@
           </td>
           {% if can_edit %}
           <td style="text-align:right">
-            <form method="post" action="{% url 'jobs:round_delete' round.pk %}" onsubmit="event.preventDefault();confirmAction(this,'Remove this round?','Candidates in it will keep their history.')">
+            <form method="post" action="{% url 'jobs:round_delete' round.pk %}" onsubmit="event.preventDefault();confirmAction(this,'Remove round','Remove this round? Existing candidates keep their information, and this action cannot be undone.')">
               {% csrf_token %}
               <button type="submit" class="btn-ghost btn-icon" title="Remove round" aria-label="Remove round">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
