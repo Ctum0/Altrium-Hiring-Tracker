@@ -114,6 +114,9 @@ class FeedbackFormView(LoginRequiredMixin, View):
             feedback.interviewer = request.user
 
         feedback.save()
+        JobApplication.objects.filter(pk=self.application.pk).update(
+            feedback_submitted=True,
+        )
         action = 'updated' if existing else 'submitted'
         messages.success(
             request,

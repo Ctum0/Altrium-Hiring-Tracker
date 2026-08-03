@@ -27,6 +27,9 @@ media/
 .pytest_cache/
 .mypy_cache/
 
+# Dev-only requirements (lint tooling, kept out of production)
+requirements-dev.txt
+
 # Environment files
 .env.*
 !.env.example
