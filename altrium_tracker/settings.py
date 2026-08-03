@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     'notifications',
     'pipeline',
     'feedback',
+    'storages',
 ]
 
 MIDDLEWARE = [
@@ -159,6 +160,36 @@ STORAGES = {
 # Media files (uploaded CVs)
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# Optional S3-compatible object storage (e.g. Cloudflare R2).
+# Activates only when S3_ACCESS_KEY_ID and S3_BUCKET_NAME are set;
+# otherwise media files use the local filesystem as before.
+S3_ACCESS_KEY_ID = _env('S3_ACCESS_KEY_ID', default='')
+S3_SECRET_ACCESS_KEY = _env('S3_SECRET_ACCESS_KEY', default='')
+S3_BUCKET_NAME = _env('S3_BUCKET_NAME', default='')
+S3_ENDPOINT = _env('S3_ENDPOINT', default='')
+S3_PUBLIC_DOMAIN = _env('S3_PUBLIC_DOMAIN', default='')
+
+if S3_ACCESS_KEY_ID and S3_BUCKET_NAME:
+    _s3_custom_domain = None
+    if S3_PUBLIC_DOMAIN:
+        _s3_custom_domain = S3_PUBLIC_DOMAIN.split('://', 1)[-1]
+    STORAGES['default'] = {
+        'BACKEND': 'storages.backends.s3boto3.S3Boto3Storage',
+        'OPTIONS': {
+            'access_key': S3_ACCESS_KEY_ID,
+            'secret_key': S3_SECRET_ACCESS_KEY,
+            'bucket_name': S3_BUCKET_NAME,
+            'endpoint_url': S3_ENDPOINT or None,
+            'region_name': 'auto',
+            'default_acl': None,
+            'querystring_auth': False,
+            'custom_domain': _s3_custom_domain,
+            'object_parameters': {'CacheControl': 'max-age=86400'},
+        },
+    }
+    if S3_PUBLIC_DOMAIN:
+        MEDIA_URL = f'{S3_PUBLIC_DOMAIN}/media/'
 
 
 # Security settings - only enforced in production (DEBUG=False)
