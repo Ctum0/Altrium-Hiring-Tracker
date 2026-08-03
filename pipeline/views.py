@@ -22,13 +22,23 @@ class KanbanBoardView(LoginRequiredMixin, DetailView):
         job = self.object
         rounds = list(job.rounds.all())
 
-        # Final states always render as trailing columns.
+        # Single query for the whole board, bucketed in Python by round/status.
+        applications = list(job.applications.select_related(
+            'candidate', 'current_round', 'assigned_to'
+        ))
+        by_round = {r.pk: [] for r in rounds}
+        by_status = {}
+        for app in applications:
+            if app.current_round_id is not None and app.current_round_id in by_round:
+                by_round[app.current_round_id].append(app)
+            by_status.setdefault(app.status, []).append(app)
+
         columns = []
         for r in rounds:
             columns.append({
                 'kind': 'round',
                 'round': r,
-                'applications': self._applications_for_round(job, r),
+                'applications': by_round[r.pk],
             })
 
         final_states = [
@@ -41,18 +51,13 @@ class KanbanBoardView(LoginRequiredMixin, DetailView):
                 'kind': 'final',
                 'status': status,
                 'label': label,
-                'applications': job.applications.filter(status=status),
+                'applications': by_status.get(status, []),
             })
 
         context['columns'] = columns
         context['can_move'] = self.request.user.is_hr()
         context['active_nav'] = 'jobs'
         return context
-
-    def _applications_for_round(self, job, round_obj):
-        return job.applications.filter(current_round=round_obj).select_related(
-            'candidate', 'assigned_to'
-        )
 
 
 class PipelineMoveView(LoginRequiredMixin, View):

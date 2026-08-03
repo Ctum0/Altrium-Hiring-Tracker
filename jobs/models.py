@@ -36,6 +36,9 @@ class Job(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['is_active', '-created_at'], name='ix_job_active_created'),
+        ]
 
     def __str__(self):
         return self.title
@@ -56,6 +59,9 @@ class InterviewRound(models.Model):
 
     class Meta:
         ordering = ['order', 'id']
+        indexes = [
+            models.Index(fields=['job', 'order'], name='ix_round_job_order'),
+        ]
         constraints = [
             models.UniqueConstraint(
                 fields=['job', 'name'],

@@ -30,6 +30,10 @@ class Candidate(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['score'], name='ix_cand_score'),
+            models.Index(fields=['-created_at'], name='ix_cand_created'),
+        ]
 
     def __str__(self):
         name = self.full_name
@@ -91,6 +95,11 @@ class JobApplication(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['status'], name='ix_app_status'),
+            models.Index(fields=['-updated_at'], name='ix_app_updated'),
+            models.Index(fields=['current_round'], name='ix_app_round'),
+        ]
         constraints = [
             models.UniqueConstraint(fields=['candidate', 'job'], name='unique_candidate_job'),
         ]

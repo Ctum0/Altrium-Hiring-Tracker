@@ -14,6 +14,10 @@ logger = logging.getLogger(__name__)
 
 GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions'
 
+# Reused for HTTP keep-alive so repeated calls skip TLS/connection setup,
+# and so no single call can hold a free-tier worker hostage for long.
+_client = httpx.Client(timeout=12.0)
+
 SYSTEM_PARSE = (
     'You extract structured data from resume text. '
     'Return ONLY valid JSON with keys: first_name, last_name, email, phone, '
@@ -43,7 +47,7 @@ def _chat(system: str, user: str, temperature: float = 0.2) -> str:
         return ''
 
     try:
-        resp = httpx.post(
+        resp = _client.post(
             GROQ_API_URL,
             headers={'Authorization': f'Bearer {api_key}'},
             json={
@@ -54,7 +58,6 @@ def _chat(system: str, user: str, temperature: float = 0.2) -> str:
                 ],
                 'temperature': temperature,
             },
-            timeout=30.0,
         )
         resp.raise_for_status()
         data = resp.json()

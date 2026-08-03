@@ -210,7 +210,7 @@ class CandidateUploadView(LoginRequiredMixin, View):
                 )
                 unparsed.append(f.name)
 
-            _, app_created = JobApplication.objects.get_or_create(
+            app, app_created = JobApplication.objects.get_or_create(
                 candidate=candidate,
                 job=job,
                 defaults={'status': JobApplication.Status.NEW},
@@ -221,10 +221,7 @@ class CandidateUploadView(LoginRequiredMixin, View):
             # Auto-score and optionally auto-reject based on job requirements.
             if job.requirements:
                 score = auto_apply(candidate, job)
-                app = JobApplication.objects.filter(
-                    candidate=candidate, job=job
-                ).first()
-                if app and job.auto_reject_score and score <= job.auto_reject_score:
+                if job.auto_reject_score and score <= job.auto_reject_score:
                     app.status = JobApplication.Status.REJECTED
                     app.save(update_fields=['status', 'updated_at'])
 
