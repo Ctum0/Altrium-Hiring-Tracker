@@ -14,3 +14,15 @@ services:
         value: "false"
       - key: GROQ_API_KEY
         sync: false
+      # Object storage for CV files (Cloudflare R2). Set real values in the
+      # Render dashboard after creating the bucket + API token.
+      - key: S3_ACCESS_KEY_ID
+        sync: false
+      - key: S3_SECRET_ACCESS_KEY
+        sync: false
+      - key: S3_BUCKET_NAME
+        sync: false
+      - key: S3_ENDPOINT
+        sync: false
+      - key: S3_PUBLIC_DOMAIN
+        sync: false
