@@ -12,6 +12,8 @@ services:
         generateValue: true
       - key: DJANGO_DEBUG
         value: "false"
+      - key: DJANGO_ALLOWED_HOSTS
+        value: ".onrender.com"
       - key: GROQ_API_KEY
         sync: false
       # Object storage for CV files (Cloudflare R2). Set real values in the
