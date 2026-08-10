@@ -24,6 +24,8 @@ class PipelineTests(TestCase):
         self.round2 = InterviewRound.objects.create(job=self.job, name='Tech', order=2)
         self.cand = Candidate.objects.create(email='a@example.com', first_name='Anna')
         self.app = JobApplication.objects.create(candidate=self.cand, job=self.job)
+        self.app.current_round = None
+        self.app.save(update_fields=['current_round'])
 
     def _add_feedback(self, round_obj, score=5):
         return InterviewFeedback.objects.create(

@@ -33,3 +33,18 @@ requirements-dev.txt
 # Environment files
 .env.*
 !.env.example
+
+# Agents & artifacts
+.agents
+.agents/
+.artifacts/
+
+# Node (toolkit deps for playwright a11y audits)
+node_modules/
+package-lock.json
+
+# Playwright MCP local runtime dir
+.playwright-mcp/
+
+# Pre-migration DB backup
+db.sqlite3.pre-migration.bak

@@ -1,0 +1,23 @@
+services:
+  playwright-mcp:
+    image: mcr.microsoft.com/playwright/mcp
+    container_name: playwright-mcp
+    restart: unless-stopped
+    network_mode: host
+    ports:
+      - "8931:8931"
+    volumes:
+      - ./.artifacts/browser:/artifacts
+    command:
+      - --headless
+      - --browser
+      - chromium
+      - --no-sandbox
+      - --port
+      - "8931"
+      - --host
+      - 0.0.0.0
+      - --output-dir
+      - /artifacts
+      - --caps
+      - vision,devtools
