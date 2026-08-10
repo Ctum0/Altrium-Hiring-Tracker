@@ -1,0 +1,7 @@
+{
+  "devDependencies": {
+    "axe-core": "^4.12.1",
+    "playwright": "^1.62.1",
+    "prettier": "^3.9.6"
+  }
+}

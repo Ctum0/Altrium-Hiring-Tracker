@@ -207,18 +207,9 @@ if not DEBUG:
 
 
 # Groq AI
-# Read key directly from the .env file — more reliable than decouple path resolution.
-GROQ_API_KEY = ''
-GROQ_MODEL = 'llama-3.3-70b-versatile'
-try:
-    with open(BASE_DIR / '.env') as _f:
-        for _line in _f:
-            if _line.startswith('GROQ_API_KEY='):
-                GROQ_API_KEY = _line.split('=', 1)[1].strip()
-            elif _line.startswith('GROQ_MODEL='):
-                GROQ_MODEL = _line.split('=', 1)[1].strip()
-except FileNotFoundError:
-    pass
+# Check environment variable first (Render dashboard), then fall back to .env file.
+GROQ_API_KEY = _env('GROQ_API_KEY', default='')
+GROQ_MODEL = _env('GROQ_MODEL', default='llama-3.3-70b-versatile')
 
 
 # Default primary key field type

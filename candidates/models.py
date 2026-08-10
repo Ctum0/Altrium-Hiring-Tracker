@@ -106,3 +106,12 @@ class JobApplication(models.Model):
 
     def __str__(self):
         return f'{self.candidate.full_name} -> {self.job.title}'
+
+    def save(self, *args, **kwargs):
+        if self._state.adding and not self.current_round_id and self.job_id:
+            first_round = self.job.rounds.first()
+            if first_round:
+                self.current_round = first_round
+        super().save(*args, **kwargs)
+
+

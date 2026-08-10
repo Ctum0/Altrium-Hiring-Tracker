@@ -97,6 +97,7 @@ class PipelineMoveView(LoginRequiredMixin, View):
             if to_status not in [s for s, _ in JobApplication.Status.choices]:
                 return HttpResponse('Invalid status.', status=400)
             app.status = to_status
+            app.current_round = None
 
         # No-op guard: same round or same final status -> no state change,
         # no audit noise.

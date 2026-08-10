@@ -61,14 +61,14 @@ class InterviewerDashboardView(LoginRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         user = self.request.user
-        assigned = JobApplication.objects.filter(
+        assigned_qs = JobApplication.objects.filter(
             assigned_to=user
         ).select_related(
             'candidate', 'job', 'current_round'
-        ).order_by('-updated_at')[:20]
+        )
 
-        context['assigned_apps'] = assigned
-        context['pending_feedback'] = assigned.filter(
+        context['assigned_apps'] = assigned_qs.order_by('-updated_at')[:20]
+        context['pending_feedback'] = assigned_qs.filter(
             feedback_submitted=False, current_round__isnull=False
         ).count()
         context['active_nav'] = 'dashboard'
