@@ -5,6 +5,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Altrium Tracker{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{% static 'css/app.css' %}">
   <script src="{% static 'vendor/htmx.min.js' %}"></script>
   {% block head %}{% endblock %}
@@ -12,7 +15,7 @@
 <body>
 <a href="#main-content" class="skip-link">Skip to content</a>
 <div class="app-shell">
-  <aside class="sidebar">
+  <aside class="sidebar glass-sidebar">
     <a href="{% url 'accounts:home' %}" class="brand" style="text-decoration:none">
       <span class="brand-mark">A</span>
       <span>
@@ -59,7 +62,7 @@
   </aside>
 
   <div class="main">
-    <header class="topbar">
+    <header class="topbar glass-topbar">
       <p class="topbar-title">{% block page_title %}{% endblock %}</p>
       <div class="topbar-actions">
         {% if user.is_authenticated %}

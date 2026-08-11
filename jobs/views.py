@@ -7,8 +7,6 @@ from django.utils import timezone
 from django.views import View
 from django.views.generic import CreateView, DeleteView, DetailView, ListView, UpdateView
 
-from candidates.models import JobApplication
-
 from .forms import JobForm, RoundForm
 from .models import InterviewRound, Job
 
@@ -80,7 +78,7 @@ class JobEditView(LoginRequiredMixin, UpdateView):
 
 
 class JobCloseView(LoginRequiredMixin, View):
-    """Close a job and reject all remaining active candidates."""
+    """Close a job: stop accepting new CV uploads. Existing candidates are untouched."""
 
     def post(self, request, pk):
         job = get_object_or_404(Job, pk=pk)
@@ -91,13 +89,9 @@ class JobCloseView(LoginRequiredMixin, View):
         job.closed_at = timezone.now()
         job.save()
 
-        rejected = job.applications.exclude(
-            status__in=[JobApplication.Status.HIRED, JobApplication.Status.REJECTED]
-        ).update(status=JobApplication.Status.REJECTED)
-
         messages.success(
             request,
-            f'Job "{job.title}" closed. {rejected} candidate(s) marked as rejected.',
+            f'Job "{job.title}" closed. Existing candidates are unchanged.',
         )
         return redirect('jobs:detail', pk=job.pk)
 

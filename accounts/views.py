@@ -1,8 +1,8 @@
 from django.contrib.auth import views as auth_views
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import redirect
-from django.urls import reverse_lazy
-from django.views.generic import ListView, TemplateView
+from django.urls import reverse, reverse_lazy
+from django.views.generic import ListView, RedirectView, TemplateView
 
 from candidates.models import JobApplication
 from jobs.models import Job
@@ -75,15 +75,10 @@ class InterviewerDashboardView(LoginRequiredMixin, TemplateView):
         return context
 
 
-class ManagementDashboardView(LoginRequiredMixin, TemplateView):
-    """Management dashboard — placeholder (Sprint 2)."""
-    template_name = 'accounts/management_dashboard.html'
+class ManagementDashboardView(LoginRequiredMixin, RedirectView):
+    """Management lands on the read-only candidate pipeline on sign-in."""
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['total_jobs'] = Job.objects.filter(is_active=True).count()
-        context['total_candidates'] = JobApplication.objects.exclude(
-            status__in=['hired', 'rejected']
-        ).count()
-        context['active_nav'] = 'dashboard'
-        return context
+    permanent = False
+
+    def get_redirect_url(self, *args, **kwargs):
+        return reverse('candidates:list')

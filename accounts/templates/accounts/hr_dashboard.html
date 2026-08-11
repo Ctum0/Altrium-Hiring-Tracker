@@ -27,7 +27,7 @@
     </div>
     <div class="flex gap-2">
       <a href="{% url 'jobs:detail' job.pk %}" class="btn btn-secondary btn-sm">Details</a>
-      <a href="{% url 'pipeline:board' job.pk %}" class="btn btn-primary btn-sm">Pipeline</a>
+      <a href="{% url 'candidates:list' %}?job={{ job.pk }}" class="btn btn-primary btn-sm">View candidates</a>
     </div>
   </div>
   {% endfor %}

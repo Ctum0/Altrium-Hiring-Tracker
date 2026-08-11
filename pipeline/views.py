@@ -2,66 +2,15 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, render
 from django.views import View
-from django.views.generic import DetailView
 
 from candidates.models import JobApplication
-from jobs.models import InterviewRound, Job
+from jobs.models import InterviewRound
 
 from .models import PipelineMove
 
 
-class KanbanBoardView(LoginRequiredMixin, DetailView):
-    """The visual pipeline: columns per interview round, cards per candidate."""
-
-    model = Job
-    template_name = 'pipeline/kanban.html'
-    context_object_name = 'job'
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        job = self.object
-        rounds = list(job.rounds.all())
-
-        # Single query for the whole board, bucketed in Python by round/status.
-        applications = list(job.applications.select_related(
-            'candidate', 'current_round', 'assigned_to'
-        ))
-        by_round = {r.pk: [] for r in rounds}
-        by_status = {}
-        for app in applications:
-            if app.current_round_id is not None and app.current_round_id in by_round:
-                by_round[app.current_round_id].append(app)
-            by_status.setdefault(app.status, []).append(app)
-
-        columns = []
-        for r in rounds:
-            columns.append({
-                'kind': 'round',
-                'round': r,
-                'applications': by_round[r.pk],
-            })
-
-        final_states = [
-            (JobApplication.Status.HIRED, 'Hired'),
-            (JobApplication.Status.REJECTED, 'Rejected'),
-            (JobApplication.Status.ON_HOLD, 'On Hold'),
-        ]
-        for status, label in final_states:
-            columns.append({
-                'kind': 'final',
-                'status': status,
-                'label': label,
-                'applications': by_status.get(status, []),
-            })
-
-        context['columns'] = columns
-        context['can_move'] = self.request.user.is_hr()
-        context['active_nav'] = 'jobs'
-        return context
-
-
 class PipelineMoveView(LoginRequiredMixin, View):
-    """HTMX endpoint: move a candidate card between columns.
+    """HTMX endpoint: move a candidate between stages via the inline dropdown.
 
     Blocks advancement if the current round has no submitted feedback.
     """
@@ -71,8 +20,21 @@ class PipelineMoveView(LoginRequiredMixin, View):
         if not request.user.is_hr():
             return HttpResponse('Only HR can move candidates.', status=403)
 
-        to_round_id = request.POST.get('round')
-        to_status = request.POST.get('status')
+        # Single POST format: 'stage' like 'round:1' or 'status:hired'.
+        stage_value = request.POST.get('stage')
+        if stage_value:
+            if stage_value.startswith('round:'):
+                to_round_id = stage_value.split(':', 1)[1]
+                to_status = None
+            elif stage_value.startswith('status:'):
+                to_round_id = None
+                to_status = stage_value.split(':', 1)[1]
+            else:
+                to_round_id = None
+                to_status = None
+        else:
+            to_round_id = None
+            to_status = None
 
         from_round = app.current_round
         from_status = app.status
@@ -94,10 +56,11 @@ class PipelineMoveView(LoginRequiredMixin, View):
             app.status = JobApplication.Status.IN_PROGRESS
         else:
             to_round = None
-            if to_status not in [s for s, _ in JobApplication.Status.choices]:
-                return HttpResponse('Invalid status.', status=400)
-            app.status = to_status
-            app.current_round = None
+            if to_status:
+                if to_status not in [s for s, _ in JobApplication.Status.choices]:
+                    return HttpResponse('Invalid status.', status=400)
+                app.status = to_status
+                app.current_round = None
 
         # No-op guard: same round or same final status -> no state change,
         # no audit noise.
@@ -113,33 +76,19 @@ class PipelineMoveView(LoginRequiredMixin, View):
             moved_by=request.user,
         )
 
-        # Return the source column refreshed so HTMX can update the card list.
-        source_round_id = request.POST.get('source_round')
-        source_status = request.POST.get('source_status')
-        job = app.job
-
-        if source_round_id:
-            source_round = get_object_or_404(
-                InterviewRound, pk=source_round_id, job=job
-            )
-            applications = job.applications.filter(
-                current_round=source_round
-            ).select_related('candidate', 'assigned_to')
-            return render(request, 'pipeline/_column_cards.html', {
-                'kind': 'round',
-                'round': source_round,
-                'applications': applications,
-            })
-        elif source_status:
-            applications = job.applications.filter(
-                status=source_status
-            ).select_related('candidate', 'assigned_to')
-            return render(request, 'pipeline/_column_cards.html', {
-                'kind': 'final',
-                'status': source_status,
-                'label': dict(JobApplication.Status.choices)[source_status],
-                'applications': applications,
-            })
+        # Return the updated row so HTMX can swap it in place.
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        app.refresh_from_db()
+        source = request.POST.get('source', 'detail')
+        if source == 'list':
+            template = 'pipeline/_list_app_row.html'
         else:
-            # Unknown source column: nothing to refresh.
-            return HttpResponse(status=204)
+            template = 'pipeline/_app_row.html'
+        return render(request, template, {
+            'app': app,
+            'is_hr': True,
+            'interviewers': User.objects.filter(role='IV').order_by(
+                'first_name', 'last_name'
+            ),
+        })

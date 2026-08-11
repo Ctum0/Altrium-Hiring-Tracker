@@ -14,7 +14,7 @@
       <label class="form-label" for="{{ form.order.id_for_label }}">Order</label>
       {{ form.order }}
       {% if form.order.errors %}<p class="form-error">{{ form.order.errors.0 }}</p>{% endif %}
-      <p class="form-help">Lower numbers appear first on the Kanban board.</p>
+      <p class="form-help">Lower numbers appear first in the candidate list and detail views.</p>
     </div>
     <div class="form-actions">
       <button type="submit" class="btn btn-primary">Add round</button>

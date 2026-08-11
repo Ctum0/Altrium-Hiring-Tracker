@@ -29,7 +29,7 @@ def visible_applications(user):
     """
     qs = JobApplication.objects.select_related(
         'candidate', 'job', 'current_round', 'assigned_to'
-    )
+    ).prefetch_related('job__rounds')
     if user.is_interviewer():
         qs = qs.filter(assigned_to=user)
     return qs
@@ -114,9 +114,10 @@ class CandidateDetailView(LoginRequiredMixin, DetailView):
         context = super().get_context_data(**kwargs)
         context['active_nav'] = 'candidates'
         context['applications'] = self.object.applications.select_related(
-            'job', 'current_round', 'assigned_to'
-        )
+            'candidate', 'job', 'current_round', 'assigned_to'
+        ).prefetch_related('job__rounds')
         context['is_hr'] = self.request.user.is_hr()
+        context['is_management'] = self.request.user.is_management()
         context['interviewers'] = User.objects.filter(role='IV').order_by(
             'first_name', 'last_name'
         )
