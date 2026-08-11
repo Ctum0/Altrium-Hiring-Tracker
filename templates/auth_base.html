@@ -8,6 +8,32 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script>
+  (function () {
+    var KEY = 'altrium-theme';
+    function current() {
+      try {
+        var s = localStorage.getItem(KEY);
+        if (s === 'light' || s === 'dark') return s;
+      } catch (e) {}
+      return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    var root = document.documentElement;
+    root.dataset.theme = current();
+    window.toggleTheme = function () {
+      var next = root.dataset.theme === 'dark' ? 'light' : 'dark';
+      root.dataset.theme = next;
+      try { localStorage.setItem(KEY, next); } catch (e) {}
+    };
+    if (window.matchMedia) {
+      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function (e) {
+        try {
+          if (!localStorage.getItem(KEY)) root.dataset.theme = e.matches ? 'dark' : 'light';
+        } catch (err) {}
+      });
+    }
+  })();
+  </script>
   <link rel="stylesheet" href="{% static 'css/app.css' %}">
   <script src="{% static 'vendor/htmx.min.js' %}"></script>
   {% block head %}{% endblock %}
