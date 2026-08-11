@@ -21,8 +21,11 @@
 
   /* ===== Neutrals (light glass) ===== */
   --bg: oklch(0.97 0.005 270);
+  --bg-1: #f8fafc;
+  --bg-2: #edf2f7;
   --surface: rgba(255, 255, 255, 0.55);
   --surface-2: rgba(255, 255, 255, 0.35);
+  --surface-hover: rgba(255, 255, 255, 0.75);
   --border: rgba(226, 232, 240, 0.5);
   --border-strong: rgba(226, 232, 240, 0.7);
   --ink: oklch(0.20 0.02 270);
@@ -96,6 +99,69 @@
   --z-backdrop: 300;
   --z-modal: 400;
   --z-toast: 500;
+
+  color-scheme: light;
+}
+
+/* ===== Dark theme =====
+   Applied via data-theme="dark" on <html>. Auth and app pages share tokens,
+   so both render correctly in either theme. Default = stored preference or
+   the operating system's prefers-color-scheme. */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  /* Brand (shifted lighter for contrast on dark glass) */
+  --brand: oklch(0.60 0.18 262);
+  --brand-hover: oklch(0.66 0.17 262);
+  --brand-active: oklch(0.55 0.17 262);
+  --brand-soft: oklch(0.31 0.07 258);
+  --brand-border: oklch(0.45 0.11 262);
+  --on-brand: oklch(1 0 0);
+
+  /* Accent */
+  --accent: oklch(0.75 0.13 70);
+  --accent-soft: oklch(0.32 0.05 70);
+
+  /* Neutrals (dark glass) */
+  --bg: oklch(0.17 0.022 255);
+  --bg-1: oklch(0.17 0.022 255);
+  --bg-2: oklch(0.14 0.022 258);
+  --surface: rgba(255, 255, 255, 0.06);
+  --surface-2: rgba(255, 255, 255, 0.09);
+  --surface-hover: rgba(255, 255, 255, 0.12);
+  --border: rgba(148, 163, 184, 0.16);
+  --border-strong: rgba(148, 163, 184, 0.26);
+  --ink: oklch(0.93 0.012 250);
+  --ink-secondary: oklch(0.73 0.02 250);
+  --muted: oklch(0.60 0.02 250);
+
+  /* Semantic status colors */
+  --status-new: oklch(0.73 0.11 244);
+  --status-new-bg: oklch(0.30 0.06 244);
+  --status-shortlisted: oklch(0.78 0.11 68);
+  --status-shortlisted-bg: oklch(0.33 0.05 68);
+  --status-progress: oklch(0.75 0.09 195);
+  --status-progress-bg: oklch(0.30 0.05 195);
+  --status-hired: oklch(0.80 0.12 152);
+  --status-hired-bg: oklch(0.30 0.06 152);
+  --status-rejected: oklch(0.79 0.13 24);
+  --status-rejected-bg: oklch(0.32 0.06 24);
+  --status-hold: oklch(0.72 0.02 240);
+  --status-hold-bg: oklch(0.29 0.01 240);
+
+  /* Danger */
+  --danger: oklch(0.70 0.17 25);
+  --danger-hover: oklch(0.62 0.17 25);
+  --danger-soft: oklch(0.33 0.07 25);
+
+  /* Shadows & glass */
+  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.55);
+  --shadow-xl: 0 24px 48px rgba(0, 0, 0, 0.60);
+  --glass-bg: rgba(30, 41, 59, 0.56);
+  --glass-border: rgba(148, 163, 184, 0.18);
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.45);
 }
 
 /* ===== Gradient canvas background ===== */
@@ -109,7 +175,7 @@ body {
   font-size: var(--text-base);
   line-height: 1.5;
   color: var(--ink);
-  background: linear-gradient(135deg, #f8fafc 0%, #edf2f7 100%);
+  background: linear-gradient(135deg, var(--bg-1) 0%, var(--bg-2) 100%);
   -webkit-font-smoothing: antialiased;
   min-height: 100dvh;
 }
@@ -168,8 +234,8 @@ a:hover {
 }
 
 .glass-panel:hover {
-  background: rgba(255, 255, 255, 0.65);
-  border-color: rgba(226, 232, 240, 0.7);
+  background: var(--surface-hover);
+  border-color: var(--border-strong);
   box-shadow: var(--shadow-md);
 }
 
@@ -183,14 +249,14 @@ a:hover {
 }
 
 .glass-topbar {
-  background: rgba(255, 255, 255, 0.60);
+  background: var(--glass-bg);
   border-bottom: 1px solid var(--glass-border);
   backdrop-filter: blur(16px) saturate(180%);
   -webkit-backdrop-filter: blur(16px) saturate(180%);
 }
 
 .glass-sidebar {
-  background: rgba(255, 255, 255, 0.55);
+  background: var(--glass-bg);
   border-right: 1px solid var(--glass-border);
   backdrop-filter: blur(16px) saturate(180%);
   -webkit-backdrop-filter: blur(16px) saturate(180%);
@@ -206,7 +272,7 @@ a:hover {
 }
 
 .glass-input {
-  background: rgba(255, 255, 255, 0.45);
+  background: var(--glass-bg);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius);
   color: var(--ink);
@@ -214,7 +280,7 @@ a:hover {
 }
 
 .glass-input:focus {
-  background: rgba(255, 255, 255, 0.70);
+  background: var(--surface-hover);
   border-color: var(--brand);
   box-shadow: 0 0 0 3px var(--brand-soft);
   outline: none;
@@ -590,6 +656,31 @@ a:hover {
   color: var(--ink);
 }
 
+/* ===== Theme toggle ===== */
+.theme-toggle {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  color: var(--ink-secondary);
+  backdrop-filter: blur(8px);
+}
+
+.theme-toggle:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+.theme-toggle svg {
+  display: block;
+}
+
+/* Light theme shows the moon (tap to go dark); dark theme shows the sun. */
+.theme-toggle .icon-sun { display: none; }
+.theme-toggle .icon-moon { display: block; }
+
+:root[data-theme='dark'] .theme-toggle .icon-sun { display: block; }
+:root[data-theme='dark'] .theme-toggle .icon-moon { display: none; }
+
 /* ===== Forms ===== */
 .form-field {
   margin-bottom: var(--sp-4);
@@ -912,7 +1003,7 @@ a:hover {
 }
 
 .alert-error {
-  background: oklch(0.95 0.03 25);
+  background: var(--danger-soft);
   color: var(--danger);
 }
 
@@ -1003,30 +1094,13 @@ a:hover {
   to { transform: rotate(360deg); }
 }
 
-/* ===== Auth pages (dark theme) ===== */
+/* ===== Auth pages =====
+   Follows the active theme via the shared design tokens (light or dark),
+   so the sign-in card matches the rest of the application. */
 .auth-body {
   min-height: 100dvh;
   display: grid;
   place-items: center;
-  /* Dark theme, scoped to auth pages only */
-  --auth-bg: oklch(0.16 0.02 240);
-  --auth-surface: oklch(0.22 0.025 240);
-  --auth-border: oklch(0.32 0.03 240);
-  --auth-ink: oklch(0.93 0.01 240);
-  --auth-muted: oklch(0.68 0.03 240);
-  --auth-brand: oklch(0.70 0.15 230);
-  --auth-brand-hover: oklch(0.75 0.14 230);
-  --auth-input-bg: oklch(0.18 0.02 240);
-  --auth-input-border: oklch(0.38 0.04 240);
-  background: var(--auth-bg);
-}
-
-.auth-body .brand-mark {
-  background: var(--auth-brand);
-}
-
-.auth-body .brand-name {
-  color: var(--auth-ink);
 }
 
 .auth-shell {
@@ -1036,11 +1110,11 @@ a:hover {
 }
 
 .auth-card {
-  background: rgba(34, 38, 51, 0.65);
-  border: 1px solid var(--auth-border);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-xl);
   padding: var(--sp-8);
-  box-shadow: 0 8px 32px 0 oklch(0 0 0 / 0.30);
+  box-shadow: var(--glass-shadow);
   backdrop-filter: blur(16px) saturate(180%);
   -webkit-backdrop-filter: blur(16px) saturate(180%);
 }
@@ -1057,60 +1131,19 @@ a:hover {
   font-weight: 700;
   letter-spacing: -0.02em;
   margin-bottom: var(--sp-1);
-  color: var(--auth-ink);
+  color: var(--ink);
 }
 
 .auth-sub {
-  color: var(--auth-muted);
+  color: var(--muted);
   font-size: var(--text-sm);
   margin-bottom: var(--sp-6);
-}
-
-/* Dark-theme form controls inside the auth card */
-.auth-body .form-label {
-  color: var(--auth-ink);
-}
-
-.auth-body .form-input,
-.auth-body .form-select,
-.auth-body .form-textarea {
-  background: var(--auth-input-bg);
-  border-color: var(--auth-input-border);
-  color: var(--auth-ink);
-}
-
-.auth-body .form-input::placeholder,
-.auth-body .form-textarea::placeholder {
-  color: var(--auth-muted);
-}
-
-.auth-body .form-input:focus,
-.auth-body .form-select:focus,
-.auth-body .form-textarea:focus {
-  border-color: var(--auth-brand);
-  box-shadow: 0 0 0 3px oklch(0.70 0.15 230 / 0.25);
-}
-
-.auth-body .btn-primary {
-  background: var(--auth-brand);
-  color: oklch(0.14 0.02 240);
-  border-color: var(--auth-brand);
-  box-shadow: 0 4px 12px oklch(0.70 0.15 230 / 0.20);
-}
-
-.auth-body .btn-primary:hover {
-  background: var(--auth-brand-hover);
-  box-shadow: 0 6px 16px oklch(0.70 0.15 230 / 0.30);
-}
-
-.auth-body .alert-error {
-  background: oklch(0.30 0.08 25);
-  color: oklch(0.85 0.12 25);
 }
 
 /* ===== Utility ===== */
 .flex { display: flex; }
 .flex-col { display: flex; flex-direction: column; }
+.flex-1 { flex: 1; }
 .items-center { align-items: center; }
 .justify-between { justify-content: space-between; }
 .gap-2 { gap: var(--sp-2); }
