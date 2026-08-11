@@ -10,11 +10,10 @@
     </p>
   </div>
   <div class="page-actions">
-    <a href="{% url 'pipeline:board' job.pk %}" class="btn btn-primary">Pipeline board</a>
     {% if can_edit %}<a href="{% url 'jobs:edit' job.pk %}" class="btn btn-secondary">Edit</a>{% endif %}
     <a href="{% url 'jobs:list' %}" class="btn btn-secondary">All jobs</a>
     {% if can_edit and job.is_active %}
-    <form method="post" action="{% url 'jobs:close' job.pk %}" style="display:inline" onsubmit="event.preventDefault();confirmAction(this,'Close job','Close this job? All remaining active candidates will be marked Rejected. You can reopen the job to undo this.')">
+    <form method="post" action="{% url 'jobs:close' job.pk %}" style="display:inline" onsubmit="event.preventDefault();confirmAction(this,'Close job','Close this job? It will stop accepting new CV uploads. Existing candidates keep their current stage and status.')">
       {% csrf_token %}
       <button type="submit" class="btn btn-danger">Close job</button>
     </form>
@@ -61,7 +60,7 @@
 <div class="panel panel-pad" style="margin-top:var(--sp-6)">
   <div class="flex items-center justify-between" style="margin-bottom:var(--sp-4)">
     <h3 style="font-size:var(--text-base);font-weight:650">Interview rounds</h3>
-    <span class="text-sm text-muted">Candidates move through these stages on the Kanban board.</span>
+    <span class="text-sm text-muted">Candidates move through these stages on the candidate list and detail views.</span>
   </div>
 
   {% if rounds %}

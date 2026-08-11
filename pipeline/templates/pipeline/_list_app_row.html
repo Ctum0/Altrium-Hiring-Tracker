@@ -1,0 +1,47 @@
+{% load static %}
+<tr id="app-row-{{ app.pk }}">
+  <td class="strong">
+    <a href="{% url 'candidates:detail' app.candidate.pk %}">{{ app.candidate.full_name }}</a>
+    <div class="text-xs text-muted">{{ app.candidate.email }}</div>
+  </td>
+  <td>{{ app.job.title }}</td>
+  <td>
+    <span class="badge badge-{{ app.status }}">{{ app.get_status_display }}</span>
+    {% if app.current_round %}<div class="text-xs text-muted">{{ app.current_round.name }}</div>{% endif %}
+  </td>
+  <td>
+    {% if app.candidate.score is not None %}
+    <span class="score-chip has-score">{{ app.candidate.score }}</span>
+    {% else %}
+    <span class="text-muted">-</span>
+    {% endif %}
+  </td>
+  <td>
+    {% if app.assigned_to %}{{ app.assigned_to.get_full_name|default:app.assigned_to.username }}{% else %}Unassigned{% endif %}
+  </td>
+  <td class="text-muted">{{ app.created_at|date:'M j, Y' }}</td>
+  {% if is_hr %}
+  <td style="min-width:140px">
+    {% if app.status != 'hired' and app.status != 'rejected' and app.status != 'on_hold' %}
+    <select class="stage-select" name="stage"
+            hx-post="{% url 'pipeline:move' app.pk %}"
+            hx-include="[name='csrfmiddlewaretoken']"
+            hx-vals='{"source": "list"}'
+            hx-target="#app-row-{{ app.pk }}"
+            hx-swap="outerHTML"
+            hx-trigger="change"
+            style="width:100%">
+      <option value="">Move to…</option>
+      {% for round in app.job.rounds.all %}
+      <option value="round:{{ round.pk }}" {% if app.current_round_id == round.pk %}selected{% endif %}>{{ round.name }}</option>
+      {% endfor %}
+      <option value="status:hired">Hired</option>
+      <option value="status:rejected">Rejected</option>
+      <option value="status:on_hold">On Hold</option>
+    </select>
+    {% else %}
+    <span class="text-xs text-muted">Final state</span>
+    {% endif %}
+  </td>
+  {% endif %}
+</tr>

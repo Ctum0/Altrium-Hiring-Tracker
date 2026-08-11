@@ -36,25 +36,13 @@ class PipelineTests(TestCase):
             notes='Test feedback.',
         )
 
-    def test_board_renders_columns_and_final_states(self):
-        assert self.client.login(username='hr', password='pass12345')
-        r = self.client.get(reverse('pipeline:board', args=[self.job.pk]))
-        self.assertEqual(r.status_code, 200)
-        self.assertContains(r, 'Screen')
-        self.assertContains(r, 'Tech')
-        self.assertContains(r, 'Hired')
-        self.assertContains(r, 'Rejected')
-        self.assertContains(r, 'On Hold')
-
     def test_move_round_to_round(self):
         assert self.client.login(username='hr', password='pass12345')
         self.app.current_round = self.round1
         self.app.save()
         self._add_feedback(self.round1)  # required for advancement
         r = self.client.post(reverse('pipeline:move', args=[self.app.pk]), {
-            'round': self.round2.pk,
-            'source_round': self.round1.pk,
-            'source_status': '',
+            'stage': f'round:{self.round2.pk}',
         })
         self.assertEqual(r.status_code, 200)
         self.app.refresh_from_db()
@@ -65,30 +53,26 @@ class PipelineTests(TestCase):
     def test_move_to_final_status(self):
         assert self.client.login(username='hr', password='pass12345')
         r = self.client.post(reverse('pipeline:move', args=[self.app.pk]), {
-            'status': 'hired',
-            'source_round': '',
-            'source_status': '',
+            'stage': 'status:hired',
         })
-        self.assertEqual(r.status_code, 204)  # no source column to refresh
+        self.assertEqual(r.status_code, 200)  # returns updated row
         self.app.refresh_from_db()
         self.assertEqual(self.app.status, JobApplication.Status.HIRED)
         self.assertIsNone(self.app.current_round)  # final status clears round
 
-    def test_move_unknown_source_returns_204(self):
+    def test_move_unknown_source_returns_row(self):
         assert self.client.login(username='hr', password='pass12345')
         r = self.client.post(reverse('pipeline:move', args=[self.app.pk]), {
-            'round': self.round1.pk,
-            'source_round': '',
-            'source_status': '',
+            'stage': f'round:{self.round1.pk}',
         })
-        self.assertEqual(r.status_code, 204)
+        self.assertEqual(r.status_code, 200)
+        self.app.refresh_from_db()
+        self.assertEqual(self.app.current_round, self.round1)
 
     def test_invalid_status_rejected(self):
         assert self.client.login(username='hr', password='pass12345')
         r = self.client.post(reverse('pipeline:move', args=[self.app.pk]), {
-            'status': 'not_a_status',
-            'source_round': '',
-            'source_status': '',
+            'stage': 'status:not_a_status',
         })
         self.assertEqual(r.status_code, 400)
         self.app.refresh_from_db()
@@ -97,34 +81,22 @@ class PipelineTests(TestCase):
     def test_interviewer_cannot_move(self):
         assert self.client.login(username='iv', password='pass12345')
         r = self.client.post(reverse('pipeline:move', args=[self.app.pk]), {
-            'round': self.round2.pk,
-            'source_round': '',
-            'source_status': '',
+            'stage': f'round:{self.round2.pk}',
         })
         self.assertEqual(r.status_code, 403)
         self.app.refresh_from_db()
         self.assertIsNone(self.app.current_round)
 
-    def test_board_read_only_for_interviewer(self):
-        assert self.client.login(username='iv', password='pass12345')
-        r = self.client.get(reverse('pipeline:board', args=[self.job.pk]))
-        self.assertEqual(r.status_code, 200)
-        self.assertContains(r, 'read-only')
-
     def test_audit_log_records_every_move(self):
         assert self.client.login(username='hr', password='pass12345')
         # Move into round1 (no feedback needed — from_round is None)
         self.client.post(reverse('pipeline:move', args=[self.app.pk]), {
-            'round': self.round1.pk,
-            'source_round': '',
-            'source_status': '',
+            'stage': f'round:{self.round1.pk}',
         })
         # Add feedback, then move round1 -> round2
         self._add_feedback(self.round1)
         self.client.post(reverse('pipeline:move', args=[self.app.pk]), {
-            'round': self.round2.pk,
-            'source_round': self.round1.pk,
-            'source_status': '',
+            'stage': f'round:{self.round2.pk}',
         })
         self.assertEqual(PipelineMove.objects.filter(application=self.app).count(), 2)
 
@@ -137,3 +109,26 @@ class PipelineTests(TestCase):
         self.app.refresh_from_db()
         self.assertIsNone(self.app.current_round)
         self.assertTrue(JobApplication.objects.filter(pk=self.app.pk).exists())
+
+    def test_inline_transition_returns_updated_row(self):
+        """Inline stage transition from candidate detail returns the updated row HTML."""
+        assert self.client.login(username='hr', password='pass12345')
+        r = self.client.post(reverse('pipeline:move', args=[self.app.pk]), {
+            'stage': 'status:hired',
+        })
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'app-row-')
+        self.app.refresh_from_db()
+        self.assertEqual(self.app.status, JobApplication.Status.HIRED)
+
+    def test_feedback_validation_blocks_advancement(self):
+        """Moving to a new round without feedback on the current round is blocked."""
+        assert self.client.login(username='hr', password='pass12345')
+        self.app.current_round = self.round1
+        self.app.save()
+        r = self.client.post(reverse('pipeline:move', args=[self.app.pk]), {
+            'stage': f'round:{self.round2.pk}',
+        })
+        self.assertEqual(r.status_code, 409)
+        self.app.refresh_from_db()
+        self.assertEqual(self.app.current_round, self.round1)

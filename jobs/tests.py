@@ -110,3 +110,18 @@ class JobRoundTests(JobsBaseTestCase):
 
         r = self.client.get(reverse('jobs:list') + '?inactive=1')
         self.assertContains(r, 'Closed Role')
+
+    def test_close_job_does_not_reject_candidates(self):
+        self.login('hr')
+        from candidates.models import Candidate, JobApplication
+        from jobs.models import Job
+        job = Job.objects.create(title='Dev', created_by=self.hr)
+        cand = Candidate.objects.create(email='a@example.com', first_name='Anna')
+        app = JobApplication.objects.create(candidate=cand, job=job)
+        r = self.client.post(reverse('jobs:close', args=[job.pk]))
+        self.assertEqual(r.status_code, 302)
+        job.refresh_from_db()
+        self.assertFalse(job.is_active)
+        self.assertIsNotNone(job.closed_at)
+        app.refresh_from_db()
+        self.assertEqual(app.status, JobApplication.Status.NEW)

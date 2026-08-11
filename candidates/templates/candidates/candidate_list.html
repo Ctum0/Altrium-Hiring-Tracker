@@ -78,11 +78,12 @@
         <th>Score</th>
         <th>Assigned to</th>
         <th>Applied</th>
+        {% if user.is_hr %}<th>Move</th>{% endif %}
       </tr>
     </thead>
     <tbody>
       {% for app in applications %}
-      <tr>
+      <tr id="app-row-{{ app.pk }}">
         <td class="strong">
           <a href="{% url 'candidates:detail' app.candidate.pk %}">{{ app.candidate.full_name }}</a>
           <div class="text-xs text-muted">{{ app.candidate.email }}</div>
@@ -103,6 +104,30 @@
           {% if app.assigned_to %}{{ app.assigned_to.get_full_name|default:app.assigned_to.username }}{% else %}Unassigned{% endif %}
         </td>
         <td class="text-muted">{{ app.created_at|date:'M j, Y' }}</td>
+        {% if user.is_hr %}
+        <td style="min-width:140px">
+          {% if app.status != 'hired' and app.status != 'rejected' and app.status != 'on_hold' %}
+          <select class="stage-select" name="stage"
+                  hx-post="{% url 'pipeline:move' app.pk %}"
+                  hx-include="[name='csrfmiddlewaretoken']"
+                  hx-vals='{"source": "list"}'
+                  hx-target="#app-row-{{ app.pk }}"
+                  hx-swap="outerHTML"
+                  hx-trigger="change"
+                  style="width:100%">
+            <option value="">Move to…</option>
+            {% for round in app.job.rounds.all %}
+            <option value="round:{{ round.pk }}" {% if app.current_round_id == round.pk %}selected{% endif %}>{{ round.name }}</option>
+            {% endfor %}
+            <option value="status:hired">Hired</option>
+            <option value="status:rejected">Rejected</option>
+            <option value="status:on_hold">On Hold</option>
+          </select>
+          {% else %}
+          <span class="text-xs text-muted">Final state</span>
+          {% endif %}
+        </td>
+        {% endif %}
       </tr>
       {% endfor %}
     </tbody>
