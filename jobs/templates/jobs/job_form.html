@@ -43,13 +43,6 @@
     </div>
 
     <div class="form-field">
-      <label class="form-label" for="{{ form.auto_reject_score.id_for_label }}">Auto-reject threshold</label>
-      {{ form.auto_reject_score }}
-      {% if form.auto_reject_score.errors %}<p class="form-error">{{ form.auto_reject_score.errors.0 }}</p>{% endif %}
-      <p class="form-help">Optional. Candidates scoring below this are automatically rejected on upload.</p>
-    </div>
-
-    <div class="form-field">
       <label class="form-label" for="{{ form.hiring_manager.id_for_label }}">Hiring manager</label>
       {{ form.hiring_manager }}
       {% if form.hiring_manager.errors %}<p class="form-error">{{ form.hiring_manager.errors.0 }}</p>{% endif %}

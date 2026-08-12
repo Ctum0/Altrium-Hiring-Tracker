@@ -18,21 +18,18 @@ JOBS = [
         'department': 'Engineering',
         'description': 'Build and scale our core API platform serving millions of requests.',
         'requirements': 'Python, Django, PostgreSQL, Docker, AWS',
-        'auto_reject_score': 40,
     },
     {
         'title': 'Product Designer',
         'department': 'Design',
         'description': 'Design user experiences for our B2B SaaS platform.',
         'requirements': 'Figma, UX Research, Design Systems, Prototyping',
-        'auto_reject_score': 50,
     },
     {
         'title': 'DevOps Engineer',
         'department': 'Engineering',
         'description': 'Manage our cloud infrastructure and CI/CD pipelines.',
         'requirements': 'AWS, Docker, Kubernetes, Terraform, CI/CD',
-        'auto_reject_score': 40,
     },
 ]
 
@@ -79,7 +76,7 @@ class Command(BaseCommand):
         self._place(CANDIDATES[0], job_map['Senior Backend Engineer'], hr, iv,
                     round_idx=1, status='in_progress')
         self._place(CANDIDATES[1], job_map['Senior Backend Engineer'], hr, iv,
-                    round_idx=0, status='rejected')  # low skill match -> auto-reject
+                    round_idx=0, status='rejected')
         self._place(CANDIDATES[2], job_map['Senior Backend Engineer'], hr, None,
                     round_idx=0, status='shortlisted')
 
@@ -117,10 +114,6 @@ class Command(BaseCommand):
                 'assigned_to': interviewer,
             },
         )
-        # If the job has auto_reject and score is low, enforce rejection.
-        if job.auto_reject_score and candidate.score and candidate.score <= job.auto_reject_score:
-            app.status = 'rejected'
-            app.save()
 
         label = f'{first} {last}'
         self.stdout.write(f'  {label}: score={candidate.score} status={app.status}')

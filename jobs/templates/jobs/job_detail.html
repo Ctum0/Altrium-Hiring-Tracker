@@ -49,10 +49,6 @@
       <dd class="mono">{{ job.candidate_count }}</dd>
       <dt class="text-muted">Rounds</dt>
       <dd class="mono">{{ rounds|length }}</dd>
-      {% if job.auto_reject_score %}
-      <dt class="text-muted">Auto-reject</dt>
-      <dd class="mono">Score below {{ job.auto_reject_score }}</dd>
-      {% endif %}
     </dl>
   </div>
 </div>

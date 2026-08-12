@@ -1,4 +1,4 @@
-"""Groq AI client for CV parsing, note polishing, and rejection emails.
+"""Groq AI client for CV parsing and note polishing.
 
 Uses the free Groq API tier. Falls back to graceful local defaults when
 the API key is missing or the request fails, so the app never hard-crashes
@@ -29,12 +29,6 @@ SYSTEM_POLISH = (
     'You are a professional recruiter. Rewrite messy interviewer notes into '
     'clear, concise, professional feedback. Keep the original meaning, tone '
     'slightly positive, and do not invent facts. Return only the polished text.'
-)
-
-SYSTEM_REJECTION = (
-    'You write professional, respectful job rejection emails. Keep them short '
-    'and warm, thank the candidate for their time, and do not invent details. '
-    'Return only the email body, starting with "Dear".'
 )
 
 
@@ -111,14 +105,3 @@ def polish_notes(raw_notes: str) -> str:
     if not raw_notes.strip():
         return ''
     return _chat(SYSTEM_POLISH, raw_notes[:4000], temperature=0.4)
-
-
-def generate_rejection_email(candidate_name: str, job_title: str) -> str:
-    """Generate a personalized rejection email body."""
-    if not candidate_name:
-        candidate_name = 'Candidate'
-    user = (
-        f'Write a rejection email to {candidate_name} who applied for the '
-        f'{job_title} position.'
-    )
-    return _chat(SYSTEM_REJECTION, user, temperature=0.5)

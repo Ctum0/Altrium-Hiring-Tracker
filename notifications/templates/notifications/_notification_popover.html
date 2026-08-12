@@ -1,0 +1,19 @@
+<div class="popover-list">
+  {% if notifications %}
+    {% for n in notifications|slice:":5" %}
+    <div class="popover-item {% if not n.is_read %}unread{% endif %}">
+      <div class="popover-item-content">
+        <p class="popover-item-message">{{ n.message }}</p>
+        <span class="popover-item-time">{{ n.created_at|date:'M j, g:i A' }}</span>
+      </div>
+      {% if not n.is_read %}
+      <span class="popover-unread-dot" title="Unread"></span>
+      {% endif %}
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="popover-empty">
+      <p class="text-xs text-muted">No notifications yet.</p>
+    </div>
+  {% endif %}
+</div>

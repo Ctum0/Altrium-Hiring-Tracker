@@ -1,7 +1,6 @@
 """Auto-scoring: match candidate skills against job requirements.
 
-Called after AI parsing to compute a score and optionally auto-reject
-candidates who fall below the job's threshold.
+Called after AI parsing to compute a score based on skill overlap.
 """
 from candidates.models import Candidate
 from jobs.models import Job
@@ -40,11 +39,9 @@ def compute_score(candidate: Candidate, job: Job) -> int:
 
 
 def auto_apply(candidate: Candidate, job: Job) -> int | None:
-    """Compute score and optionally auto-reject the candidate.
+    """Compute score and save it on the candidate.
 
     Returns the computed score. Sets it on the candidate and saves.
-    If the job has auto_reject_score set and the computed score is below it,
-    returns the score but does NOT auto-reject here — the caller decides.
     """
     score = compute_score(candidate, job)
     candidate.score = score
