@@ -63,18 +63,6 @@ class GroqClientTests(SimpleTestCase):
     def test_polish_notes_empty(self):
         self.assertEqual(services.polish_notes(''), '')
 
-    def test_generate_rejection_email(self):
-        with override_settings(GROQ_API_KEY='key'), \
-             patch.object(services._client, 'post', return_value=_FakeResp('Dear Jane, ...')):
-            result = services.generate_rejection_email('Jane Smith', 'Backend Engineer')
-        self.assertIn('Jane', result)
-
-    def test_generate_rejection_no_name_fallback(self):
-        with override_settings(GROQ_API_KEY='key'), \
-             patch.object(services._client, 'post', return_value=_FakeResp('Dear Candidate, ...')):
-            result = services.generate_rejection_email('', 'Backend Engineer')
-        self.assertEqual(result, 'Dear Candidate, ...')
-
     def test_httpx_failure_returns_empty(self):
         with override_settings(GROQ_API_KEY='key'), \
              patch.object(services._client, 'post', side_effect=Exception('network down')):

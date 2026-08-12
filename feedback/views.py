@@ -37,7 +37,8 @@ class FeedbackListView(LoginRequiredMixin, ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['active_nav'] = 'candidates'
+        context['active_nav'] = 'feedback'
+        return context
         return context
 
 

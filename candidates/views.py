@@ -219,12 +219,9 @@ class CandidateUploadView(LoginRequiredMixin, View):
             if app_created:
                 linked += 1
 
-            # Auto-score and optionally auto-reject based on job requirements.
+            # Auto-score based on job requirements.
             if job.requirements:
-                score = auto_apply(candidate, job)
-                if job.auto_reject_score and score <= job.auto_reject_score:
-                    app.status = JobApplication.Status.REJECTED
-                    app.save(update_fields=['status', 'updated_at'])
+                auto_apply(candidate, job)
 
         summary = f'{created} candidate(s) created, {linked} linked to "{job.title}".'
         if duplicates:
@@ -301,15 +298,9 @@ class CandidateImportView(LoginRequiredMixin, View):
             defaults={'status': JobApplication.Status.NEW},
         )
 
-        # Auto-score and optionally auto-reject for imports too.
+        # Auto-score for imports too.
         if job.requirements:
-            score = auto_apply(candidate, job)
-            app = JobApplication.objects.filter(
-                candidate=candidate, job=job
-            ).first()
-            if app and job.auto_reject_score and score <= job.auto_reject_score:
-                app.status = JobApplication.Status.REJECTED
-                app.save(update_fields=['status', 'updated_at'])
+            auto_apply(candidate, job)
 
         if was_created and app_created:
             messages.success(request, f'Imported {candidate.full_name} for {job.title}.')
@@ -403,6 +394,35 @@ class AssignApplicationView(LoginRequiredMixin, View):
             messages.info(
                 request,
                 f'{app.candidate.full_name} is already assigned to that interviewer.',
+            )
+
+        return redirect('candidates:detail', pk=app.candidate_id)
+
+
+class InterviewDetailsView(LoginRequiredMixin, View):
+    """HR only: set or update interview link and scheduling notes for an application."""
+
+    def post(self, request, pk):
+        app = get_object_or_404(JobApplication, pk=pk)
+        if request.user.is_management():
+            return HttpResponse('Management has read-only access.', status=403)
+        if not request.user.is_hr():
+            messages.error(request, 'Only HR can set interview details.')
+            return redirect('candidates:detail', pk=app.candidate_id)
+
+        details = request.POST.get('interview_details', '').strip()
+        app.interview_details = details
+        app.save(update_fields=['interview_details', 'updated_at'])
+
+        if details:
+            messages.success(
+                request,
+                f'Interview details updated for {app.candidate.full_name}.',
+            )
+        else:
+            messages.success(
+                request,
+                f'Interview details cleared for {app.candidate.full_name}.',
             )
 
         return redirect('candidates:detail', pk=app.candidate_id)

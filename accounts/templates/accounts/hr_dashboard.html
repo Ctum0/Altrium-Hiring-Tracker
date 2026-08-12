@@ -1,42 +1,470 @@
 {% extends 'base.html' %}
 {% block title %}HR Dashboard | Altrium Tracker{% endblock %}
 {% block page_title %}HR Dashboard{% endblock %}
+{% block content_class %}wide{% endblock %}
 {% block content %}
-<div class="page-header">
+<!-- Main Page Header -->
+<div class="page-header" style="margin-bottom:var(--sp-5)">
   <div>
-    <h2 class="page-title">Job postings</h2>
-    <p class="page-sub">Manage your open positions, upload CVs, and track candidates.</p>
+    <h1 class="page-title" style="font-size:2rem;font-weight:700;letter-spacing:-0.02em;color:var(--ink)">Pipeline overview</h1>
+    <p class="page-sub" style="font-size:var(--text-sm);color:var(--muted);margin-top:4px">Candidates, scores, and feedback &mdash; all from live data.</p>
   </div>
   <div class="page-actions">
     <a href="{% url 'jobs:create' %}" class="btn btn-primary">Create new job</a>
+    <a href="{% url 'candidates:upload' %}" class="btn btn-secondary">Upload CVs</a>
   </div>
 </div>
 
-{% if jobs %}
-<div class="grid-2">
-  {% for job in jobs %}
-  <div class="card card-pad">
-    <div class="flex items-center justify-between" style="margin-bottom:var(--sp-2)">
-      <h3 style="font-size:var(--text-lg);font-weight:650;letter-spacing:-0.01em">{{ job.title }}</h3>
-      <span class="badge badge-in_progress">{{ job.department|default:'No dept' }}</span>
+<!-- 4 Large Spacious KPI Cards Row -->
+<div class="ref-kpi-row">
+  <div class="ref-kpi-card">
+    <span class="ref-kpi-value">{{ total_applications }}</span>
+    <span class="ref-kpi-label">Total applications</span>
+  </div>
+  <div class="ref-kpi-card">
+    <span class="ref-kpi-value">{{ jobs|length }}</span>
+    <span class="ref-kpi-label">Open positions</span>
+  </div>
+  <div class="ref-kpi-card">
+    <span class="ref-kpi-value">{% if avg_score %}{{ avg_score }}{% else %}-{% endif %}</span>
+    <span class="ref-kpi-label">Avg. candidate score</span>
+  </div>
+  <div class="ref-kpi-card {% if feedback_pending > 0 %}kpi-card-danger-3d{% endif %}">
+    <span class="ref-kpi-value">{{ feedback_pending }}</span>
+    <span class="ref-kpi-label">Pending feedback</span>
+  </div>
+</div>
+
+<!-- Reference 2-Column Dashboard Grid (65% / 35%) -->
+<div class="ref-dash-grid">
+  <!-- Left Column: Visual Analytics (~65% Width) -->
+  <div class="ref-dash-col">
+    <!-- Card 1: Pipeline Breakdown -->
+    <div class="panel panel-pad ref-card">
+      <div class="panel-header-tabs" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--sp-4)">
+        <h3 class="ref-card-title">Pipeline Breakdown</h3>
+        <div class="seg-control">
+          <button type="button" class="seg-btn active" id="tab-btn-stage" onclick="switchChartTab('stage')">By Stage</button>
+          <button type="button" class="seg-btn" id="tab-btn-position" onclick="switchChartTab('position')">By Position</button>
+        </div>
+      </div>
+
+      <!-- Tab 1: Stage distribution -->
+      <div id="chart-tab-stage" class="chart-tab-content active">
+        {% for stage in stage_distribution %}
+        <div class="ref-bar-item">
+          <div class="ref-bar-badge-col">
+            <span class="badge badge-{{ stage.value }}">{{ stage.label }}</span>
+          </div>
+          <div class="ref-bar-track-col">
+            <div class="ref-bar-track">
+              <div class="ref-bar-fill bar-glass-{{ stage.value }}" style="width:{% widthratio stage.count total_applications|default:1 100 %}%"></div>
+            </div>
+          </div>
+          <div class="ref-bar-count-col">
+            <span class="ref-bar-count mono">{{ stage.count }}</span>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- Tab 2: Position distribution -->
+      <div id="chart-tab-position" class="chart-tab-content" style="display:none;opacity:0">
+        {% if apps_per_job %}
+        {% for j in apps_per_job %}
+        <div class="ref-bar-item">
+          <div class="ref-bar-badge-col">
+            <span class="badge badge-position-{{ forloop.counter0 }}">{{ j.title }}</span>
+          </div>
+          <div class="ref-bar-track-col">
+            <div class="ref-bar-track">
+              <div class="ref-bar-fill bar-job-{{ forloop.counter0 }}" style="width:{% widthratio j.count max_apps_per_job 100 %}%"></div>
+            </div>
+          </div>
+          <div class="ref-bar-count-col">
+            <span class="ref-bar-count mono">{{ j.count }}</span>
+          </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <p class="text-sm text-muted">No applications yet.</p>
+        {% endif %}
+      </div>
     </div>
-    <p class="text-muted text-sm" style="margin-bottom:var(--sp-3);max-width:48ch">{{ job.description|truncatewords:20 }}</p>
-    <div class="flex items-center gap-3" style="margin-bottom:var(--sp-3)">
-      <span class="text-xs text-muted">{{ job.candidate_count }} candidates</span>
-      {% if job.auto_reject_score %}<span class="text-xs text-muted">Auto-reject ≤ {{ job.auto_reject_score }}</span>{% endif %}
+
+    <!-- Card 2: Candidate Scores -->
+    <div class="panel panel-pad ref-card">
+      <div class="flex items-center justify-between" style="margin-bottom:var(--sp-3)">
+        <h3 class="ref-card-title">Candidate Scores</h3>
+        <span class="text-xs text-muted">{{ scored_count }} scored &middot; avg {{ avg_score|default:'-' }}</span>
+      </div>
+      {% for bucket in score_distribution %}
+      <div class="ref-bar-item">
+        <div class="ref-bar-badge-col">
+          <span class="text-xs mono" style="color:var(--muted)">{{ bucket.label }}</span>
+        </div>
+        <div class="ref-bar-track-col">
+          <div class="ref-bar-track">
+            <div class="ref-bar-fill bar-glass-brand" style="width:{% widthratio bucket.count scored_count|default:1 100 %}%"></div>
+          </div>
+        </div>
+        <div class="ref-bar-count-col">
+          <span class="ref-bar-count mono">{{ bucket.count }}</span>
+        </div>
+      </div>
+      {% endfor %}
     </div>
-    <div class="flex gap-2">
-      <a href="{% url 'jobs:detail' job.pk %}" class="btn btn-secondary btn-sm">Details</a>
-      <a href="{% url 'candidates:list' %}?job={{ job.pk }}" class="btn btn-primary btn-sm">View candidates</a>
+
+    <!-- Card 3: Feedback Status -->
+    <div class="panel panel-pad ref-card">
+      <div class="flex items-center justify-between" style="margin-bottom:var(--sp-3)">
+        <h3 class="ref-card-title">Feedback Status</h3>
+        <a href="{% url 'feedback:list' %}" class="btn btn-secondary btn-sm">View all</a>
+      </div>
+      <div class="ref-feedback-grid">
+        <div class="ref-feedback-stat">
+          <span class="ref-feedback-num text-success">{{ feedback_submitted }}</span>
+          <span class="ref-feedback-label">Submitted</span>
+          <div class="ref-bar-track" style="margin-top:6px">
+            <div class="ref-bar-fill bar-glass-hired" style="width:{% widthratio feedback_submitted total_feedback 100 %}%"></div>
+          </div>
+        </div>
+        <div class="ref-feedback-stat">
+          <span class="ref-feedback-num text-danger">{{ feedback_pending }}</span>
+          <span class="ref-feedback-label">Pending</span>
+          <div class="ref-bar-track" style="margin-top:6px">
+            <div class="ref-bar-fill bar-glass-rejected" style="width:{% widthratio feedback_pending total_feedback 100 %}%"></div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
-  {% endfor %}
+
+  <!-- Right Column: Recent Activity & Open Positions (~35% Width) -->
+  <div class="ref-dash-col">
+    <!-- Card 1: Recent Activity -->
+    <div class="panel panel-pad ref-card">
+      <h3 class="ref-card-title" style="margin-bottom:var(--sp-3)">Recent Activity</h3>
+      {% if recent_applications %}
+      <div class="ref-activity-list">
+        {% for app in recent_applications %}
+        <a href="{% url 'candidates:detail' app.candidate_id %}" class="ref-activity-item">
+          <div class="ref-activity-top">
+            <span class="ref-activity-name">{{ app.candidate.full_name }}</span>
+          </div>
+          <div class="ref-activity-meta">
+            <span class="ref-activity-job">{{ app.job.title }}</span>
+            <span class="badge badge-{{ app.status }}">{{ app.get_status_display }}</span>
+          </div>
+          <div class="ref-activity-time text-xs text-muted">{{ app.updated_at|date:'M j, g:i A' }}</div>
+        </a>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="text-sm text-muted">No activity yet.</p>
+      {% endif %}
+    </div>
+
+    <!-- Card 2: Open Positions -->
+    <div class="panel panel-pad ref-card">
+      <div class="flex items-center justify-between" style="margin-bottom:var(--sp-3)">
+        <h3 class="ref-card-title">Open Positions ({{ jobs|length }})</h3>
+        <a href="{% url 'jobs:list' %}" class="btn btn-secondary btn-sm">All Jobs</a>
+      </div>
+      {% if jobs %}
+      <div class="ref-jobs-list">
+        {% for job in jobs|slice:":4" %}
+        <div class="ref-job-item">
+          <div class="flex items-center justify-between">
+            <h4 class="ref-job-title">{{ job.title }}</h4>
+            <span class="badge badge-in_progress">{{ job.department|default:'General' }}</span>
+          </div>
+          <div class="flex items-center justify-between" style="margin-top:6px">
+            <span class="text-xs text-muted">{{ job.app_count }} candidates</span>
+            <a href="{% url 'candidates:list' %}?job={{ job.pk }}" class="btn btn-secondary btn-sm" style="padding:2px 8px;font-size:11px">View</a>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty-state" style="padding:var(--sp-3)">
+        <p class="empty-state-title">No active jobs</p>
+        <a href="{% url 'jobs:create' %}" class="btn btn-primary btn-sm mt-2">Create Job</a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
 </div>
-{% else %}
-<div class="empty-state">
-  <p class="empty-state-title">No active jobs</p>
-  <p class="empty-state-body">Create your first job posting to start receiving candidates.</p>
-  <a href="{% url 'jobs:create' %}" class="btn btn-primary">Create new job</a>
-</div>
-{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function switchChartTab(tabName) {
+  var stageContent = document.getElementById('chart-tab-stage');
+  var posContent = document.getElementById('chart-tab-position');
+  var stageBtn = document.getElementById('tab-btn-stage');
+  var posBtn = document.getElementById('tab-btn-position');
+
+  var activeContent = tabName === 'stage' ? stageContent : posContent;
+  var inactiveContent = tabName === 'stage' ? posContent : stageContent;
+
+  inactiveContent.style.opacity = '0';
+  setTimeout(function() {
+    inactiveContent.style.display = 'none';
+    activeContent.style.display = 'flex';
+    setTimeout(function() {
+      activeContent.style.opacity = '1';
+    }, 20);
+  }, 150);
+
+  if (tabName === 'stage') {
+    stageBtn.classList.add('active');
+    posBtn.classList.remove('active');
+  } else {
+    posBtn.classList.add('active');
+    stageBtn.classList.remove('active');
+  }
+}
+</script>
+{% endblock %}
+
+{% block head %}
+<style>
+/* ===== Reference Layout & Styling ===== */
+.ref-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-5);
+}
+
+.ref-kpi-card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  padding: var(--sp-4);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  box-shadow: var(--shadow-sm);
+  text-align: center;
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+.ref-kpi-card:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.ref-kpi-card.ref-kpi-danger .ref-kpi-value {
+  color: var(--danger);
+}
+
+.ref-kpi-value {
+  display: block;
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: var(--brand);
+  font-family: var(--font-mono);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.ref-kpi-label {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--muted);
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+.ref-dash-grid {
+  display: grid;
+  grid-template-columns: 1.75fr 1fr;
+  gap: var(--sp-5);
+  align-items: stretch;
+}
+
+.ref-dash-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+}
+
+.ref-card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  padding: var(--sp-5) var(--sp-6);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  box-shadow: var(--shadow-sm);
+}
+
+.ref-card-title {
+  font-size: var(--text-base);
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0;
+}
+
+/* ===== Pipeline Stage Rows ===== */
+.ref-bar-item {
+  display: grid;
+  grid-template-columns: 180px 1fr 40px;
+  align-items: center;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-3);
+}
+
+.ref-bar-item:last-child {
+  margin-bottom: 0;
+}
+
+.ref-bar-badge-col {
+  display: flex;
+  align-items: center;
+}
+
+.ref-bar-track-col {
+  width: 100%;
+}
+
+.ref-bar-track {
+  height: 12px;
+  background: var(--surface-2);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.ref-bar-fill {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 400ms ease-out;
+  min-width: 6px;
+}
+
+.ref-bar-count-col {
+  text-align: right;
+}
+
+.ref-bar-count {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--ink-secondary);
+}
+
+/* ===== Feedback Grid ===== */
+.ref-feedback-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-4);
+}
+
+.ref-feedback-stat {
+  display: flex;
+  flex-direction: column;
+}
+
+.ref-feedback-num {
+  font-size: 1.6rem;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  line-height: 1;
+}
+
+.ref-feedback-label {
+  font-size: var(--text-xs);
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+/* ===== Recent Activity List ===== */
+.ref-activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.ref-activity-item {
+  display: flex;
+  flex-direction: column;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  text-decoration: none;
+  transition: background-color 150ms ease;
+}
+
+.ref-activity-item:hover {
+  background: var(--surface-hover);
+  text-decoration: none;
+}
+
+.ref-activity-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ref-activity-name {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.ref-activity-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  margin-top: 2px;
+}
+
+.ref-activity-job {
+  font-size: var(--text-xs);
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ref-activity-time {
+  margin-top: 2px;
+}
+
+/* ===== Open Positions List ===== */
+.ref-jobs-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.ref-job-item {
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.ref-job-title {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0;
+}
+
+.text-success { color: var(--status-hired) !important; }
+.text-danger { color: var(--danger) !important; }
+
+@media (max-width: 1024px) {
+  .ref-dash-grid {
+    grid-template-columns: 1fr;
+  }
+  .ref-kpi-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+</style>
 {% endblock %}

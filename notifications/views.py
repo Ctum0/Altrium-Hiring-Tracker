@@ -12,6 +12,11 @@ class NotificationListView(LoginRequiredMixin, ListView):
     context_object_name = 'notifications'
     paginate_by = 30
 
+    def get_template_names(self):
+        if self.request.GET.get('popover') == '1':
+            return ['notifications/_notification_popover.html']
+        return [self.template_name]
+
     def paginate_queryset(self, queryset, page_size):
         """Clamp out-of-range pages instead of 404ing."""
         try:
