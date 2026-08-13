@@ -4,10 +4,10 @@
 {% block content_class %}wide{% endblock %}
 {% block content %}
 <!-- Main Page Header -->
-<div class="page-header" style="margin-bottom:var(--sp-5)">
+<div class="page-header" style="margin-bottom:12px">
   <div>
-    <h1 class="page-title" style="font-size:2rem;font-weight:700;letter-spacing:-0.02em;color:var(--ink)">Pipeline overview</h1>
-    <p class="page-sub" style="font-size:var(--text-sm);color:var(--muted);margin-top:4px">Candidates, scores, and feedback &mdash; all from live data.</p>
+    <h1 class="page-title" style="font-size:1.75rem;font-weight:700;letter-spacing:-0.02em;color:var(--ink)">Pipeline overview</h1>
+    <p class="page-sub" style="font-size:var(--text-xs);color:var(--muted);margin-top:2px">Candidates, scores, and feedback &mdash; all from live data.</p>
   </div>
   <div class="page-actions">
     <a href="{% url 'jobs:create' %}" class="btn btn-primary">Create new job</a>
@@ -234,15 +234,15 @@ function switchChartTab(tabName) {
 .ref-kpi-row {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: var(--sp-4);
-  margin-bottom: var(--sp-5);
+  gap: 12px;
+  margin-bottom: 12px;
 }
 
 .ref-kpi-card {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
-  padding: var(--sp-4);
+  padding: 10px 14px;
   backdrop-filter: blur(16px) saturate(180%);
   -webkit-backdrop-filter: blur(16px) saturate(180%);
   box-shadow: var(--shadow-sm);
@@ -261,7 +261,7 @@ function switchChartTab(tabName) {
 
 .ref-kpi-value {
   display: block;
-  font-size: 2.2rem;
+  font-size: 1.8rem;
   font-weight: 800;
   color: var(--brand);
   font-family: var(--font-mono);
@@ -273,28 +273,28 @@ function switchChartTab(tabName) {
   display: block;
   font-size: var(--text-xs);
   color: var(--muted);
-  margin-top: 4px;
+  margin-top: 2px;
   font-weight: 500;
 }
 
 .ref-dash-grid {
   display: grid;
   grid-template-columns: 1.75fr 1fr;
-  gap: var(--sp-5);
+  gap: 12px;
   align-items: stretch;
 }
 
 .ref-dash-col {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-5);
+  gap: 12px;
 }
 
 .ref-card {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
-  padding: var(--sp-5) var(--sp-6);
+  padding: 12px 16px;
   backdrop-filter: blur(16px) saturate(180%);
   -webkit-backdrop-filter: blur(16px) saturate(180%);
   box-shadow: var(--shadow-sm);
@@ -312,8 +312,8 @@ function switchChartTab(tabName) {
   display: grid;
   grid-template-columns: 180px 1fr 40px;
   align-items: center;
-  gap: var(--sp-3);
-  margin-bottom: var(--sp-3);
+  gap: 10px;
+  margin-bottom: 4px;
 }
 
 .ref-bar-item:last-child {
@@ -382,8 +382,8 @@ function switchChartTab(tabName) {
 .ref-activity-list {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2);
-  max-height: 320px;
+  gap: 4px;
+  max-height: 140px;
   overflow-y: auto;
 }
 
