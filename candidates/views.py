@@ -10,8 +10,8 @@ from django.views import View
 from django.views.generic import DetailView, ListView
 
 from ai.cv_parser import extract_text
-from ai.matching import auto_apply
-from ai.services import parse_cv
+from ai.matching import auto_apply, job_fit
+from ai.services import fit_summary, parse_cv
 from jobs.models import Job
 from notifications.models import Notification
 
@@ -100,7 +100,7 @@ class CandidateDetailView(LoginRequiredMixin, DetailView):
     context_object_name = 'candidate'
 
     def dispatch(self, request, *args, **kwargs):
-        if request.user.is_interviewer():
+        if request.user.is_authenticated and getattr(request.user, 'role', None) == 'interviewer':
             candidate = self.get_object()
             assigned = JobApplication.objects.filter(
                 candidate=candidate, assigned_to=request.user
@@ -113,14 +113,21 @@ class CandidateDetailView(LoginRequiredMixin, DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['active_nav'] = 'candidates'
-        context['applications'] = self.object.applications.select_related(
+        applications = self.object.applications.select_related(
             'candidate', 'job', 'current_round', 'assigned_to'
-        ).prefetch_related('job__rounds')
+        ).prefetch_related('job__rounds', 'feedbacks', 'moves', 'moves__moved_by')
+        context['applications'] = applications
         context['is_hr'] = self.request.user.is_hr()
         context['is_management'] = self.request.user.is_management()
         context['interviewers'] = User.objects.filter(role='IV').order_by(
             'first_name', 'last_name'
         )
+
+        # Per-application skill overlap breakdown for the fit panel.
+        context['fit'] = [
+            (app, job_fit(self.object, app.job))
+            for app in applications
+        ]
         return context
 
 
@@ -130,6 +137,8 @@ class CandidateUploadView(LoginRequiredMixin, View):
     ALLOWED_EXTENSIONS = {'.pdf', '.docx'}
 
     def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
         if not request.user.is_hr():
             return redirect('candidates:list')
         return super().dispatch(request, *args, **kwargs)
@@ -177,51 +186,55 @@ class CandidateUploadView(LoginRequiredMixin, View):
         duplicates = 0
         unparsed = []
 
-        for f in files:
-            # Sanitize filename before saving.
-            f.name = get_valid_filename(f.name)
-            text = extract_text(f)
-            parsed = parse_cv(text)
-            email = (parsed.get('email') or '').strip().lower()
+        try:
+            for f in files:
+                # Sanitize filename before saving.
+                f.name = get_valid_filename(f.name)
+                text = extract_text(f)
+                parsed = parse_cv(text)
+                email = (parsed.get('email') or '').strip().lower()
 
-            if email:
-                candidate, was_created = Candidate.objects.get_or_create(
-                    email=email,
-                    defaults={
-                        'first_name': parsed.get('first_name', ''),
-                        'last_name': parsed.get('last_name', ''),
-                        'phone': parsed.get('phone', ''),
-                        'skills': ', '.join(parsed.get('skills', [])),
-                        'resume_file': f,
-                        'resume_text': text[:50000],
-                        'source': 'upload',
-                    },
-                )
-                if was_created:
-                    created += 1
+                if email:
+                    candidate, was_created = Candidate.objects.get_or_create(
+                        email=email,
+                        defaults={
+                            'first_name': parsed.get('first_name', ''),
+                            'last_name': parsed.get('last_name', ''),
+                            'phone': parsed.get('phone', ''),
+                            'skills': ', '.join(parsed.get('skills', [])),
+                            'resume_file': f,
+                            'resume_text': text[:50000],
+                            'source': 'upload',
+                        },
+                    )
+                    if was_created:
+                        created += 1
+                    else:
+                        duplicates += 1
                 else:
-                    duplicates += 1
-            else:
-                # No email extracted: still store the CV so it is not lost.
-                candidate = Candidate.objects.create(
-                    email=None,
-                    resume_file=f,
-                    resume_text=text[:50000],
-                    source='upload',
+                    # No email extracted: still store the CV so it is not lost.
+                    candidate = Candidate.objects.create(
+                        email=None,
+                        resume_file=f,
+                        resume_text=text[:50000],
+                        source='upload',
+                    )
+                    unparsed.append(f.name)
+
+                app, app_created = JobApplication.objects.get_or_create(
+                    candidate=candidate,
+                    job=job,
+                    defaults={'status': JobApplication.Status.NEW},
                 )
-                unparsed.append(f.name)
+                if app_created:
+                    linked += 1
 
-            app, app_created = JobApplication.objects.get_or_create(
-                candidate=candidate,
-                job=job,
-                defaults={'status': JobApplication.Status.NEW},
-            )
-            if app_created:
-                linked += 1
-
-            # Auto-score based on job requirements.
-            if job.requirements:
-                auto_apply(candidate, job)
+                # Auto-score based on job requirements.
+                if job.requirements:
+                    auto_apply(candidate, job)
+        except Exception as exc:
+            messages.error(request, f'Upload failed: {exc}')
+            return self._render(request, jobs)
 
         summary = f'{created} candidate(s) created, {linked} linked to "{job.title}".'
         if duplicates:
@@ -242,6 +255,8 @@ class CandidateImportView(LoginRequiredMixin, View):
     """HR only: import a candidate from external sources by pasting profile text."""
 
     def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
         if not request.user.is_hr():
             return redirect('candidates:list')
         return super().dispatch(request, *args, **kwargs)
@@ -314,6 +329,35 @@ class CandidateImportView(LoginRequiredMixin, View):
             else:
                 messages.info(request, f'{candidate.full_name} already applies to {job.title}.')
         return redirect('candidates:detail', pk=candidate.pk)
+
+
+class AiFitSummaryView(LoginRequiredMixin, View):
+    """HTMX endpoint: generate (or regenerate) the AI fit assessment.
+
+    Caches the result on the application so the next page load is instant.
+    """
+
+    def post(self, request, pk):
+        app = get_object_or_404(JobApplication, pk=pk)
+        if request.user.is_management():
+            return HttpResponse('Management has read-only access.', status=403)
+        if not request.user.is_hr() and not request.user.is_interviewer():
+            return HttpResponse('You cannot generate this assessment.', status=403)
+
+        summary = fit_summary(
+            app.candidate.skills,
+            app.job.title,
+            app.job.requirements,
+        )
+        if not summary:
+            return HttpResponse(
+                'AI assessment is unavailable right now. Try again shortly.',
+                status=503,
+            )
+
+        app.ai_fit_summary = summary
+        app.save(update_fields=['ai_fit_summary', 'updated_at'])
+        return render(request, 'candidates/_fit_summary.html', {'app': app})
 
 
 class ScoreUpdateView(LoginRequiredMixin, View):

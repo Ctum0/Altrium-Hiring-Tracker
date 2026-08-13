@@ -14,7 +14,7 @@
   <div class="flex items-center gap-3">
     <span class="text-sm strong">{{ assigned_apps|length }} assigned</span>
     {% if pending_feedback %}
-    <span class="badge badge-rejected">{{ pending_feedback }} pending feedback</span>
+    <span class="badge badge-shortlisted">{{ pending_feedback }} pending feedback</span>
     {% endif %}
   </div>
 </div>
@@ -26,6 +26,7 @@
         <th>Candidate</th>
         <th>Position</th>
         <th>Round</th>
+        <th>Interview Details</th>
         <th>Feedback</th>
         <th>Score</th>
         <th>Updated</th>
@@ -40,6 +41,13 @@
         </td>
         <td>{{ app.job.title }}</td>
         <td>{% if app.current_round %}<span class="badge badge-in_progress">{{ app.current_round.name }}</span>{% else %}-{% endif %}</td>
+        <td>
+          {% if app.interview_details %}
+          <div class="text-xs text-muted" style="white-space:pre-line">{{ app.interview_details }}</div>
+          {% else %}
+          <span class="text-xs text-muted">-</span>
+          {% endif %}
+        </td>
         <td>
           {% if app.feedback_submitted %}
           <span class="badge badge-hired">Submitted</span>

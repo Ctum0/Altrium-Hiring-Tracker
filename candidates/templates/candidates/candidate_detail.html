@@ -2,177 +2,211 @@
 {% load static %}
 {% block title %}{{ candidate.full_name }} | Altrium Tracker{% endblock %}
 {% block page_title %}{{ candidate.full_name }}{% endblock %}
+{% block content_class %}candidate-detail{% endblock %}
 {% block content %}
-<div class="page-header">
-  <div>
-    <p class="page-sub">
-      {% if candidate.email %}{{ candidate.email }}{% endif %}
-      {% if candidate.phone %}&middot; {{ candidate.phone }}{% endif %}
-      &middot; Added {{ candidate.created_at|date:'M j, Y' }}
-    </p>
-  </div>
-  <div class="page-actions">
-    <a href="{% url 'candidates:list' %}" class="btn btn-secondary">All candidates</a>
+<div class="page-header" style="margin-bottom:8px">
+  <div class="flex items-center justify-between" style="width:100%">
+    <div>
+      <h1 class="page-title" style="font-size:1.3rem;font-weight:800;color:var(--ink);letter-spacing:-0.02em;margin:0">{{ candidate.full_name }}</h1>
+      <p class="page-sub" style="font-size:var(--text-xs);color:var(--muted);margin-top:1px">
+        {% if candidate.email %}{{ candidate.email }}{% endif %}
+        {% if candidate.phone %}&middot; {{ candidate.phone }}{% endif %}
+        &middot; Added {{ candidate.created_at|date:'M j, Y' }}
+      </p>
+    </div>
+    <div class="page-actions flex gap-2">
+      <a href="{% url 'candidates:list' %}" class="btn btn-secondary btn-sm">All candidates</a>
+    </div>
   </div>
 </div>
 
-<div class="grid-2">
-  <div class="panel panel-pad">
-    <h3 style="font-size:var(--text-base);font-weight:650;margin-bottom:var(--sp-2)">Profile</h3>
-    <dl style="display:grid;grid-template-columns:max-content 1fr;gap:var(--sp-2) var(--sp-4);font-size:var(--text-sm)">
-      <dt class="text-muted">Email</dt>
-      <dd>{{ candidate.email }}</dd>
-      <dt class="text-muted">Phone</dt>
-      <dd>{{ candidate.phone|default:'-' }}</dd>
-      <dt class="text-muted">Source</dt>
-      <dd>{{ candidate.source|default:'Uploaded CV' }}</dd>
-    </dl>
-
-    {% if is_hr %}
-    <h3 style="font-size:var(--text-base);font-weight:650;margin:var(--sp-5) 0 var(--sp-2)">Shortlist score</h3>
-    <form method="post" action="{% url 'candidates:score' candidate.pk %}" class="flex gap-3" style="align-items:flex-end">
-      {% csrf_token %}
-      <div style="width:140px">
-        <label class="form-label" for="score">Score (0-100)</label>
-        <input class="form-input mono" type="number" id="score" name="score" min="0" max="100" value="{% if candidate.score is not None %}{{ candidate.score }}{% endif %}" placeholder="Auto">
+<div class="candidate-detail-grid">
+  <div class="panel glass-panel candidate-detail-profile" style="padding:12px 16px;box-shadow:var(--shadow-md);border-radius:var(--radius-lg)">
+    <div>
+      <!-- Profile Header & Score Chip -->
+      <div class="flex items-center justify-between" style="margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--glass-border)">
+        <div>
+          <h2 style="font-size:1.15rem;font-weight:800;color:var(--ink);margin:0">Candidate Profile</h2>
+          <p class="text-xs text-muted" style="margin-top:1px">Source: {{ candidate.source|default:'Uploaded CV' }}</p>
+        </div>
+        {% if candidate.score is not None %}
+        <span class="score-chip has-score" style="font-size:1rem;padding:4px 12px;font-weight:800">{{ candidate.score }} / 100</span>
+        {% endif %}
       </div>
-      <button type="submit" class="btn btn-primary">Save score</button>
-      {% if candidate.score is not None %}
-      <button type="submit" class="btn btn-ghost" name="score" value="">Reset to auto</button>
-      {% endif %}
-    </form>
-    <p class="text-xs text-muted" style="margin-top:var(--sp-1)">
-      Score auto-computed from skill match against job requirements. You can override it here.
-    </p>
-    {% else %}
-    <dl style="display:grid;grid-template-columns:max-content 1fr;gap:var(--sp-2) var(--sp-4);font-size:var(--text-sm);margin-top:var(--sp-3)">
-      <dt class="text-muted">Score</dt>
-      <dd>{% if candidate.score is not None %}<span class="score-chip has-score">{{ candidate.score }}</span>{% else %}<span class="text-muted">Not scored</span>{% endif %}</dd>
-    </dl>
-    {% endif %}
 
-    {% if candidate.skills %}
-    <h3 style="font-size:var(--text-base);font-weight:650;margin:var(--sp-5) 0 var(--sp-2)">Skills</h3>
-    <div class="flex gap-2" style="flex-wrap:wrap">
-      {% for skill in candidate.skills_list %}
-      <span class="badge badge-role">{{ skill }}</span>
+      <!-- Side-by-Side: Contact Info & Shortlist Score Override -->
+      <div style="display:grid;grid-template-columns:310px 1fr;gap:12px;margin-bottom:10px">
+        <div style="background:var(--surface-2);padding:10px 12px;border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow-sm)">
+          <dl style="display:grid;grid-template-columns:65px 1fr;gap:4px 8px;font-size:var(--text-xs);margin:0">
+            <dt class="text-muted strong">Email</dt>
+            <dd class="strong" style="color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ candidate.email|default:'-' }}</dd>
+            <dt class="text-muted strong">Phone</dt>
+            <dd>{{ candidate.phone|default:'-' }}</dd>
+          </dl>
+        </div>
+
+        {% if is_hr %}
+        <div style="background:var(--surface-2);padding:10px 12px;border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow-sm)">
+          <span class="section-label">Shortlist Score Override</span>
+          <form method="post" action="{% url 'candidates:score' candidate.pk %}" class="flex gap-2" style="align-items:center">
+            {% csrf_token %}
+            <input class="form-input mono" type="number" id="score" name="score" min="0" max="100" value="{% if candidate.score is not None %}{{ candidate.score }}{% endif %}" placeholder="Auto" style="width:80px;padding:2px 6px;font-size:var(--text-xs)">
+            <button type="submit" class="btn btn-primary btn-sm" style="padding:3px 10px;font-size:var(--text-xs)">Save score</button>
+            {% if candidate.score is not None %}
+            <button type="submit" class="btn btn-ghost btn-sm" name="score" value="" style="padding:3px 8px;font-size:var(--text-xs)">Reset</button>
+            {% endif %}
+          </form>
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Web Profiles & Links -->
+      {% if candidate.extracted_links %}
+      <div style="background:var(--surface-2);padding:8px 12px;border-radius:var(--radius);border:1px solid var(--border);margin-bottom:10px;box-shadow:var(--shadow-sm)">
+        <span class="section-label">Web Profiles & Links</span>
+        <div class="flex gap-2" style="flex-wrap:wrap">
+          {% for link in candidate.extracted_links %}
+          <span class="badge badge-secondary" style="font-size:var(--text-xs);padding:3px 8px">{{ link }}</span>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Side-by-Side: Education & Key Accomplishments -->
+      {% if candidate.extracted_education or candidate.extracted_highlights %}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px">
+        {% if candidate.extracted_education %}
+        <div style="background:var(--surface-2);padding:10px 12px;border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow-sm)">
+          <h4 class="section-label" style="margin-bottom:6px">Education</h4>
+          <ul style="margin:0;padding-left:16px;font-size:var(--text-xs);color:var(--ink);line-height:1.4">
+            {% for edu in candidate.extracted_education %}
+            <li style="margin-bottom:3px">{{ edu }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+
+        {% if candidate.extracted_highlights %}
+        <div style="background:var(--surface-2);padding:10px 12px;border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow-sm)">
+          <h4 class="section-label" style="margin-bottom:6px">Key Highlights</h4>
+          <ul style="margin:0;padding-left:16px;font-size:var(--text-xs);color:var(--ink);line-height:1.4">
+            {% for hl in candidate.extracted_highlights %}
+            <li style="margin-bottom:3px">{{ hl }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      <!-- Skills Breakdown -->
+      {% if candidate.skills %}
+      <div style="margin-bottom:8px">
+        <h4 class="section-label">Skills & Competencies</h4>
+        <div class="flex gap-1" style="flex-wrap:wrap">
+          {% for skill in candidate.skills_list|slice:":10" %}
+          <span class="badge badge-role" style="font-size:var(--text-xs);padding:2px 7px">{{ skill }}</span>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- CV Executive Overview -->
+      {% if candidate.resume_text %}
+      <div style="margin-bottom:8px">
+        <h4 class="section-label">CV Executive Summary</h4>
+        <p class="text-xs text-muted" style="line-height:1.45;background:var(--surface-2);padding:8px 10px;border-radius:var(--radius);border:1px solid var(--border);margin-bottom:4px;box-shadow:var(--shadow-sm)">
+          {{ candidate.resume_preview_snippet }}
+        </p>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="openCvOverlay()">View full extracted CV text &rarr;</button>
+      </div>
+      {% endif %}
+
+      <!-- Job Fit (fills profile dead space; per-application skill overlap) -->
+      {% for app in applications %}
+        {% if app.job.requirements %}
+        <div class="fit-panel">
+          <h4>Job fit · {{ app.job.title }}</h4>
+          <div class="fit-grid">
+            <div class="fit-col">
+              <h5>Matched</h5>
+              {% for skill in app.fit.matched|slice:":5" %}
+              <span class="fit-tag matched">{{ skill }}</span>
+              {% empty %}
+              <span class="text-xs text-muted">None</span>
+              {% endfor %}
+            </div>
+            <div class="fit-col">
+              <h5>Missing</h5>
+              {% for skill in app.fit.missing|slice:":5" %}
+              <span class="fit-tag missing">{{ skill }}</span>
+              {% empty %}
+              <span class="text-xs text-muted">None</span>
+              {% endfor %}
+            </div>
+          </div>
+          {% include 'candidates/_fit_summary.html' %}
+        </div>
+        {% endif %}
       {% endfor %}
     </div>
-    {% endif %}
 
     {% if candidate.resume_file %}
-    <p class="mt-4">
-      <a class="btn btn-secondary btn-sm" href="{{ candidate.resume_file.url }}" target="_blank" rel="noopener">View resume</a>
-    </p>
+    <div class="resume-cta">
+      <a class="btn btn-secondary btn-sm" href="{{ candidate.resume_file.url }}" target="_blank" rel="noopener" style="width:100%;justify-content:center;font-size:var(--text-xs);padding:6px 12px">View original resume PDF &rarr;</a>
+    </div>
     {% endif %}
   </div>
 
-  <div class="panel panel-pad">
-    <h3 style="font-size:var(--text-base);font-weight:650;margin-bottom:var(--sp-2)">Applications</h3>
-    {% if applications %}
-    <div class="table-wrap">
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Position</th>
-            <th>Stage</th>
-            <th>Current round</th>
-            <th>Assigned to</th>
-            <th>Feedback</th>
-            <th>Interview</th>
-            <th>Assign</th>
-            {% if is_hr %}<th>Move</th>{% endif %}
-          </tr>
-        </thead>
-        <tbody>
-          {% for app in applications %}
-          <tr id="app-row-{{ app.pk }}">
-            <td class="strong">{{ app.job.title }}</td>
-            <td>
-              <span class="badge badge-{{ app.status }}">{{ app.get_status_display }}</span>
-            </td>
-            <td>
-              {% if app.current_round %}<span class="badge badge-in_progress">{{ app.current_round.name }}</span>
-              {% else %}<span class="text-xs text-muted">-</span>{% endif %}
-            </td>
-            <td>{% if app.assigned_to %}{{ app.assigned_to.get_full_name|default:app.assigned_to.username }}{% else %}Unassigned{% endif %}</td>
-            <td>
-              {% if app.feedback_submitted %}<span class="badge badge-hired">Submitted</span>
-              {% elif app.current_round %}<span class="badge badge-rejected">Pending</span>
-              {% else %}-{% endif %}
-            </td>
-            <td>
-              {% if is_hr %}
-              <form method="post" action="{% url 'candidates:interview_details' app.pk %}" class="flex gap-2" style="align-items:flex-end">
-                {% csrf_token %}
-                <input class="form-input" name="interview_details"
-                       value="{{ app.interview_details }}"
-                       placeholder="Meet link or notes"
-                       style="width:160px;padding:var(--sp-1) var(--sp-2);font-size:var(--text-xs)">
-                <button type="submit" class="btn btn-primary btn-sm">Save</button>
-              </form>
-              {% elif app.interview_details %}
-              <span class="text-xs text-muted" style="white-space:pre-line">{{ app.interview_details }}</span>
-              {% else %}
-              <span class="text-xs text-muted">-</span>
-              {% endif %}
-            </td>
-            <td>
-              {% if is_hr and app.status != 'rejected' and app.status != 'hired' %}
-              <form method="post" action="{% url 'candidates:assign' app.pk %}" class="flex gap-2">
-                {% csrf_token %}
-                <select class="form-select" name="interviewer" style="width:auto;padding:var(--sp-1) var(--sp-2);font-size:var(--text-xs)" required>
-                  <option value="">Assign to...</option>
-                  {% for iv in interviewers %}
-                  <option value="{{ iv.pk }}" {% if app.assigned_to_id == iv.pk %}selected{% endif %}>{{ iv.get_full_name|default:iv.username }}</option>
-                  {% endfor %}
-                  {% if app.assigned_to %}
-                  <option value="">Unassign</option>
-                  {% endif %}
-                </select>
-                <button type="submit" class="btn btn-primary btn-sm">Assign</button>
-              </form>
-              {% else %}
-              <span class="text-xs text-muted">-</span>
-              {% endif %}
-            </td>
-            {% if is_hr %}
-            <td style="min-width:140px">
-              {% if app.status != 'hired' and app.status != 'rejected' and app.status != 'on_hold' %}
-              <select class="stage-select" name="stage"
-                      hx-post="{% url 'pipeline:move' app.pk %}"
-                      hx-include="[name='csrfmiddlewaretoken']"
-                      hx-vals='{"source": "detail"}'
-                      hx-target="#app-row-{{ app.pk }}"
-                      hx-swap="outerHTML"
-                      hx-trigger="change"
-                      style="width:100%">
-                <option value="">Move to…</option>
-                {% for round in app.job.rounds.all %}
-                <option value="round:{{ round.pk }}" {% if app.current_round_id == round.pk %}selected{% endif %}>{{ round.name }}</option>
-                {% endfor %}
-                <option value="status:hired">Hired</option>
-                <option value="status:rejected">Rejected</option>
-                <option value="status:on_hold">On Hold</option>
-              </select>
-              {% else %}
-              <span class="text-xs text-muted">Final state</span>
-              {% endif %}
-            </td>
-            {% endif %}
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    {% else %}
-    <p class="text-sm text-muted">No applications yet.</p>
-    {% endif %}
-    {% if is_hr %}
-    <div style="margin-top:var(--sp-3)">
+  <!-- Applications Column (only area that scrolls on desktop) -->
+  <div class="candidate-detail-apps">
+    <div class="flex items-center justify-between" style="margin-bottom:8px">
+      <h3 style="font-size:1.05rem;font-weight:800;color:var(--ink)">Applications ({{ applications|length }})</h3>
+      {% if is_hr %}
       <a href="{% url 'candidates:import' %}" class="btn btn-secondary btn-sm">Link to another job</a>
+      {% endif %}
     </div>
-    {% endif %}
+
+    <div class="candidate-detail-apps-scroll">
+      {% if applications %}
+        {% for app in applications %}
+          {% include 'pipeline/_app_row.html' %}
+        {% endfor %}
+      {% else %}
+        <div class="panel panel-pad text-sm text-muted">No applications for this candidate yet.</div>
+      {% endif %}
+    </div>
   </div>
 </div>
+
+{% if candidate.resume_text %}
+<div class="cv-overlay" id="cv-overlay" aria-hidden="true">
+  <div class="cv-overlay-backdrop" onclick="closeCvOverlay()"></div>
+  <div class="cv-overlay-panel" role="dialog" aria-modal="true" aria-labelledby="cv-overlay-title">
+    <div class="cv-overlay-header">
+      <h2 id="cv-overlay-title">Extracted CV text</h2>
+      <button type="button" class="btn-icon" onclick="closeCvOverlay()" aria-label="Close">&times;</button>
+    </div>
+    <div class="cv-overlay-body">{{ candidate.resume_text }}</div>
+  </div>
+</div>
+<script>
+  var cvOverlay = document.getElementById('cv-overlay');
+  window.openCvOverlay = function () {
+    cvOverlay.classList.add('open');
+    cvOverlay.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('no-scroll');
+  };
+  window.closeCvOverlay = function () {
+    cvOverlay.classList.remove('open');
+    cvOverlay.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('no-scroll');
+  };
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && cvOverlay.classList.contains('open')) {
+      closeCvOverlay();
+    }
+  });
+</script>
+{% endif %}
 {% endblock %}

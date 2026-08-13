@@ -24,7 +24,8 @@ class LoginView(auth_views.LoginView):
 
 
 class LogoutView(auth_views.LogoutView):
-    pass
+    def get(self, request, *args, **kwargs):
+        return super().post(request, *args, **kwargs)
 
 
 class HomeView(TemplateView):
@@ -46,6 +47,13 @@ class HRDashboardView(LoginRequiredMixin, ListView):
     template_name = 'accounts/hr_dashboard.html'
     context_object_name = 'jobs'
     paginate_by = 20
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
+        if not request.user.is_hr():
+            return redirect('accounts:home')
+        return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):
         return (

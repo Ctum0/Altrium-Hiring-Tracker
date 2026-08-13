@@ -24,20 +24,25 @@
   <td style="min-width:140px">
     {% if app.status != 'hired' and app.status != 'rejected' and app.status != 'on_hold' %}
     <select class="stage-select" name="stage"
+            onchange="confirmStageMove(this)"
             hx-post="{% url 'pipeline:move' app.pk %}"
             hx-include="[name='csrfmiddlewaretoken']"
             hx-vals='{"source": "list"}'
             hx-target="#app-row-{{ app.pk }}"
             hx-swap="outerHTML"
-            hx-trigger="change"
+            hx-trigger="stagechange"
             style="width:100%">
       <option value="">Move to…</option>
+      <optgroup label="Advance to round">
       {% for round in app.job.rounds.all %}
       <option value="round:{{ round.pk }}" {% if app.current_round_id == round.pk %}selected{% endif %}>{{ round.name }}</option>
       {% endfor %}
+      </optgroup>
+      <optgroup label="End candidacy">
       <option value="status:hired">Hired</option>
       <option value="status:rejected">Rejected</option>
       <option value="status:on_hold">On Hold</option>
+      </optgroup>
     </select>
     {% else %}
     <span class="text-xs text-muted">Final state</span>

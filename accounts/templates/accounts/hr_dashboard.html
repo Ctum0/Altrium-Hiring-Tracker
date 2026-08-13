@@ -116,12 +116,12 @@
     </div>
 
     <!-- Card 3: Feedback Status -->
-    <div class="panel panel-pad ref-card">
+    <div class="panel panel-pad ref-card" style="flex:1;display:flex;flex-direction:column;justify-content:space-between">
       <div class="flex items-center justify-between" style="margin-bottom:var(--sp-3)">
         <h3 class="ref-card-title">Feedback Status</h3>
         <a href="{% url 'feedback:list' %}" class="btn btn-secondary btn-sm">View all</a>
       </div>
-      <div class="ref-feedback-grid">
+      <div class="ref-feedback-grid" style="margin-top:auto;margin-bottom:auto">
         <div class="ref-feedback-stat">
           <span class="ref-feedback-num text-success">{{ feedback_submitted }}</span>
           <span class="ref-feedback-label">Submitted</span>
@@ -181,7 +181,7 @@
           </div>
           <div class="flex items-center justify-between" style="margin-top:6px">
             <span class="text-xs text-muted">{{ job.app_count }} candidates</span>
-            <a href="{% url 'candidates:list' %}?job={{ job.pk }}" class="btn btn-secondary btn-sm" style="padding:2px 8px;font-size:11px">View</a>
+            <a href="{% url 'candidates:list' %}?job={{ job.pk }}" class="btn btn-secondary btn-sm" style="padding:3px 10px">View</a>
           </div>
         </div>
         {% endfor %}

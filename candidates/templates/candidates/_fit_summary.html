@@ -1,0 +1,25 @@
+{% if app.ai_fit_summary %}
+<div class="fit-summary" id="fit-summary-{{ app.pk }}">
+  <div class="fit-summary-body">{{ app.ai_fit_summary|linebreaks }}</div>
+  <div class="flex gap-2">
+    <button type="button" class="btn btn-ghost btn-sm"
+            hx-post="{% url 'candidates:ai_fit' app.pk %}"
+            hx-target="#fit-summary-{{ app.pk }}"
+            hx-swap="outerHTML"
+            hx-include="[name='csrfmiddlewaretoken']">
+      Regenerate
+    </button>
+  </div>
+</div>
+{% else %}
+<div class="fit-summary" id="fit-summary-{{ app.pk }}">
+  <p class="text-xs text-muted">No AI assessment yet.</p>
+  <button type="button" class="btn btn-primary btn-sm"
+          hx-post="{% url 'candidates:ai_fit' app.pk %}"
+          hx-target="#fit-summary-{{ app.pk }}"
+          hx-swap="outerHTML"
+          hx-include="[name='csrfmiddlewaretoken']">
+    Generate AI assessment
+  </button>
+</div>
+{% endif %}

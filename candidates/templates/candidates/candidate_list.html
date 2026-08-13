@@ -1,17 +1,16 @@
 {% extends 'base.html' %}
 {% block title %}Candidates | Altrium Tracker{% endblock %}
 {% block page_title %}Candidates{% endblock %}
+{% block content_class %}scrollable{% endblock %}
 {% block content %}
-<div class="page-header">
+<div class="page-header" style="margin-bottom:var(--sp-4)">
   <div>
-    <h2 class="page-title">
-      {% if user.is_interviewer %}My candidates{% else %}Candidate pipeline{% endif %}
-    </h2>
-    <p class="page-sub">Profiles linked to positions, with current stage and assignment.</p>
+    <h1 class="page-title">Candidates</h1>
+    <p class="page-sub">Track all candidate applications and scores across hiring pipelines.</p>
   </div>
   <div class="page-actions">
     {% if user.is_hr %}
-    <a href="{% url 'candidates:import' %}" class="btn btn-secondary">Import</a>
+    <a href="{% url 'candidates:import' %}" class="btn btn-secondary">Import candidate</a>
     <a href="{% url 'candidates:upload' %}" class="btn btn-primary">Upload CVs</a>
     {% endif %}
   </div>
@@ -29,46 +28,49 @@
      class="btn btn-sm {% if filter_stage == 'rejected' %}btn-primary{% else %}btn-secondary{% endif %}">Rejected</a>
 </div>
 
-<!-- Filters -->
-<form method="get" class="panel panel-pad" style="margin-bottom:var(--sp-6)">
-  <div class="form-row">
-    <div class="form-field" style="margin-bottom:0">
-      <label class="form-label" for="q">Search</label>
-      <input class="form-input" type="search" id="q" name="q" value="{{ filter_q }}" placeholder="Name, email, skill, or role">
+<!-- Wide 3D Glass Filter Card -->
+<div class="panel panel-pad glass-panel" style="margin-bottom:var(--sp-5);box-shadow:var(--shadow-md)">
+  <form method="get">
+    <div class="form-row" style="display:grid;grid-template-columns:2fr 1fr 1fr 120px max-content;gap:var(--sp-4);align-items:end">
+      <div class="form-field" style="margin-bottom:0">
+        <label class="form-label" for="q">Search candidate</label>
+        <input class="form-input" type="search" id="q" name="q" value="{{ filter_q }}" placeholder="Name, email, skill, or role">
+      </div>
+      <div class="form-field" style="margin-bottom:0">
+        <label class="form-label" for="job">Position</label>
+        <select class="form-select" id="job" name="job">
+          <option value="">All positions</option>
+          {% for job_id, job_title in jobs %}
+          <option value="{{ job_id }}" {% if filter_job == job_id|stringformat:'s' %}selected{% endif %}>{{ job_title }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-field" style="margin-bottom:0">
+        <label class="form-label" for="stage">Stage</label>
+        <select class="form-select" id="stage" name="stage">
+          <option value="">All stages</option>
+          {% for value, label in stages %}
+          <option value="{{ value }}" {% if filter_stage == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-field" style="margin-bottom:0">
+        <label class="form-label" for="min_score">Min score</label>
+        <input class="form-input mono" type="number" id="min_score" name="min_score" min="0" max="100" value="{{ filter_min_score }}" placeholder="Any">
+      </div>
+      <div class="form-field" style="margin-bottom:0;display:flex;gap:var(--sp-2)">
+        <button type="submit" class="btn btn-primary">Filter</button>
+        {% if filter_q or filter_job or filter_stage or filter_min_score %}
+        <a href="{% url 'candidates:list' %}" class="btn btn-secondary">Clear</a>
+        {% endif %}
+      </div>
     </div>
-    <div class="form-field" style="margin-bottom:0">
-      <label class="form-label" for="job">Position</label>
-      <select class="form-select" id="job" name="job">
-        <option value="">All positions</option>
-        {% for job_id, job_title in jobs %}
-        <option value="{{ job_id }}" {% if filter_job == job_id|stringformat:'s' %}selected{% endif %}>{{ job_title }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="form-field" style="margin-bottom:0">
-      <label class="form-label" for="stage">Stage</label>
-      <select class="form-select" id="stage" name="stage">
-        <option value="">All stages</option>
-        {% for value, label in stages %}
-        <option value="{{ value }}" {% if filter_stage == value %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="form-field" style="margin-bottom:0">
-      <label class="form-label" for="min_score">Min. score</label>
-      <input class="form-input mono" type="number" id="min_score" name="min_score" min="0" max="100" value="{{ filter_min_score }}" placeholder="Any">
-    </div>
-    <div class="form-field" style="margin-bottom:0;display:flex;align-items:flex-end">
-      <button type="submit" class="btn btn-secondary">Filter</button>
-      {% if filter_q or filter_job or filter_stage or filter_min_score %}
-      <a href="{% url 'candidates:list' %}" class="btn btn-ghost">Clear</a>
-      {% endif %}
-    </div>
-  </div>
-</form>
+  </form>
+</div>
 
 {% if applications %}
-<div class="table-wrap">
+<div class="panel panel-pad glass-panel" style="box-shadow:var(--shadow-md)">
+  <div class="table-wrap" style="max-height:calc(100vh - 360px);overflow-y:auto">
   <table class="table">
     <thead>
       <tr>
@@ -108,20 +110,25 @@
         <td style="min-width:140px">
           {% if app.status != 'hired' and app.status != 'rejected' and app.status != 'on_hold' %}
           <select class="stage-select" name="stage"
+                  onchange="confirmStageMove(this)"
                   hx-post="{% url 'pipeline:move' app.pk %}"
                   hx-include="[name='csrfmiddlewaretoken']"
                   hx-vals='{"source": "list"}'
                   hx-target="#app-row-{{ app.pk }}"
                   hx-swap="outerHTML"
-                  hx-trigger="change"
+                  hx-trigger="stagechange"
                   style="width:100%">
             <option value="">Move to…</option>
+            <optgroup label="Advance to round">
             {% for round in app.job.rounds.all %}
             <option value="round:{{ round.pk }}" {% if app.current_round_id == round.pk %}selected{% endif %}>{{ round.name }}</option>
             {% endfor %}
+            </optgroup>
+            <optgroup label="End candidacy">
             <option value="status:hired">Hired</option>
             <option value="status:rejected">Rejected</option>
             <option value="status:on_hold">On Hold</option>
+            </optgroup>
           </select>
           {% else %}
           <span class="text-xs text-muted">Final state</span>
@@ -132,6 +139,7 @@
       {% endfor %}
     </tbody>
   </table>
+</div>
 </div>
 
 {% if is_paginated and page_obj.paginator.num_pages > 1 %}
