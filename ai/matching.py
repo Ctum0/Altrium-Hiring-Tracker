@@ -47,3 +47,31 @@ def auto_apply(candidate: Candidate, job: Job) -> int | None:
     candidate.score = score
     candidate.save(update_fields=['score', 'updated_at'])
     return score
+
+
+def job_fit(candidate: Candidate, job: Job) -> dict:
+    """Return a deterministic skill-overlap breakdown for an application.
+
+    ``matched`` and ``missing`` are lists of *required* skills; ``extra``
+    lists candidate skills not named in the requirements. This is the
+    reliable, always-available signal interviewers can act on.
+    """
+    required = _tokenize(job.requirements)
+    candidate_skills = _tokenize(candidate.skills)
+
+    matched = []
+    missing = []
+    for req in required:
+        if any(req in cs or cs in req for cs in candidate_skills):
+            matched.append(req)
+        else:
+            missing.append(req)
+
+    extra = sorted(cs for cs in candidate_skills if cs not in required)
+
+    return {
+        'matched': matched,
+        'missing': missing,
+        'extra': extra,
+        'total': len(required),
+    }

@@ -98,6 +98,7 @@
                     hx-get="{% url 'notifications:unread_count' %}"
                     hx-trigger="load, every 30s"
                     hx-swap="innerHTML"
+                    hx-on::after-request="this.setAttribute('data-count', this.textContent.trim())"
                     aria-live="polite">0</span>
             </span>
           </button>
@@ -152,10 +153,13 @@
   var okBtn = document.getElementById('confirm-ok');
   var cancelBtn = document.getElementById('confirm-cancel');
   var targetForm = null;
+  var targetSelect = null;
+  var targetSelectPrev = null;
   var returnFocus = null;
 
   window.confirmAction = function(formEl, titleText, bodyText) {
     targetForm = formEl;
+    targetSelect = null;
     returnFocus = document.activeElement;
     title.textContent = titleText;
     body.textContent = bodyText;
@@ -163,9 +167,34 @@
     okBtn.focus();
   };
 
+  // Stage dropdown guard: fire round moves immediately, but confirm terminal
+  // status moves (hired / rejected / on_hold) because they are irreversible.
+  window.confirmStageMove = function(selectEl) {
+    var value = selectEl.value;
+    var isTerminal = value && value.indexOf('status:') === 0;
+    if (!isTerminal) {
+      selectEl.dispatchEvent(new Event('stagechange', { bubbles: true }));
+      return;
+    }
+    var label = selectEl.options[selectEl.selectedIndex].text;
+    targetForm = null;
+    targetSelect = selectEl;
+    targetSelectPrev = selectEl.dataset.prev || '';
+    returnFocus = selectEl;
+    title.textContent = 'Move candidate to ' + label + '?';
+    body.textContent = 'This ends the current process and is not reversible from this screen. Review before confirming.';
+    dialog.showModal();
+    okBtn.focus();
+  };
+
   function closeModal() {
     dialog.close();
+    if (targetSelect) {
+      targetSelect.value = targetSelectPrev;
+    }
     targetForm = null;
+    targetSelect = null;
+    targetSelectPrev = null;
     if (returnFocus && document.contains(returnFocus)) {
       returnFocus.focus();
     }
@@ -182,14 +211,65 @@
 
   okBtn.addEventListener('click', function() {
     var form = targetForm;
+    var select = targetSelect;
     closeModal();
     if (form) {
       form.submit();
+    } else if (select) {
+      select.dispatchEvent(new Event('stagechange', { bubbles: true }));
+    }
+  });
+
+  // Remember the pre-change value so a cancelled terminal move resets cleanly.
+  document.addEventListener('focusin', function(e) {
+    var el = e.target;
+    if (el && el.classList && el.classList.contains('stage-select')) {
+      el.dataset.prev = el.value;
     }
   });
 
   // Escape is handled natively by <dialog>. Cancel event closes it.
   dialog.addEventListener('cancel', closeModal);
+
+  // Surface HTMX error responses (e.g. 409 "Feedback required") as a toast
+  // instead of leaving the row in a silently-broken state.
+  document.addEventListener('htmx:responseError', function(e) {
+    var xhr = e.detail && e.detail.xhr;
+    var msg = xhr && xhr.responseText;
+    if (msg && msg.indexOf('<') !== 0) {
+      showToast(msg);
+    }
+    // Revert any stage dropdown that failed to move so the UI matches state.
+    document.querySelectorAll('.stage-select').forEach(function(sel) {
+      if (sel.dataset.prev) {
+        sel.value = sel.dataset.prev;
+      }
+    });
+  });
+
+  function showToast(message) {
+    var existing = document.querySelector('.toast-stack');
+    var stack = existing || document.createElement('div');
+    if (!existing) {
+      stack.className = 'toast-stack';
+      document.body.appendChild(stack);
+    }
+    var toast = document.createElement('div');
+    toast.className = 'toast toast-error';
+    toast.setAttribute('role', 'alert');
+    toast.textContent = message;
+    var closeBtn = document.createElement('button');
+    closeBtn.className = 'toast-dismiss';
+    closeBtn.setAttribute('aria-label', 'Dismiss');
+    closeBtn.textContent = '×';
+    closeBtn.addEventListener('click', function() { toast.remove(); });
+    toast.appendChild(closeBtn);
+    stack.appendChild(toast);
+    setTimeout(function() {
+      toast.style.opacity = '0';
+      setTimeout(function() { toast.remove(); }, 200);
+    }, 5000);
+  }
 
   // Message auto-dismiss for success/info alerts (5s)
   function dismissAlert(el) {
@@ -209,6 +289,17 @@
       setTimeout(function() { if (el.parentNode) dismissAlert(el); }, 5000);
     }
   });
+  var notifCount = document.querySelector('.notif-count');
+  if (notifCount) {
+    var syncNotifBadge = function() {
+      notifCount.setAttribute('data-count', notifCount.textContent.trim());
+    };
+    syncNotifBadge();
+    if (window.MutationObserver) {
+      new MutationObserver(syncNotifBadge).observe(notifCount, { childList: true, subtree: true, characterData: true });
+    }
+  }
+
   window.toggleNotifPopover = function(e) {
     if (e) e.stopPropagation();
     var pop = document.getElementById('notif-popover');

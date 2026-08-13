@@ -31,6 +31,15 @@ SYSTEM_POLISH = (
     'slightly positive, and do not invent facts. Return only the polished text.'
 )
 
+SYSTEM_FIT = (
+    'You are a hiring assistant. Given a candidate\'s skills and a job\'s '
+    'requirements, write a short, structured fit assessment with three '
+    'sections exactly: "Strengths", "Gaps", "Interview focus". Use 2-3 '
+    'concrete, plain-language bullets each. Be direct and do not invent '
+    'facts beyond the skills provided. Return plain text with the section '
+    'headings on their own lines, bullets starting with a dash.'
+)
+
 
 def _chat(system: str, user: str, temperature: float = 0.2) -> str:
     """Single chat completion call. Returns empty string on any failure."""
@@ -105,3 +114,13 @@ def polish_notes(raw_notes: str) -> str:
     if not raw_notes.strip():
         return ''
     return _chat(SYSTEM_POLISH, raw_notes[:4000], temperature=0.4)
+
+
+def fit_summary(candidate_skills: str, job_title: str, requirements: str) -> str:
+    """Produce a short candidate-vs-job fit assessment for interviewers."""
+    user = (
+        f'Job title: {job_title or "Untitled"}\n'
+        f'Requirements: {requirements or "None listed"}\n'
+        f'Candidate skills: {candidate_skills or "None listed"}'
+    )
+    return _chat(SYSTEM_FIT, user, temperature=0.4)

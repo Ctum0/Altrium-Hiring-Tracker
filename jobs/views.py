@@ -47,6 +47,8 @@ class JobCreateView(LoginRequiredMixin, CreateView):
     template_name = 'jobs/job_form.html'
 
     def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
         if not request.user.is_hr():
             return redirect('jobs:list')
         return super().dispatch(request, *args, **kwargs)
@@ -63,6 +65,8 @@ class JobEditView(LoginRequiredMixin, UpdateView):
     template_name = 'jobs/job_form.html'
 
     def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
         if not request.user.is_hr():
             return redirect('jobs:list')
         return super().dispatch(request, *args, **kwargs)
@@ -117,6 +121,8 @@ class RoundCreateView(LoginRequiredMixin, CreateView):
     template_name = 'jobs/round_form.html'
 
     def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
         if not request.user.is_hr():
             return redirect('jobs:list')
         return super().dispatch(request, *args, **kwargs)
@@ -140,6 +146,8 @@ class RoundDeleteView(LoginRequiredMixin, DeleteView):
     model = InterviewRound
 
     def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
         if not request.user.is_hr():
             return redirect('jobs:list')
         return super().dispatch(request, *args, **kwargs)

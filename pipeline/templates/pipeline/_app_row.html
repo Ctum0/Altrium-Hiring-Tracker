@@ -1,67 +1,109 @@
 {% load static %}
-<tr id="app-row-{{ app.pk }}">
-  <td class="strong">{{ app.job.title }}</td>
-  <td>
-    <span class="badge badge-{{ app.status }}">{{ app.get_status_display }}</span>
-  </td>
-  <td>
-    {% if app.current_round %}<span class="badge badge-in_progress">{{ app.current_round.name }}</span>
-    {% else %}<span class="text-xs text-muted">-</span>{% endif %}
-  </td>
-  <td>{% if app.assigned_to %}{{ app.assigned_to.get_full_name|default:app.assigned_to.username }}{% else %}Unassigned{% endif %}</td>
-  <td>
-    {% if app.feedback_submitted %}<span class="badge badge-hired">Submitted</span>
-    {% elif app.current_round %}<span class="badge badge-rejected">Pending</span>
-    {% else %}-{% endif %}
-  </td>
-  <td>
-    {% if is_hr and app.status != 'rejected' and app.status != 'hired' %}
-    <form method="post" action="{% url 'candidates:assign' app.pk %}" class="flex gap-2">
-      {% csrf_token %}
-      <select class="form-select" name="interviewer" style="width:auto;padding:var(--sp-1) var(--sp-2);font-size:var(--text-xs)" required>
-        <option value="">Assign to...</option>
-        {% for iv in interviewers %}
-        <option value="{{ iv.pk }}" {% if app.assigned_to_id == iv.pk %}selected{% endif %}>{{ iv.get_full_name|default:iv.username }}</option>
+<div id="app-row-{{ app.pk }}" class="app-card">
+  <!-- Card Header -->
+  <div class="app-card-header">
+    <div class="app-card-title">{{ app.job.title }}</div>
+    <div class="app-card-badges">
+      <span class="badge badge-{{ app.status }}">{{ app.get_status_display }}</span>
+      {% if app.current_round %}
+      <span class="badge badge-in_progress">{{ app.current_round.name }}</span>
+      {% endif %}
+      {% if app.feedback_submitted %}
+      <span class="badge badge-feedback">Feedback Submitted</span>
+      {% elif app.current_round %}
+      <span class="badge badge-feedback">Feedback Pending</span>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Card Controls (Zero Horizontal Scroll UX) -->
+  <div class="app-card-controls">
+    <!-- Meeting Link / Interview Details -->
+    <div class="app-card-control-group">
+      <label class="app-card-control-label">Interview Link / Notes</label>
+      {% if is_hr %}
+      <form method="post" action="{% url 'candidates:interview_details' app.pk %}" class="flex gap-2">
+        {% csrf_token %}
+        <input class="form-input" name="interview_details"
+               value="{{ app.interview_details }}"
+               placeholder="Meet link or notes"
+               style="padding:var(--sp-1) var(--sp-2);font-size:var(--text-xs)">
+        <button type="submit" class="btn btn-primary btn-sm">Save</button>
+      </form>
+      {% elif app.interview_details %}
+      <span class="text-xs text-muted" style="white-space:pre-line">{{ app.interview_details }}</span>
+      {% else %}
+      <span class="text-xs text-muted">No meeting details added</span>
+      {% endif %}
+    </div>
+
+    <!-- Interviewer Assignment -->
+    <div class="app-card-control-group">
+      <label class="app-card-control-label">Assigned Interviewer</label>
+      {% if is_hr and app.status != 'rejected' and app.status != 'hired' %}
+      <form method="post" action="{% url 'candidates:assign' app.pk %}" class="flex gap-2">
+        {% csrf_token %}
+        <select class="form-select" name="interviewer" style="padding:var(--sp-1) var(--sp-2);font-size:var(--text-xs)" required>
+          <option value="">Assign to...</option>
+          {% for iv in interviewers %}
+          <option value="{{ iv.pk }}" {% if app.assigned_to_id == iv.pk %}selected{% endif %}>{{ iv.get_full_name|default:iv.username }}</option>
+          {% endfor %}
+          {% if app.assigned_to %}
+          <option value="">Unassign</option>
+          {% endif %}
+        </select>
+        <button type="submit" class="btn btn-primary btn-sm">Assign</button>
+      </form>
+      {% else %}
+      <span class="text-xs text-muted">
+        {% if app.assigned_to %}{{ app.assigned_to.get_full_name|default:app.assigned_to.username }}{% else %}Unassigned{% endif %}
+      </span>
+      {% endif %}
+    </div>
+
+    <!-- Pipeline Stage Move -->
+    {% if is_hr %}
+    <div class="app-card-control-group">
+      <label class="app-card-control-label">Move Stage</label>
+      {% if app.status != 'hired' and app.status != 'rejected' and app.status != 'on_hold' %}
+      <select class="stage-select" name="stage"
+              onchange="confirmStageMove(this)"
+              hx-post="{% url 'pipeline:move' app.pk %}"
+              hx-include="[name='csrfmiddlewaretoken']"
+              hx-vals='{"source": "detail"}'
+              hx-target="#app-row-{{ app.pk }}"
+              hx-swap="outerHTML"
+              hx-trigger="stagechange"
+              style="width:100%">
+        <option value="">Move to…</option>
+        <optgroup label="Advance to round">
+        {% for round in app.job.rounds.all %}
+        <option value="round:{{ round.pk }}" {% if app.current_round_id == round.pk %}selected{% endif %}>{{ round.name }}</option>
         {% endfor %}
-        {% if app.assigned_to %}
-        <option value="">Unassign</option>
-        {% endif %}
+        </optgroup>
+        <optgroup label="End candidacy">
+        <option value="status:hired">Hired</option>
+        <option value="status:rejected">Rejected</option>
+        <option value="status:on_hold">On Hold</option>
+        </optgroup>
       </select>
-      <button type="submit" class="btn btn-primary btn-sm">Assign</button>
-    </form>
-    {% else %}
-    <span class="text-xs text-muted">-</span>
+      {% else %}
+      <span class="text-xs text-muted">Final state</span>
+      {% endif %}
+    </div>
     {% endif %}
-  </td>
-  {% if is_hr %}
-  <td style="min-width:140px">
-    {% if app.status != 'hired' and app.status != 'rejected' and app.status != 'on_hold' %}
-    <select class="stage-select" name="stage"
-            hx-post="{% url 'pipeline:move' app.pk %}"
-            hx-include="[name='csrfmiddlewaretoken']"
-            hx-vals='{"source": "detail"}'
-            hx-target="#app-row-{{ app.pk }}"
-            hx-swap="outerHTML"
-            hx-trigger="change"
-            style="width:100%">
-      <option value="">Move to…</option>
-      {% for round in app.job.rounds.all %}
-      <option value="round:{{ round.pk }}" {% if app.current_round_id == round.pk %}selected{% endif %}>{{ round.name }}</option>
-      {% endfor %}
-      <option value="status:hired">Hired</option>
-      <option value="status:rejected">Rejected</option>
-      <option value="status:on_hold">On Hold</option>
-    </select>
-    {% else %}
-    <span class="text-xs text-muted">Final state</span>
-    {% endif %}
-  </td>
-  {% endif %}
-</tr>
-{% if app.interview_details %}
-<tr>
-  <td colspan="7" style="padding-top:0;padding-bottom:var(--sp-3)">
-    <div style="font-size:var(--text-xs);color:var(--muted);padding:var(--sp-2) var(--sp-3);background:var(--surface-2);border-radius:var(--radius);white-space:pre-line">{{ app.interview_details }}</div>
-  </td>
-</tr>
-{% endif %}
+  </div>
+
+  <!-- Card Footer -->
+  <div class="app-card-footer">
+    <div>
+      Applied {{ app.created_at|date:"M j, Y" }} &middot; {% if app.feedbacks.count %}{{ app.feedbacks.count }} feedback submission(s){% else %}No round feedback recorded yet{% endif %}
+      {% if app.moves.exists %}
+      <div class="last-move">Last moved to <strong>{{ app.get_status_display }}{% if app.current_round %} &middot; {{ app.current_round.name }}{% endif %}</strong> by {{ app.moves.first.moved_by.get_full_name|default:app.moves.first.moved_by.username }} {{ app.moves.first.moved_at|date:"M j, g:i A" }}</div>
+      {% endif %}
+    </div>
+    <div class="flex gap-2">
+      <a href="{% url 'feedback:list' %}?application={{ app.pk }}" class="btn btn-ghost btn-sm">View Feedback History &rarr;</a>
+    </div>
+  </div>
+</div>

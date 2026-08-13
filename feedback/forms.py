@@ -29,3 +29,11 @@ class FeedbackForm(forms.ModelForm):
             'notes': 'Feedback',
             'raw_notes': 'Raw notes (optional)',
         }
+
+    def clean_score(self):
+        score = self.cleaned_data.get('score')
+        if score is None:
+            raise forms.ValidationError('Score is required.')
+        if not (0 <= score <= 100):
+            raise forms.ValidationError('Score must be between 0 and 100.')
+        return score

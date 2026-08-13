@@ -66,7 +66,6 @@
         <tr>
           <th>Order</th>
           <th>Round name</th>
-          <th>Type</th>
           {% if can_edit %}<th></th>{% endif %}
         </tr>
       </thead>
@@ -74,13 +73,9 @@
         {% for round in rounds %}
         <tr>
           <td class="mono">{{ round.order }}</td>
-          <td class="strong">{{ round.name }}</td>
-          <td>
-            {% if round.is_final %}
-            <span class="badge badge-hold">Final state</span>
-            {% else %}
-            <span class="badge badge-new">Interview stage</span>
-            {% endif %}
+          <td class="strong">
+            {{ round.name }}
+            {% if round.is_final %}<span class="badge badge-hold" style="margin-left:var(--sp-2)">Final</span>{% endif %}
           </td>
           {% if can_edit %}
           <td style="text-align:right">
