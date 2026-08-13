@@ -166,7 +166,7 @@
     </div>
 
     <!-- Card 2: Open Positions -->
-    <div class="panel panel-pad ref-card">
+    <div class="panel panel-pad ref-card ref-jobs-card">
       <div class="flex items-center justify-between" style="margin-bottom:var(--sp-3)">
         <h3 class="ref-card-title">Open Positions ({{ jobs|length }})</h3>
         <a href="{% url 'jobs:list' %}" class="btn btn-secondary btn-sm">All Jobs</a>
@@ -382,8 +382,8 @@ function switchChartTab(tabName) {
 .ref-activity-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  max-height: 140px;
+  gap: 6px;
+  max-height: 220px;
   overflow-y: auto;
 }
 
@@ -435,14 +435,23 @@ function switchChartTab(tabName) {
 }
 
 /* ===== Open Positions List ===== */
+.ref-jobs-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  flex: 1;
+}
+
 .ref-jobs-list {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2);
+  gap: 8px;
+  justify-content: space-between;
+  flex: 1;
 }
 
 .ref-job-item {
-  padding: var(--sp-2) var(--sp-3);
+  padding: 8px 12px;
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: var(--radius);
