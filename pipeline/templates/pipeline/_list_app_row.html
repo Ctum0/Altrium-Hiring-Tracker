@@ -24,9 +24,9 @@
   <td style="min-width:140px">
     {% if app.status != 'hired' and app.status != 'rejected' and app.status != 'on_hold' %}
     <select class="stage-select" name="stage"
+            aria-label="Move {{ app.candidate.full_name }} to another stage"
             onchange="confirmStageMove(this)"
             hx-post="{% url 'pipeline:move' app.pk %}"
-            hx-include="[name='csrfmiddlewaretoken']"
             hx-vals='{"source": "list"}'
             hx-target="#app-row-{{ app.pk }}"
             hx-swap="outerHTML"
