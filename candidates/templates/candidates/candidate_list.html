@@ -16,17 +16,19 @@
   </div>
 </div>
 
-<!-- Quick-filter tabs -->
+<!-- Quick-filter tabs (preserve search/filters when switching) -->
+{% with tab_extra='q='|add:filter_q|add:'&job='|add:filter_job|add:'&min_score='|add:filter_min_score %}
 <div class="flex gap-2" style="margin-bottom:var(--sp-4)">
-  <a href="{% url 'candidates:list' %}{% if filter_q %}?q={{ filter_q }}{% endif %}"
+  <a href="{% url 'candidates:list' %}?{{ tab_extra }}"
      class="btn btn-sm {% if not show_all and filter_stage != 'hired' and filter_stage != 'rejected' %}btn-primary{% else %}btn-secondary{% endif %}">Active</a>
-  <a href="?all=1{% if filter_q %}&q={{ filter_q }}{% endif %}"
+  <a href="?all=1&{{ tab_extra }}"
      class="btn btn-sm {% if show_all %}btn-primary{% else %}btn-secondary{% endif %}">All candidates</a>
-  <a href="?stage=hired{% if filter_q %}&q={{ filter_q }}{% endif %}"
+  <a href="?stage=hired&{{ tab_extra }}"
      class="btn btn-sm {% if filter_stage == 'hired' %}btn-primary{% else %}btn-secondary{% endif %}">Hired</a>
-  <a href="?stage=rejected{% if filter_q %}&q={{ filter_q }}{% endif %}"
+  <a href="?stage=rejected&{{ tab_extra }}"
      class="btn btn-sm {% if filter_stage == 'rejected' %}btn-primary{% else %}btn-secondary{% endif %}">Rejected</a>
 </div>
+{% endwith %}
 
 <!-- Wide 3D Glass Filter Card -->
 <div class="panel panel-pad glass-panel" style="margin-bottom:var(--sp-5);box-shadow:var(--shadow-md)">
@@ -110,9 +112,9 @@
         <td style="min-width:140px">
           {% if app.status != 'hired' and app.status != 'rejected' and app.status != 'on_hold' %}
           <select class="stage-select" name="stage"
+                  aria-label="Move {{ app.candidate.full_name }} to another stage"
                   onchange="confirmStageMove(this)"
                   hx-post="{% url 'pipeline:move' app.pk %}"
-                  hx-include="[name='csrfmiddlewaretoken']"
                   hx-vals='{"source": "list"}'
                   hx-target="#app-row-{{ app.pk }}"
                   hx-swap="outerHTML"

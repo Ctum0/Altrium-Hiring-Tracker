@@ -1,7 +1,12 @@
+{% load notification_extras %}
 <div class="popover-list">
   {% if notifications %}
     {% for n in notifications|slice:":5" %}
+    {% if n.link|safe_link %}
+    <a href="{{ n.link|safe_link }}" class="popover-item {% if not n.is_read %}unread{% endif %}">
+    {% else %}
     <div class="popover-item {% if not n.is_read %}unread{% endif %}">
+    {% endif %}
       <div class="popover-item-content">
         <p class="popover-item-message">{{ n.message }}</p>
         <span class="popover-item-time">{{ n.created_at|date:'M j, g:i A' }}</span>
@@ -9,7 +14,7 @@
       {% if not n.is_read %}
       <span class="popover-unread-dot" title="Unread"></span>
       {% endif %}
-    </div>
+    {% if n.link|safe_link %}</a>{% else %}</div>{% endif %}
     {% endfor %}
   {% else %}
     <div class="popover-empty">

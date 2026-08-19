@@ -27,6 +27,7 @@
         <input class="form-input" name="interview_details"
                value="{{ app.interview_details }}"
                placeholder="Meet link or notes"
+               aria-label="Interview link or notes for {{ app.candidate.full_name }}"
                style="padding:var(--sp-1) var(--sp-2);font-size:var(--text-xs)">
         <button type="submit" class="btn btn-primary btn-sm">Save</button>
       </form>
@@ -43,8 +44,8 @@
       {% if is_hr and app.status != 'rejected' and app.status != 'hired' %}
       <form method="post" action="{% url 'candidates:assign' app.pk %}" class="flex gap-2">
         {% csrf_token %}
-        <select class="form-select" name="interviewer" style="padding:var(--sp-1) var(--sp-2);font-size:var(--text-xs)" required>
-          <option value="">Assign to...</option>
+        <select class="form-select" name="interviewer" aria-label="Assigned interviewer for {{ app.candidate.full_name }}" style="padding:var(--sp-1) var(--sp-2);font-size:var(--text-xs)">
+          <option value="">{% if app.assigned_to %}Keep current / unassign...{% else %}Assign to...{% endif %}</option>
           {% for iv in interviewers %}
           <option value="{{ iv.pk }}" {% if app.assigned_to_id == iv.pk %}selected{% endif %}>{{ iv.get_full_name|default:iv.username }}</option>
           {% endfor %}
@@ -67,9 +68,9 @@
       <label class="app-card-control-label">Move Stage</label>
       {% if app.status != 'hired' and app.status != 'rejected' and app.status != 'on_hold' %}
       <select class="stage-select" name="stage"
+              aria-label="Move {{ app.candidate.full_name }} to another stage"
               onchange="confirmStageMove(this)"
               hx-post="{% url 'pipeline:move' app.pk %}"
-              hx-include="[name='csrfmiddlewaretoken']"
               hx-vals='{"source": "detail"}'
               hx-target="#app-row-{{ app.pk }}"
               hx-swap="outerHTML"

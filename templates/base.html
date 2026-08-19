@@ -36,6 +36,7 @@
   </script>
   <link rel="stylesheet" href="{% static 'css/app.css' %}">
   <script src="{% static 'vendor/htmx.min.js' %}"></script>
+<meta name="csrf-token" content="{{ csrf_token }}">
   {% block head %}{% endblock %}
 </head>
 <body>
@@ -91,16 +92,16 @@
         {% include 'includes/theme_toggle.html' %}
         {% if user.is_authenticated %}
         <div class="notif-dropdown-wrapper">
-          <button type="button" class="btn-icon" id="notif-trigger" aria-label="Notifications" onclick="toggleNotifPopover(event)">
+          <button type="button" class="btn-icon" id="notif-trigger" aria-label="Notifications" aria-haspopup="true" aria-expanded="false" onclick="toggleNotifPopover(event)">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
             <span class="notif-badge">
               <span class="notif-count"
                     hx-get="{% url 'notifications:unread_count' %}"
                     hx-trigger="load, every 30s"
                     hx-swap="innerHTML"
-                    hx-on::after-request="this.setAttribute('data-count', this.textContent.trim())"
-                    aria-live="polite">0</span>
+                    hx-on::after-request="this.setAttribute('data-count', this.textContent.trim())">0</span>
             </span>
+            <span class="sr-only" id="notif-live" aria-live="polite"></span>
           </button>
           <div id="notif-popover" class="notif-popover glass-panel" style="display:none">
             <div class="notif-popover-header">
@@ -109,7 +110,7 @@
             </div>
             <div class="notif-popover-body"
                  hx-get="{% url 'notifications:list' %}?popover=1"
-                 hx-trigger="load, click from:#notif-trigger"
+                 hx-trigger="click from:#notif-trigger"
                  hx-swap="innerHTML">
               <p class="text-xs text-muted p-3">Loading notifications...</p>
             </div>
@@ -147,6 +148,13 @@
 </dialog>
 <script>
 (function() {
+  // Attach the CSRF token to every HTMX request so POSTs work on any page,
+  // regardless of whether a {% raw %}{% csrf_token %}{% endraw %} input exists.
+  document.body.addEventListener('htmx:configRequest', function(e) {
+    var token = document.querySelector('meta[name="csrf-token"]');
+    if (token) e.detail.headers['X-CSRFToken'] = token.getAttribute('content');
+  });
+
   var dialog = document.getElementById('confirm-modal');
   var title = document.getElementById('confirm-title');
   var body = document.getElementById('confirm-body');
@@ -239,12 +247,14 @@
     if (msg && msg.indexOf('<') !== 0) {
       showToast(msg);
     }
-    // Revert any stage dropdown that failed to move so the UI matches state.
-    document.querySelectorAll('.stage-select').forEach(function(sel) {
-      if (sel.dataset.prev) {
-        sel.value = sel.dataset.prev;
-      }
-    });
+    // Revert only the stage dropdown that fired the failed request so the
+    // UI matches state, leaving unrelated rows untouched.
+    var src = e.detail && e.detail.elt;
+    var sel = src && src.closest ? src.closest('.stage-select') : null;
+    if (!sel) sel = src && src.classList && src.classList.contains('stage-select') ? src : null;
+    if (sel && sel.dataset.prev) {
+      sel.value = sel.dataset.prev;
+    }
   });
 
   function showToast(message) {
@@ -272,7 +282,9 @@
   }
 
   // Message auto-dismiss for success/info alerts (5s)
+  var reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   function dismissAlert(el) {
+    if (reducedMotion) { el.remove(); return; }
     el.style.transition = 'opacity 300ms ease, height 300ms ease, padding 300ms ease, margin 300ms ease';
     el.style.opacity = '0';
     el.style.height = '0';
@@ -296,20 +308,51 @@
     };
     syncNotifBadge();
     if (window.MutationObserver) {
-      new MutationObserver(syncNotifBadge).observe(notifCount, { childList: true, subtree: true, characterData: true });
+      var live = document.getElementById('notif-live');
+      var lastCount = notifCount.textContent.trim();
+      new MutationObserver(function() {
+        syncNotifBadge();
+        var now = notifCount.textContent.trim();
+        // Announce only when the unread count actually changes, not every poll.
+        if (live && now !== lastCount) {
+          live.textContent = now === '0' ? 'No unread notifications' : now + ' unread notifications';
+          lastCount = now;
+        }
+      }).observe(notifCount, { childList: true, subtree: true, characterData: true });
     }
   }
 
+  var notifReturnFocus = null;
   window.toggleNotifPopover = function(e) {
     if (e) e.stopPropagation();
     var pop = document.getElementById('notif-popover');
+    var trig = document.getElementById('notif-trigger');
     if (!pop) return;
-    if (pop.style.display === 'none' || !pop.style.display) {
-      pop.style.display = 'block';
-    } else {
-      pop.style.display = 'none';
+    var opening = pop.style.display === 'none' || !pop.style.display;
+    pop.style.display = opening ? 'block' : 'none';
+    if (trig) trig.setAttribute('aria-expanded', opening ? 'true' : 'false');
+    if (opening) {
+      notifReturnFocus = document.activeElement;
+      var first = pop.querySelector('a, button');
+      if (first) first.focus();
+    } else if (notifReturnFocus && document.contains(notifReturnFocus)) {
+      notifReturnFocus.focus();
+      notifReturnFocus = null;
     }
   };
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key !== 'Escape') return;
+    var pop = document.getElementById('notif-popover');
+    var trig = document.getElementById('notif-trigger');
+    if (pop && pop.style.display !== 'none') {
+      pop.style.display = 'none';
+      if (trig) {
+        trig.setAttribute('aria-expanded', 'false');
+        trig.focus();
+      }
+    }
+  });
 
   document.addEventListener('click', function(e) {
     var pop = document.getElementById('notif-popover');
@@ -317,6 +360,7 @@
     if (pop && pop.style.display !== 'none') {
       if (!pop.contains(e.target) && !trigger.contains(e.target)) {
         pop.style.display = 'none';
+        if (trigger) trigger.setAttribute('aria-expanded', 'false');
       }
     }
   });
