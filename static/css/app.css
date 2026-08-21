@@ -926,17 +926,22 @@ a:hover {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: var(--sp-2) var(--sp-3) 6px;
-  border: 1px solid var(--glass-border);
+  padding: 9px 11px 8px;
+  border: 1px solid rgba(255,255,255,0.08);
   border-radius: var(--radius);
-  background: var(--surface-2);
-  min-width: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.015) 100%), var(--surface-2);
+  backdrop-filter: blur(18px) saturate(130%);
+  -webkit-backdrop-filter: blur(18px) saturate(130%);
+  min-height: 0;
+  max-height: 212px;
   overflow: hidden;
-  transition: transform 200ms ease, border-color 200ms ease;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.05);
+  transition: transform 200ms ease, border-color 200ms ease, box-shadow 200ms ease;
 }
 .main-content.dashboard-single-screen .ai-insight-card:hover {
   transform: translateY(-2px);
   border-color: var(--border-strong);
+  box-shadow: 0 8px 28px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.06);
 }
 .main-content.dashboard-single-screen .ai-insight-head {
   display: flex;
@@ -981,7 +986,7 @@ a:hover {
   gap: 1px;
 }
 .main-content.dashboard-single-screen .ai-insight-value {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 800;
   color: var(--ink);
   line-height: 1.2;
@@ -990,7 +995,7 @@ a:hover {
   text-overflow: ellipsis;
 }
 .main-content.dashboard-single-screen .ai-insight-text {
-  font-size: 11px;
+  font-size: 10.5px;
   color: var(--muted);
   white-space: nowrap;
   overflow: hidden;
@@ -1008,8 +1013,26 @@ a:hover {
 .main-content.dashboard-single-screen .accent-bar-green { background: var(--status-hired); box-shadow: 0 0 6px var(--status-hired); }
 .main-content.dashboard-single-screen .accent-bar-amber { background: var(--status-pending); box-shadow: 0 0 6px var(--status-pending); }
 
-/* AI Insights — Enhanced type-specific internals */
+/* AI Insights — Refined internals (same footprint, higher information density) */
 .main-content.dashboard-single-screen .ai-insight-card .ai-insight-body { gap: 1px; }
+.main-content.dashboard-single-screen .ai-insight-card .ai-insight-value { font-size: 13px; font-weight: 800; color: var(--ink); line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.main-content.dashboard-single-screen .ai-insight-card .ai-insight-text { font-size: 10.5px; color: var(--muted); }
+
+/* Shared micro elements */
+.main-content.dashboard-single-screen .ai-insight-meta-row { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.main-content.dashboard-single-screen .ai-meta-dot { color: var(--muted); font-size: 10px; }
+.main-content.dashboard-single-screen .ai-meta-muted { font-size: 10px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+.main-content.dashboard-single-screen .ai-meta-muted.ai-meta-violet { color: var(--accent-violet); }
+.main-content.dashboard-single-screen .ai-demand-score { font-size: 10px; font-weight: 800; color: var(--brand); letter-spacing: 0.02em; }
+.main-content.dashboard-single-screen .ai-line { font-size: 10px; font-style: italic; color: var(--muted); line-height: 1.25; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.main-content.dashboard-single-screen .ai-line-violet { color: rgba(129, 140, 248, 0.85); }
+.main-content.dashboard-single-screen .ai-line-amber { color: rgba(245, 158, 11, 0.9); }
+.main-content.dashboard-single-screen .ai-line-green { color: rgba(52, 211, 153, 0.9); }
+.main-content.dashboard-single-screen .ai-line-red { color: rgba(248, 113, 113, 0.9); }
+.main-content.dashboard-single-screen .ai-line-blue { color: rgba(34, 211, 238, 0.9); }
+.main-content.dashboard-single-screen .ai-chip-row { display: flex; flex-wrap: wrap; gap: 4px; }
+.main-content.dashboard-single-screen .ai-chip { font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 9999px; background: rgba(34, 211, 238, 0.14); color: var(--brand); white-space: nowrap; }
+.main-content.dashboard-single-screen .ai-chip-violet { background: rgba(129, 140, 248, 0.14); color: var(--accent-violet); }
 
 /* Top Role — mini bar chart */
 .main-content.dashboard-single-screen .ai-mini-bars { display: flex; flex-direction: column; gap: 3px; margin-top: 1px; }
@@ -1024,19 +1047,25 @@ a:hover {
 .main-content.dashboard-single-screen .ai-bar-amber { background: var(--status-pending); }
 
 /* Best Fit — match score badge */
-.main-content.dashboard-single-screen .ai-fit-row { display: flex; align-items: baseline; gap: var(--sp-2); }
-.main-content.dashboard-single-screen .ai-fit-score { font-size: var(--text-micro); font-weight: 800; padding: 2px 7px; border-radius: var(--radius-pill); white-space: nowrap; }
+.main-content.dashboard-single-screen .ai-fit-score { font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: var(--radius-pill); white-space: nowrap; }
 .main-content.dashboard-single-screen .ai-fit-violet { background: rgba(99, 102, 241, 0.18); color: var(--vui-violet-500); }
 .main-content.dashboard-single-screen .ai-fit-bar-wrap { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
 .main-content.dashboard-single-screen .ai-fit-bar-track { flex: 1; height: 6px; border-radius: 9999px; background: rgba(255,255,255,0.06); overflow: hidden; }
 .main-content.dashboard-single-screen .ai-fit-bar-fill { height: 100%; border-radius: 9999px; background: var(--vui-violet-500); transition: width 600ms ease; }
 .main-content.dashboard-single-screen .ai-fit-bar-label { font-size: 9px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; }
 
-/* Pipeline Health — stacked status bars */
-.main-content.dashboard-single-screen .ai-health-row { display: flex; align-items: baseline; gap: var(--sp-2); }
-.main-content.dashboard-single-screen .ai-health-badge { font-size: var(--text-micro); font-weight: 700; padding: 2px 7px; border-radius: var(--radius-pill); white-space: nowrap; }
-.main-content.dashboard-single-screen .ai-health-green { background: rgba(52, 211, 153, 0.18); color: var(--status-hired); }
-.main-content.dashboard-single-screen .ai-health-amber { background: rgba(245, 158, 11, 0.18); color: var(--status-pending); }
+/* Pipeline Health — score + status bars */
+.main-content.dashboard-single-screen .ai-health-score-row { display: flex; align-items: center; gap: 6px; }
+.main-content.dashboard-single-screen .ai-health-score { font-size: 10px; font-weight: 800; color: var(--status-hired); white-space: nowrap; }
+.main-content.dashboard-single-screen .ai-health-score-bar { flex: 1; height: 4px; border-radius: 9999px; background: rgba(255,255,255,0.06); overflow: hidden; }
+.main-content.dashboard-single-screen .ai-health-score-fill { height: 100%; border-radius: 9999px; display: block; transition: width 600ms ease; }
+.main-content.dashboard-single-screen .ai-health-score-fill.fill-strong { background: var(--status-hired); }
+.main-content.dashboard-single-screen .ai-health-score-fill.fill-ok { background: var(--status-pending); }
+.main-content.dashboard-single-screen .ai-health-score-fill.fill-weak { background: var(--danger); }
+.main-content.dashboard-single-screen .ai-health-badge { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: var(--radius-pill); white-space: nowrap; }
+.main-content.dashboard-single-screen .ai-health-strong { background: rgba(52, 211, 153, 0.18); color: var(--status-hired); }
+.main-content.dashboard-single-screen .ai-health-ok { background: rgba(245, 158, 11, 0.18); color: var(--status-pending); }
+.main-content.dashboard-single-screen .ai-health-weak { background: rgba(248, 113, 113, 0.18); color: var(--danger); }
 .main-content.dashboard-single-screen .ai-health-bars { display: flex; flex-direction: column; gap: 3px; margin-top: 1px; }
 .main-content.dashboard-single-screen .ai-health-bar-row { display: grid; grid-template-columns: 5px 34px 1fr 16px; align-items: center; gap: 4px; }
 .main-content.dashboard-single-screen .ai-health-dot { width: 5px; height: 5px; border-radius: 50%; flex: none; }
@@ -1046,20 +1075,24 @@ a:hover {
 .main-content.dashboard-single-screen .ai-health-count { font-size: 10px; font-weight: 700; color: var(--ink); text-align: right; font-variant-numeric: tabular-nums; }
 
 /* At Risk — risk gauge */
-.main-content.dashboard-single-screen .ai-risk-row { display: flex; align-items: baseline; gap: var(--sp-2); }
-.main-content.dashboard-single-screen .ai-risk-badge { font-size: var(--text-micro); font-weight: 700; padding: 2px 7px; border-radius: var(--radius-pill); white-space: nowrap; }
+.main-content.dashboard-single-screen .ai-risk-badge { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: var(--radius-pill); white-space: nowrap; }
 .main-content.dashboard-single-screen .ai-risk-green { background: rgba(52, 211, 153, 0.18); color: var(--status-hired); }
 .main-content.dashboard-single-screen .ai-risk-amber { background: rgba(245, 158, 11, 0.18); color: var(--status-pending); }
 .main-content.dashboard-single-screen .ai-risk-red { background: rgba(248, 113, 113, 0.18); color: var(--danger); }
 .main-content.dashboard-single-screen .ai-risk-gauge { margin-top: 2px; }
 .main-content.dashboard-single-screen .ai-risk-gauge-track { height: 4px; border-radius: 9999px; background: rgba(255,255,255,0.06); overflow: hidden; }
-.main-content.dashboard-single-screen .ai-risk-gauge-fill { height: 100%; border-radius: 9999px; background: var(--status-pending); transition: width 600ms ease; }
-.main-content.dashboard-single-screen .ai-risk-gauge-label { font-size: 9px; font-weight: 600; color: var(--muted); margin-top: 2px; display: block; }
+.main-content.dashboard-single-screen .ai-risk-gauge-fill { height: 100%; border-radius: 9999px; transition: width 600ms ease; }
+.main-content.dashboard-single-screen .ai-risk-gauge-fill.tone-green { background: var(--status-hired); }
+.main-content.dashboard-single-screen .ai-risk-gauge-fill.tone-amber { background: var(--status-pending); }
+.main-content.dashboard-single-screen .ai-risk-gauge-fill.tone-red { background: var(--danger); }
 
 /* Light mode overrides for AI insight internals */
+[data-theme="light"] .main-content.dashboard-single-screen .ai-insight-card { background: linear-gradient(135deg, rgba(255,255,255,0.82) 0%, rgba(255,255,255,0.48) 100%), var(--surface-2); border-color: rgba(0,0,0,0.06); box-shadow: 0 4px 18px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.95); }
+[data-theme="light"] .main-content.dashboard-single-screen .ai-insight-card:hover { box-shadow: 0 8px 28px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.95); }
 [data-theme="light"] .main-content.dashboard-single-screen .ai-mini-bar-track,
 [data-theme="light"] .main-content.dashboard-single-screen .ai-fit-bar-track,
 [data-theme="light"] .main-content.dashboard-single-screen .ai-health-bar-track,
+[data-theme="light"] .main-content.dashboard-single-screen .ai-health-score-bar,
 [data-theme="light"] .main-content.dashboard-single-screen .ai-risk-gauge-track { background: rgba(0,0,0,0.06); }
 
 .main-content.wide {
