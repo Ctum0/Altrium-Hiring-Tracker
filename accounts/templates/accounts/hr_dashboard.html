@@ -59,7 +59,7 @@
     </div>
   </a>
 
-  <a href="{% url 'feedback:list' %}" class="ref-kpi-card glass-panel vui-card vui-card-hover kpi-card-link {% if feedback_pending > 0 %}kpi-card-pending-3d{% endif %}" {% if feedback_pending > 0 %}aria-label="Pending feedback: open feedback list"{% else %}aria-label="Feedback list"{% endif %}>
+  <a href="{% url 'feedback:list' %}?status=pending" class="ref-kpi-card glass-panel vui-card vui-card-hover kpi-card-link {% if feedback_pending > 0 %}kpi-card-pending-3d{% endif %}" {% if feedback_pending > 0 %}aria-label="Pending feedback: open feedback list"{% else %}aria-label="Feedback list"{% endif %}>
     <div class="ref-kpi-meta">
       <span class="ref-kpi-label">Pending Feedback</span>
       <span class="ref-kpi-value">{% if feedback_pending > 0 %}<span class="text-pending">{{ feedback_pending }}</span>{% else %}{{ feedback_pending|default:0 }}{% endif %}</span>
@@ -131,7 +131,7 @@
           <div class="ref-velocity-item">
             <div class="velocity-meta">
               <span class="velocity-label">Screening Avg Time</span>
-              <span class="velocity-val mono">2.4 days</span>
+              <span class="velocity-val mono">{{ velocity_screening }} days</span>
             </div>
             <div class="velocity-bar-track">
               <div class="velocity-bar-fill fill-blue" style="width: 45%;"></div>
@@ -140,7 +140,7 @@
           <div class="ref-velocity-item">
             <div class="velocity-meta">
               <span class="velocity-label">Interview Stage Avg</span>
-              <span class="velocity-val mono">4.1 days</span>
+              <span class="velocity-val mono">{{ velocity_interview }} days</span>
             </div>
             <div class="velocity-bar-track">
               <div class="velocity-bar-fill fill-amber" style="width: 72%;"></div>
@@ -149,15 +149,15 @@
           <div class="ref-velocity-item">
             <div class="velocity-meta">
               <span class="velocity-label">Offer SLA Pace</span>
-              <span class="velocity-val mono text-success">1.8 days</span>
+              <span class="velocity-val mono text-success">{{ velocity_offer }} days</span>
             </div>
             <div class="velocity-bar-track">
               <div class="velocity-bar-fill fill-green" style="width: 30%;"></div>
             </div>
           </div>
           <div class="ref-velocity-flag">
-            <span class="flag-dot dot-green"></span>
-            <span class="flag-text">0 candidates stalled over 7 days</span>
+            <span class="flag-dot {% if stalled_count > 0 %}dot-amber{% else %}dot-green{% endif %}"></span>
+            <span class="flag-text">{{ stalled_count }} candidate{{ stalled_count|pluralize }} stalled over 7 days</span>
           </div>
         </div>
       </div>
