@@ -130,6 +130,12 @@ class JobApplication(models.Model):
         blank=True,
         related_name='assigned_applications',
     )
+    panel_interviewers = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        blank=True,
+        related_name='panel_applications',
+        help_text='Hiring panel interviewers assigned to evaluate this candidate.',
+    )
     interview_details = models.TextField(
         blank=True,
         help_text='Google Meet link and scheduling notes (visible to assigned interviewer).',
@@ -164,6 +170,12 @@ class JobApplication(models.Model):
         """Skill-overlap breakdown against this application's job."""
         from ai.matching import job_fit
         return job_fit(self.candidate, self.job)
+
+    @property
+    def panel_consensus(self):
+        """Synthesizes multi-interviewer feedback and returns progressive weighted consensus."""
+        from ai.panel import synthesize_panel_consensus
+        return synthesize_panel_consensus(self)
 
     def save(self, *args, **kwargs):
         if self._state.adding and not self.current_round_id and self.job_id:

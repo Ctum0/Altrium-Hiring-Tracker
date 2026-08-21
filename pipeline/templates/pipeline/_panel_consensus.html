@@ -1,0 +1,94 @@
+{% if app.panel_consensus %}
+<div class="panel glass-panel panel-consensus-card" style="margin-top:12px;margin-bottom:12px;padding:14px 16px;border-radius:var(--radius-md, 14px);background:linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 100%), rgba(8, 24, 44, 0.65);backdrop-filter:blur(24px) saturate(180%);border:1px solid rgba(255, 255, 255, 0.12);box-shadow:inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 10px 28px rgba(0,0,0,0.30)">
+  <!-- Header & Status Badge -->
+  <div class="flex items-center justify-between" style="margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.08)">
+    <div class="flex items-center gap-2">
+      <span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;background:rgba(34,211,238,0.15);color:var(--vui-primary-blue)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </span>
+      <div>
+        <h4 style="font-size:0.92rem;font-weight:800;color:var(--ink);margin:0;line-height:1.2">AI Panel Consensus & Conflict Resolver</h4>
+        <span class="text-micro text-muted" style="font-size:11px">Synthesized across {{ app.panel_consensus.total_evaluators }} interviewer evaluation(s)</span>
+      </div>
+    </div>
+    <span class="badge {{ app.panel_consensus.status_badge_class }}" style="font-size:11px;font-weight:800;padding:3px 9px">
+      {{ app.panel_consensus.status_label }}
+    </span>
+  </div>
+
+  <!-- Metric Summary Row -->
+  <div style="display:grid;grid-template-columns:140px 1fr;gap:12px;margin-bottom:10px">
+    <!-- Progressive Weighted Score -->
+    <div style="background:rgba(255,255,255,0.04);padding:8px 10px;border-radius:var(--radius-sm, 8px);border:1px solid rgba(255,255,255,0.08);text-align:center">
+      <div class="text-micro text-muted" style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em">Weighted Panel Avg</div>
+      <div style="font-size:1.3rem;font-weight:800;color:var(--ink);line-height:1.1;margin-top:2px">{{ app.panel_consensus.weighted_avg_10 }} <small style="font-size:0.6em;color:var(--muted)">/ 10</small></div>
+      <div class="text-micro" style="font-size:10px;color:var(--vui-primary-blue);margin-top:2px">({{ app.panel_consensus.weighted_avg_100 }}% match)</div>
+    </div>
+
+    <!-- Vote Tally & Divergence Bar -->
+    <div style="background:rgba(255,255,255,0.04);padding:8px 10px;border-radius:var(--radius-sm, 8px);border:1px solid rgba(255,255,255,0.08);display:flex;flex-direction:column;justify-content:center">
+      <div class="flex items-center justify-between" style="font-size:11px;font-weight:700;color:var(--ink);margin-bottom:4px">
+        <span>Panel Vote Breakdown:</span>
+        <span>
+          <span style="color:#34d399">Hire: {{ app.panel_consensus.hire_votes }}</span> &middot;
+          <span style="color:#f59e0b">Hold: {{ app.panel_consensus.hold_votes }}</span> &middot;
+          <span style="color:#f87171">Reject: {{ app.panel_consensus.reject_votes }}</span>
+        </span>
+      </div>
+      <div style="display:flex;height:6px;border-radius:9999px;overflow:hidden;background:rgba(255,255,255,0.08)">
+        {% if app.panel_consensus.hire_votes %}
+        <div style="background:#34d399;flex:{{ app.panel_consensus.hire_votes }}"></div>
+        {% endif %}
+        {% if app.panel_consensus.hold_votes %}
+        <div style="background:#f59e0b;flex:{{ app.panel_consensus.hold_votes }}"></div>
+        {% endif %}
+        {% if app.panel_consensus.reject_votes %}
+        <div style="background:#f87171;flex:{{ app.panel_consensus.reject_votes }}"></div>
+        {% endif %}
+      </div>
+      {% if app.panel_consensus.is_divergent %}
+      <div class="text-micro" style="font-size:10.5px;color:#f87171;font-weight:700;margin-top:4px">⚠️ High Divergence: Score spread is {{ app.panel_consensus.score_spread }} pts across rounds.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Agreed Strengths & Conflicts Grid -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+    <!-- Agreed Strengths -->
+    <div style="background:rgba(52,211,153,0.06);padding:8px 10px;border-radius:var(--radius-sm, 8px);border:1px solid rgba(52,211,153,0.18)">
+      <h5 style="font-size:11px;font-weight:800;color:#34d399;text-transform:uppercase;letter-spacing:0.03em;margin:0 0 4px 0">✓ Agreed Strengths</h5>
+      <ul style="margin:0;padding-left:14px;font-size:11px;color:var(--ink);line-height:1.4">
+        {% for strength in app.panel_consensus.agreed_strengths %}
+        <li style="margin-bottom:2px">{{ strength }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    <!-- Divergence / Conflict Points -->
+    {% if app.panel_consensus.is_divergent %}
+    <div style="background:rgba(248,113,113,0.08);padding:8px 10px;border-radius:var(--radius-sm, 8px);border:1px solid rgba(248,113,113,0.25)">
+      <h5 style="font-size:11px;font-weight:800;color:#f87171;text-transform:uppercase;letter-spacing:0.03em;margin:0 0 4px 0">⚡ Panel Divergence Notes</h5>
+      <ul style="margin:0;padding-left:14px;font-size:11px;color:var(--ink);line-height:1.4">
+        {% for pt in app.panel_consensus.conflict_points %}
+        <li style="margin-bottom:2px">{{ pt }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% else %}
+    <div style="background:rgba(255,255,255,0.04);padding:8px 10px;border-radius:var(--radius-sm, 8px);border:1px solid rgba(255,255,255,0.08)">
+      <h5 style="font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:0.03em;margin:0 0 4px 0">⚡ Panel Alignment Notes</h5>
+      <ul style="margin:0;padding-left:14px;font-size:11px;color:var(--ink);line-height:1.4">
+        {% for pt in app.panel_consensus.conflict_points %}
+        <li style="margin-bottom:2px">{{ pt }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- AI Actionable Recommendation Box for HR -->
+  <div style="background:rgba(34,211,238,0.08);padding:8px 12px;border-radius:var(--radius-sm, 8px);border:1px solid rgba(34,211,238,0.22);font-size:11.5px;line-height:1.45;color:var(--ink)">
+    <strong style="color:var(--vui-primary-blue)">🤖 AI Consensus Action Recommendation:</strong> {{ app.panel_consensus.recommendation }}
+  </div>
+</div>
+{% endif %}

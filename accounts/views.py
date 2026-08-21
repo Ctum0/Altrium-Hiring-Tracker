@@ -330,8 +330,8 @@ class InterviewerDashboardView(LoginRequiredMixin, TemplateView):
         context = super().get_context_data(**kwargs)
         user = self.request.user
         assigned_qs = JobApplication.objects.filter(
-            assigned_to=user
-        ).select_related(
+            Q(assigned_to=user) | Q(panel_interviewers=user)
+        ).distinct().select_related(
             'candidate', 'job', 'current_round'
         )
 
