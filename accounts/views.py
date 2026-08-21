@@ -199,17 +199,17 @@ class HRDashboardView(LoginRequiredMixin, ListView):
             demand_score = min(99, 68 + top_pct + (total_roles * 2))
 
             if total_roles == 1:
-                ai_line = 'Only role with candidates — open more reqs.'
-                ai_reason = 'All {} applications target this role.'.format(total_apps)
+                ai_line = 'Only role with candidates'
+                ai_reason = 'All {} apps target this role'.format(total_apps)
             elif share_gap >= 15:
-                ai_line = 'Demand outlier. Prioritize sourcing here.'
-                ai_reason = '{:.0f}% above next role; candidate gravity is clear.'.format(share_gap)
+                ai_line = 'Demand outlier — prioritize sourcing'
+                ai_reason = '{:.0f}% above next role'.format(share_gap)
             elif top_pct >= 30:
-                ai_line = 'Strong concentration — {:.0f}% of pipeline.'.format(top_pct)
-                ai_reason = 'Allocate interview capacity to this lane first.'
+                ai_line = 'Strong concentration in pipeline'
+                ai_reason = '{:.0f}% of total; allocate interviews'.format(top_pct)
             else:
-                ai_line = 'Balanced demand across roles.'
-                ai_reason = 'No single role dominates; keep the funnel wide.'
+                ai_line = 'Balanced demand across roles'
+                ai_reason = 'No single role dominates'
 
             role_rank = [
                 {
@@ -256,16 +256,16 @@ class HRDashboardView(LoginRequiredMixin, ListView):
             match_score = min(99, max(54, round(0.55 * 94 + 0.45 * float(avg_sc or 60))))
             if match_score >= 85:
                 match_band = 'Excellent'
-                ai_line_best = 'Strong fit — move to interviews.'
-                ai_reason_best = 'Role requirements align cleanly with pipeline talent.'
+                ai_line_best = 'Strong fit — prioritize interviews'
+                ai_reason_best = 'Requirements align with talent'
             elif match_score >= 70:
                 match_band = 'Strong'
-                ai_line_best = 'Good overlap — prioritize interviews.'
-                ai_reason_best = 'Core skills present; screen for edge requirements.'
+                ai_line_best = 'Good overlap — prioritize interviews'
+                ai_reason_best = 'Core skills present'
             else:
                 match_band = 'Moderate'
-                ai_line_best = 'Review skills vs. requirements.'
-                ai_reason_best = 'Gaps detected — validate with a technical screen.'
+                ai_line_best = 'Review skills vs requirements'
+                ai_reason_best = 'Gaps detected — validate technically'
             best_job = None
             try:
                 from jobs.models import Job as _BestJob
@@ -320,17 +320,17 @@ class HRDashboardView(LoginRequiredMixin, ListView):
         ]
         bottleneck = max(stage_scores, key=lambda x: x[1])
         if bottleneck[1] <= 1:
-            bottleneck_line = 'No bottleneck — flow is balanced.'
-            bottleneck_reason = '{}% active pipeline; healthy distribution.'.format(active_pct)
+            bottleneck_line = 'No bottleneck — flow balanced'
+            bottleneck_reason = '{}% active; healthy distribution'.format(active_pct)
         elif bottleneck[0] == 'On hold':
-            bottleneck_line = 'Clear on-hold queue to restore flow.'
-            bottleneck_reason = '{} on hold — longest dwell time.'.format(bottleneck[1])
+            bottleneck_line = 'Clear on-hold to restore flow'
+            bottleneck_reason = '{} on hold — longest dwell time'.format(bottleneck[1])
         elif bottleneck[0] == 'Rejected':
-            bottleneck_line = 'High rejection rate — review screening.'
-            bottleneck_reason = '{} rejected; tighten top-of-funnel criteria.'.format(bottleneck[1])
+            bottleneck_line = 'High rejection — review screening'
+            bottleneck_reason = '{} rejected; tighten criteria'.format(bottleneck[1])
         else:
-            bottleneck_line = '{} holds most candidates — keep moving.'.format(bottleneck[0])
-            bottleneck_reason = '{} in {}; check SLA.'.format(bottleneck[1], bottleneck[0])
+            bottleneck_line = '{} holds most — keep moving'.format(bottleneck[0])
+            bottleneck_reason = '{} in {}; check SLA'.format(bottleneck[1], bottleneck[0])
         ai_insights.append({
             'id': 'health',
             'icon': 'pulse',
@@ -367,16 +367,16 @@ class HRDashboardView(LoginRequiredMixin, ListView):
             pass
         if on_hold_count == 0:
             risk_level, risk_tone = 'Low', 'green'
-            risk_ai = 'No candidates stalled — pipeline clear.'
-            risk_reason = '0% on hold; follow up on rejected if needed.'
+            risk_ai = 'No stalled candidates'
+            risk_reason = '0% on hold'
         elif risk_pct < 25:
             risk_level, risk_tone = 'Watch', 'amber'
-            risk_ai = 'Small queue forming — check in today.'
-            risk_reason = '{} on hold ({} stale {}) — quick check-in recovers.'.format(on_hold_count, stale_count, '>3d' if stale_count else 'recent')
+            risk_ai = 'Small queue — check in today'
+            risk_reason = '{} on hold ({} stale)'.format(on_hold_count, stale_count)
         else:
             risk_level, risk_tone = 'Elevated', 'red'
-            risk_ai = '{}% stalled — follow up within 48h.'.format(risk_pct)
-            risk_reason = '{} stalled, {} stale — unblock now.'.format(on_hold_count, stale_count)
+            risk_ai = '{}% stalled — follow up soon'.format(risk_pct)
+            risk_reason = '{} stalled, {} stale'.format(on_hold_count, stale_count)
         ai_insights.append({
             'id': 'risk',
             'icon': 'alert',
