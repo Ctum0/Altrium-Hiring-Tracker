@@ -210,7 +210,7 @@
           {% if insight.id == 'top_role' and insight.rank %}
           <div class="ai-insight-body">
             <span class="ai-insight-value">{{ insight.value }}</span>
-            <span class="ai-insight-text">Demand {{ insight.demand_score }}% · {{ insight.leader_label }}</span>
+            <span class="ai-insight-support">Demand {{ insight.demand_score }}% · {{ insight.leader_label }}</span>
           </div>
           <div class="ai-mini-bars">
             {% for r in insight.rank|slice:":2" %}
@@ -224,12 +224,12 @@
             {% endfor %}
           </div>
           {% if insight.skill_tokens %}<div class="ai-chip-row">{% for chip in insight.skill_tokens|slice:":2" %}<span class="ai-chip">{{ chip }}</span>{% endfor %}</div>{% endif %}
-          <span class="ai-line">{{ insight.ai_line }}</span>
+          <span class="ai-advice">{{ insight.ai_line }} · {{ insight.ai_reason }}</span>
 
           {% elif insight.id == 'best_fit' %}
           <div class="ai-insight-body">
             <span class="ai-insight-value">{{ insight.value }}</span>
-            <span class="ai-insight-text">{{ insight.match_score }}% match · {{ insight.match_band }}</span>
+            <span class="ai-insight-support ai-support-{{ insight.accent }}">{{ insight.match_score }}% match · {{ insight.match_band }}</span>
           </div>
           <div class="ai-fit-bar-wrap">
             <div class="ai-fit-bar-track">
@@ -242,11 +242,12 @@
             {% for chip in insight.skill_chips|slice:":2" %}<span class="ai-chip ai-chip-{{ insight.accent }}">{{ chip }}</span>{% endfor %}
           </div>
           {% endif %}
-          <span class="ai-line ai-line-{{ insight.accent }}">{{ insight.ai_line_best }}</span>
+          <span class="ai-advice ai-advice-{{ insight.accent }}">{{ insight.ai_line_best }} · {{ insight.ai_reason_best }}</span>
 
           {% elif insight.id == 'health' %}
           <div class="ai-insight-body">
             <span class="ai-insight-value">Score {{ insight.health_score }} — {{ insight.value }}</span>
+            <span class="ai-insight-support">{{ insight.active_pct }}% active pipeline</span>
           </div>
           <div class="ai-health-bars">
             <div class="ai-health-bar-row">
@@ -266,19 +267,19 @@
               <span class="ai-health-count">{{ insight.hold_count }}</span>
             </div>
           </div>
-          <span class="ai-line ai-line-{{ insight.accent }}">{{ insight.bottleneck_line }}</span>
+          <span class="ai-advice ai-advice-{{ insight.accent }}">{{ insight.bottleneck_line }} · {{ insight.bottleneck_reason }}</span>
 
           {% elif insight.id == 'risk' %}
           <div class="ai-insight-body">
             <span class="ai-insight-value">{{ insight.value }}</span>
-            <span class="ai-insight-text">{{ insight.risk_level }} · {{ insight.count }} on hold ({{ insight.risk_pct }}%)</span>
+            <span class="ai-insight-support">{{ insight.risk_level }} · {{ insight.count }} on hold ({{ insight.risk_pct }}%)</span>
           </div>
           <div class="ai-risk-gauge">
             <div class="ai-risk-gauge-track">
               <div class="ai-risk-gauge-fill tone-{{ insight.risk_tone }}" style="width:{{ insight.risk_pct }}%"></div>
             </div>
           </div>
-          <span class="ai-line ai-line-{{ insight.risk_tone }}">{{ insight.risk_ai }}</span>
+          <span class="ai-advice ai-advice-{{ insight.risk_tone }}">{{ insight.risk_ai }} · {{ insight.risk_reason }}</span>
 
           {% else %}
           <div class="ai-insight-body">
@@ -309,16 +310,22 @@
         {% for app in recent_applications|slice:":3" %}
         <a href="{% url 'candidates:detail' app.candidate_id %}" class="activity-item">
           <div class="activity-dot-col">
-            <div class="activity-dot"></div>
+            <div class="activity-dot status-dot-{{ app.status }}"></div>
             <div class="activity-dot-line"></div>
           </div>
           <div class="activity-content">
-            <div class="flex items-center justify-between">
+            <div class="activity-name-row">
               <span class="activity-name">{{ app.candidate.full_name }}</span>
               <span class="activity-time">{{ app.updated_at|timesince }} ago</span>
             </div>
+            <div class="activity-action-line">
+              <span class="activity-action-text">
+                {% if app.status == 'hired' %}Hired for{% elif app.status == 'rejected' %}Rejected from{% elif app.status == 'in_progress' %}Interviewing at{% elif app.status == 'shortlisted' %}Shortlisted for{% elif app.status == 'on_hold' %}On hold for{% else %}Applied to{% endif %}
+                {{ app.job.title|truncatechars:22 }}
+              </span>
+            </div>
             <div class="activity-meta-row">
-              <span class="activity-job-label">{{ app.job.title }}</span>
+              <span class="activity-assignee">{% if app.assigned_to %}{{ app.assigned_to.get_full_name|default:app.assigned_to.username }}{% else %}Unassigned{% endif %}</span>
               <span class="badge badge-{{ app.status }}">{{ app.get_status_display }}</span>
             </div>
           </div>

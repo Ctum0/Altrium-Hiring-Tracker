@@ -894,11 +894,21 @@ a:hover {
 .main-content.dashboard-single-screen .ref-feedback-col .ref-bar-track { height: 7px; border-radius: 9999px; margin-top: 2px; }
 
 .main-content.dashboard-single-screen .activity-timeline { flex: 1; overflow: hidden; }
-.main-content.dashboard-single-screen .activity-item { padding: var(--sp-2) 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+.main-content.dashboard-single-screen .activity-item { padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.04); gap: 10px; }
 .main-content.dashboard-single-screen .activity-item:last-child { border-bottom: none; }
+.main-content.dashboard-single-screen .activity-item:hover .activity-name { color: var(--brand); }
 .main-content.dashboard-single-screen .activity-dot { width: var(--sp-2); height: var(--sp-2); }
-.main-content.dashboard-single-screen .activity-content { padding-bottom: var(--sp-1); }
-.main-content.dashboard-single-screen .activity-meta-row { margin-top: var(--sp-1); }
+.main-content.dashboard-single-screen .activity-content { padding-bottom: 2px; }
+.main-content.dashboard-single-screen .activity-name-row { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-2); }
+.main-content.dashboard-single-screen .activity-action-line { margin-top: 2px; }
+.main-content.dashboard-single-screen .activity-action-text { font-size: 11px; font-weight: 500; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.main-content.dashboard-single-screen .activity-assignee { font-size: var(--text-micro); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.main-content.dashboard-single-screen .status-dot-hired { background: var(--status-hired); box-shadow: 0 0 6px var(--status-hired); }
+.main-content.dashboard-single-screen .status-dot-rejected { background: var(--status-rejected); box-shadow: 0 0 6px var(--status-rejected); }
+.main-content.dashboard-single-screen .status-dot-in_progress { background: var(--status-progress); box-shadow: 0 0 6px var(--status-progress); }
+.main-content.dashboard-single-screen .status-dot-shortlisted { background: var(--status-shortlisted); box-shadow: 0 0 6px var(--status-shortlisted); }
+.main-content.dashboard-single-screen .status-dot-new { background: var(--status-new); box-shadow: 0 0 6px var(--status-new); }
+.main-content.dashboard-single-screen .status-dot-on_hold { background: var(--status-hold); box-shadow: 0 0 6px var(--status-hold); }
 .main-content.dashboard-single-screen .activity-meta-row .badge { padding: var(--sp-1) var(--sp-2) !important; }
 .main-content.dashboard-single-screen .ref-jobs-list { justify-content: flex-start; flex: none; gap: var(--sp-2); }
 
@@ -926,22 +936,21 @@ a:hover {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 9px 11px 8px;
-  border: 1px solid rgba(255,255,255,0.08);
+  padding: 9px 11px 7px;
+  border: 1px solid rgba(255,255,255,0.09);
   border-radius: var(--radius);
-  background: linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.015) 100%), var(--surface-2);
-  backdrop-filter: blur(18px) saturate(130%);
-  -webkit-backdrop-filter: blur(18px) saturate(130%);
+  background: linear-gradient(145deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.018) 45%, rgba(255,255,255,0.004) 100%), var(--surface-2);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
   min-height: 0;
-  max-height: 212px;
   overflow: hidden;
-  box-shadow: 0 4px 18px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.05);
+  box-shadow: 0 6px 22px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.06), inset 0 -1px 0 rgba(255,255,255,0.02);
   transition: transform 200ms ease, border-color 200ms ease, box-shadow 200ms ease;
 }
 .main-content.dashboard-single-screen .ai-insight-card:hover {
   transform: translateY(-2px);
-  border-color: var(--border-strong);
-  box-shadow: 0 8px 28px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.06);
+  border-color: rgba(255,255,255,0.14);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.08), inset 0 -1px 0 rgba(255,255,255,0.03);
 }
 .main-content.dashboard-single-screen .ai-insight-head {
   display: flex;
@@ -1014,25 +1023,23 @@ a:hover {
 .main-content.dashboard-single-screen .accent-bar-amber { background: var(--status-pending); box-shadow: 0 0 6px var(--status-pending); }
 
 /* AI Insights — Refined internals (same footprint, higher information density) */
-.main-content.dashboard-single-screen .ai-insight-card .ai-insight-body { gap: 1px; }
-.main-content.dashboard-single-screen .ai-insight-card .ai-insight-value { font-size: 13px; font-weight: 800; color: var(--ink); line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.main-content.dashboard-single-screen .ai-insight-card .ai-insight-text { font-size: 10.5px; color: var(--muted); }
+.main-content.dashboard-single-screen .ai-insight-card .ai-insight-body { gap: 2px; }
+.main-content.dashboard-single-screen .ai-insight-card .ai-insight-value { font-size: 13.5px; font-weight: 800; color: var(--ink); line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -0.01em; }
+.main-content.dashboard-single-screen .ai-insight-card .ai-insight-support { font-size: 10.5px; font-weight: 600; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.main-content.dashboard-single-screen .ai-insight-support.ai-support-violet { color: rgba(129, 140, 248, 0.85); }
 
 /* Shared micro elements */
-.main-content.dashboard-single-screen .ai-insight-meta-row { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
-.main-content.dashboard-single-screen .ai-meta-dot { color: var(--muted); font-size: 10px; }
-.main-content.dashboard-single-screen .ai-meta-muted { font-size: 10px; font-weight: 600; color: var(--muted); white-space: nowrap; }
-.main-content.dashboard-single-screen .ai-meta-muted.ai-meta-violet { color: var(--accent-violet); }
-.main-content.dashboard-single-screen .ai-demand-score { font-size: 10px; font-weight: 800; color: var(--brand); letter-spacing: 0.02em; }
-.main-content.dashboard-single-screen .ai-line { font-size: 10px; font-style: italic; color: var(--muted); line-height: 1.25; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.main-content.dashboard-single-screen .ai-line-violet { color: rgba(129, 140, 248, 0.85); }
-.main-content.dashboard-single-screen .ai-line-amber { color: rgba(245, 158, 11, 0.9); }
-.main-content.dashboard-single-screen .ai-line-green { color: rgba(52, 211, 153, 0.9); }
-.main-content.dashboard-single-screen .ai-line-red { color: rgba(248, 113, 113, 0.9); }
-.main-content.dashboard-single-screen .ai-line-blue { color: rgba(34, 211, 238, 0.9); }
 .main-content.dashboard-single-screen .ai-chip-row { display: flex; flex-wrap: wrap; gap: 4px; }
 .main-content.dashboard-single-screen .ai-chip { font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 9999px; background: rgba(34, 211, 238, 0.14); color: var(--brand); white-space: nowrap; }
 .main-content.dashboard-single-screen .ai-chip-violet { background: rgba(129, 140, 248, 0.14); color: var(--accent-violet); }
+
+/* AI advice — single actionable+reason line, same vertical cost as old ai-line */
+.main-content.dashboard-single-screen .ai-advice { font-size: 9px; font-weight: 600; font-style: italic; color: var(--muted); line-height: 1.3; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 2px; }
+.main-content.dashboard-single-screen .ai-advice-violet { color: rgba(129, 140, 248, 0.85); }
+.main-content.dashboard-single-screen .ai-advice-amber { color: rgba(245, 158, 11, 0.9); }
+.main-content.dashboard-single-screen .ai-advice-green { color: rgba(52, 211, 153, 0.9); }
+.main-content.dashboard-single-screen .ai-advice-red { color: rgba(248, 113, 113, 0.9); }
+[data-theme="light"] .main-content.dashboard-single-screen .ai-advice { border-top-color: rgba(0,0,0,0.06); }
 
 /* Top Role — mini bar chart */
 .main-content.dashboard-single-screen .ai-mini-bars { display: flex; flex-direction: column; gap: 3px; margin-top: 1px; }
@@ -1046,26 +1053,13 @@ a:hover {
 .main-content.dashboard-single-screen .ai-bar-green { background: var(--status-hired); }
 .main-content.dashboard-single-screen .ai-bar-amber { background: var(--status-pending); }
 
-/* Best Fit — match score badge */
-.main-content.dashboard-single-screen .ai-fit-score { font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: var(--radius-pill); white-space: nowrap; }
-.main-content.dashboard-single-screen .ai-fit-violet { background: rgba(99, 102, 241, 0.18); color: var(--vui-violet-500); }
+/* Best Fit — match bar */
 .main-content.dashboard-single-screen .ai-fit-bar-wrap { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
 .main-content.dashboard-single-screen .ai-fit-bar-track { flex: 1; height: 6px; border-radius: 9999px; background: rgba(255,255,255,0.06); overflow: hidden; }
 .main-content.dashboard-single-screen .ai-fit-bar-fill { height: 100%; border-radius: 9999px; background: var(--vui-violet-500); transition: width 600ms ease; }
 .main-content.dashboard-single-screen .ai-fit-bar-label { font-size: 9px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; }
 
-/* Pipeline Health — score + status bars */
-.main-content.dashboard-single-screen .ai-health-score-row { display: flex; align-items: center; gap: 6px; }
-.main-content.dashboard-single-screen .ai-health-score { font-size: 10px; font-weight: 800; color: var(--status-hired); white-space: nowrap; }
-.main-content.dashboard-single-screen .ai-health-score-bar { flex: 1; height: 4px; border-radius: 9999px; background: rgba(255,255,255,0.06); overflow: hidden; }
-.main-content.dashboard-single-screen .ai-health-score-fill { height: 100%; border-radius: 9999px; display: block; transition: width 600ms ease; }
-.main-content.dashboard-single-screen .ai-health-score-fill.fill-strong { background: var(--status-hired); }
-.main-content.dashboard-single-screen .ai-health-score-fill.fill-ok { background: var(--status-pending); }
-.main-content.dashboard-single-screen .ai-health-score-fill.fill-weak { background: var(--danger); }
-.main-content.dashboard-single-screen .ai-health-badge { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: var(--radius-pill); white-space: nowrap; }
-.main-content.dashboard-single-screen .ai-health-strong { background: rgba(52, 211, 153, 0.18); color: var(--status-hired); }
-.main-content.dashboard-single-screen .ai-health-ok { background: rgba(245, 158, 11, 0.18); color: var(--status-pending); }
-.main-content.dashboard-single-screen .ai-health-weak { background: rgba(248, 113, 113, 0.18); color: var(--danger); }
+/* Pipeline Health — status bars */
 .main-content.dashboard-single-screen .ai-health-bars { display: flex; flex-direction: column; gap: 3px; margin-top: 1px; }
 .main-content.dashboard-single-screen .ai-health-bar-row { display: grid; grid-template-columns: 5px 34px 1fr 16px; align-items: center; gap: 4px; }
 .main-content.dashboard-single-screen .ai-health-dot { width: 5px; height: 5px; border-radius: 50%; flex: none; }
@@ -1074,11 +1068,7 @@ a:hover {
 .main-content.dashboard-single-screen .ai-health-bar-fill { height: 100%; border-radius: 9999px; transition: width 600ms ease; }
 .main-content.dashboard-single-screen .ai-health-count { font-size: 10px; font-weight: 700; color: var(--ink); text-align: right; font-variant-numeric: tabular-nums; }
 
-/* At Risk — risk gauge */
-.main-content.dashboard-single-screen .ai-risk-badge { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: var(--radius-pill); white-space: nowrap; }
-.main-content.dashboard-single-screen .ai-risk-green { background: rgba(52, 211, 153, 0.18); color: var(--status-hired); }
-.main-content.dashboard-single-screen .ai-risk-amber { background: rgba(245, 158, 11, 0.18); color: var(--status-pending); }
-.main-content.dashboard-single-screen .ai-risk-red { background: rgba(248, 113, 113, 0.18); color: var(--danger); }
+/* At Risk — gauge */
 .main-content.dashboard-single-screen .ai-risk-gauge { margin-top: 2px; }
 .main-content.dashboard-single-screen .ai-risk-gauge-track { height: 4px; border-radius: 9999px; background: rgba(255,255,255,0.06); overflow: hidden; }
 .main-content.dashboard-single-screen .ai-risk-gauge-fill { height: 100%; border-radius: 9999px; transition: width 600ms ease; }
@@ -1087,12 +1077,11 @@ a:hover {
 .main-content.dashboard-single-screen .ai-risk-gauge-fill.tone-red { background: var(--danger); }
 
 /* Light mode overrides for AI insight internals */
-[data-theme="light"] .main-content.dashboard-single-screen .ai-insight-card { background: linear-gradient(135deg, rgba(255,255,255,0.82) 0%, rgba(255,255,255,0.48) 100%), var(--surface-2); border-color: rgba(0,0,0,0.06); box-shadow: 0 4px 18px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.95); }
-[data-theme="light"] .main-content.dashboard-single-screen .ai-insight-card:hover { box-shadow: 0 8px 28px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.95); }
+[data-theme="light"] .main-content.dashboard-single-screen .ai-insight-card { background: linear-gradient(145deg, rgba(255,255,255,0.84) 0%, rgba(255,255,255,0.52) 100%), var(--surface-2); border-color: rgba(0,0,0,0.06); box-shadow: 0 6px 22px rgba(0,0,0,0.09), inset 0 1px 0 rgba(255,255,255,0.98); }
+[data-theme="light"] .main-content.dashboard-single-screen .ai-insight-card:hover { box-shadow: 0 10px 30px rgba(0,0,0,0.14), inset 0 1px 0 rgba(255,255,255,0.98); }
 [data-theme="light"] .main-content.dashboard-single-screen .ai-mini-bar-track,
 [data-theme="light"] .main-content.dashboard-single-screen .ai-fit-bar-track,
 [data-theme="light"] .main-content.dashboard-single-screen .ai-health-bar-track,
-[data-theme="light"] .main-content.dashboard-single-screen .ai-health-score-bar,
 [data-theme="light"] .main-content.dashboard-single-screen .ai-risk-gauge-track { background: rgba(0,0,0,0.06); }
 
 .main-content.wide {

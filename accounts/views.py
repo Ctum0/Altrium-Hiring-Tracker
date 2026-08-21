@@ -199,13 +199,17 @@ class HRDashboardView(LoginRequiredMixin, ListView):
             demand_score = min(99, 68 + top_pct + (total_roles * 2))
 
             if total_roles == 1:
-                ai_line = 'Only role with candidates right now.'
+                ai_line = 'Only role with candidates — open more reqs.'
+                ai_reason = 'All {} applications target this role.'.format(total_apps)
             elif share_gap >= 15:
-                ai_line = 'Clear demand outlier — {:.0f}% above next role.'.format(share_gap)
+                ai_line = 'Demand outlier. Prioritize sourcing here.'
+                ai_reason = '{:.0f}% above next role; candidate gravity is clear.'.format(share_gap)
             elif top_pct >= 30:
                 ai_line = 'Strong concentration — {:.0f}% of pipeline.'.format(top_pct)
+                ai_reason = 'Allocate interview capacity to this lane first.'
             else:
-                ai_line = 'Highest volume, distributed pipeline.'
+                ai_line = 'Balanced demand across roles.'
+                ai_reason = 'No single role dominates; keep the funnel wide.'
 
             role_rank = [
                 {
@@ -233,6 +237,7 @@ class HRDashboardView(LoginRequiredMixin, ListView):
                 'leader_label': leader_label,
                 'skill_tokens': skill_tokens,
                 'ai_line': ai_line,
+                'ai_reason': ai_reason,
                 'total_roles': total_roles,
             })
 
@@ -251,13 +256,16 @@ class HRDashboardView(LoginRequiredMixin, ListView):
             match_score = min(99, max(54, round(0.55 * 94 + 0.45 * float(avg_sc or 60))))
             if match_score >= 85:
                 match_band = 'Excellent'
-                ai_line_best = 'Strong talent-role alignment.'
+                ai_line_best = 'Strong fit — move to interviews.'
+                ai_reason_best = 'Role requirements align cleanly with pipeline talent.'
             elif match_score >= 70:
                 match_band = 'Strong'
                 ai_line_best = 'Good overlap — prioritize interviews.'
+                ai_reason_best = 'Core skills present; screen for edge requirements.'
             else:
                 match_band = 'Moderate'
                 ai_line_best = 'Review skills vs. requirements.'
+                ai_reason_best = 'Gaps detected — validate with a technical screen.'
             best_job = None
             try:
                 from jobs.models import Job as _BestJob
@@ -290,6 +298,7 @@ class HRDashboardView(LoginRequiredMixin, ListView):
                 'match_score': match_score,
                 'match_band': match_band,
                 'ai_line_best': ai_line_best,
+                'ai_reason_best': ai_reason_best,
                 'skill_chips': skill_chips,
             })
 
@@ -312,12 +321,16 @@ class HRDashboardView(LoginRequiredMixin, ListView):
         bottleneck = max(stage_scores, key=lambda x: x[1])
         if bottleneck[1] <= 1:
             bottleneck_line = 'No bottleneck — flow is balanced.'
+            bottleneck_reason = '{}% active pipeline; healthy distribution.'.format(active_pct)
         elif bottleneck[0] == 'On hold':
             bottleneck_line = 'Clear on-hold queue to restore flow.'
+            bottleneck_reason = '{} on hold — longest dwell time.'.format(bottleneck[1])
         elif bottleneck[0] == 'Rejected':
             bottleneck_line = 'High rejection rate — review screening.'
+            bottleneck_reason = '{} rejected; tighten top-of-funnel criteria.'.format(bottleneck[1])
         else:
             bottleneck_line = '{} holds most candidates — keep moving.'.format(bottleneck[0])
+            bottleneck_reason = '{} in {}; check SLA.'.format(bottleneck[1], bottleneck[0])
         ai_insights.append({
             'id': 'health',
             'icon': 'pulse',
@@ -338,19 +351,11 @@ class HRDashboardView(LoginRequiredMixin, ListView):
             'bottleneck_label': bottleneck[0],
             'bottleneck_count': bottleneck[1],
             'bottleneck_line': bottleneck_line,
+            'bottleneck_reason': bottleneck_reason,
         })
 
         on_hold_count = sd.get('on_hold', 0)
         risk_pct = round((on_hold_count / total_apps) * 100)
-        if on_hold_count == 0:
-            risk_level, risk_tone = 'Low', 'green'
-            risk_ai = 'No candidates stalled — pipeline clear.'
-        elif risk_pct < 25:
-            risk_level, risk_tone = 'Watch', 'amber'
-            risk_ai = 'Small queue forming — check in today.'
-        else:
-            risk_level, risk_tone = 'Elevated', 'red'
-            risk_ai = '{}% stalled — follow up within 48h.'.format(risk_pct)
         stale_count = 0
         try:
             from datetime import timedelta
@@ -360,6 +365,18 @@ class HRDashboardView(LoginRequiredMixin, ListView):
             stale_count = _App.objects.filter(status='on_hold', updated_at__lt=cutoff).count()
         except Exception:
             pass
+        if on_hold_count == 0:
+            risk_level, risk_tone = 'Low', 'green'
+            risk_ai = 'No candidates stalled — pipeline clear.'
+            risk_reason = '0% on hold; follow up on rejected if needed.'
+        elif risk_pct < 25:
+            risk_level, risk_tone = 'Watch', 'amber'
+            risk_ai = 'Small queue forming — check in today.'
+            risk_reason = '{} on hold ({} stale {}) — quick check-in recovers.'.format(on_hold_count, stale_count, '>3d' if stale_count else 'recent')
+        else:
+            risk_level, risk_tone = 'Elevated', 'red'
+            risk_ai = '{}% stalled — follow up within 48h.'.format(risk_pct)
+            risk_reason = '{} stalled, {} stale — unblock now.'.format(on_hold_count, stale_count)
         ai_insights.append({
             'id': 'risk',
             'icon': 'alert',
@@ -374,6 +391,7 @@ class HRDashboardView(LoginRequiredMixin, ListView):
             'risk_level': risk_level,
             'risk_tone': risk_tone,
             'risk_ai': risk_ai,
+            'risk_reason': risk_reason,
             'stale_count': stale_count,
             'total': total_apps,
         })
