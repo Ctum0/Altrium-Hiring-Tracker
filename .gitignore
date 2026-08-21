@@ -55,3 +55,4 @@ db.sqlite3.pre-migration.bak
 # Local test DB and scratch assets
 test_db.sqlite3
 scratch/
+login-*.md

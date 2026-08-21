@@ -30,7 +30,7 @@
           <p class="text-xs text-muted" style="margin-top:1px">Source: {{ candidate.source|default:'Uploaded CV' }}</p>
         </div>
         {% if candidate.score is not None %}
-        <span class="score-chip has-score" style="font-size:1rem;padding:4px 12px;font-weight:800">{{ candidate.score }} / 100</span>
+        <span class="score-chip has-score" style="font-size:1rem;padding:4px 12px;font-weight:800" title="AI Candidate Compatibility Score (0-100): Calculated from skills match, experience relevance, and CV keyword density against target job requirements.">{{ candidate.score }} / 100 <small style="font-size:0.7em;opacity:0.8;margin-left:4px" aria-hidden="true">ℹ️</small></span>
         {% endif %}
       </div>
 
