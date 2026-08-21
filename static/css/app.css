@@ -836,7 +836,7 @@ a:hover {
 .main-content.dashboard-single-screen .page-title { font-size: var(--text-2xl); }
 .main-content.dashboard-single-screen .page-sub { font-size: var(--text-sm); margin-top: var(--sp-1); }
 .main-content.dashboard-single-screen .page-actions { gap: var(--sp-3); }
-.main-content.dashboard-single-screen .page-actions .btn-sm { padding: var(--sp-1) var(--sp-3); min-height: 32px; }
+.main-content.dashboard-single-screen .page-actions .btn-sm { padding: var(--sp-2) var(--sp-3); min-height: 36px; }
 
 .main-content.dashboard-single-screen .ref-kpi-row { gap: var(--sp-3); margin-bottom: var(--sp-4); }
 .main-content.dashboard-single-screen .ref-kpi-card { padding: var(--sp-3) var(--sp-4) var(--sp-2); min-height: 88px; }
@@ -995,7 +995,7 @@ a:hover {
 .main-content.dashboard-single-screen .ai-mini-bar-row { display: grid; grid-template-columns: 1fr 42px 16px; align-items: center; gap: 4px; }
 .main-content.dashboard-single-screen .ai-mini-bar-label { font-size: 9.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .main-content.dashboard-single-screen .ai-mini-bar-track { height: 3px; border-radius: 9999px; background: rgba(255,255,255,0.06); overflow: hidden; }
-.main-content.dashboard-single-screen .ai-mini-bar-fill { height: 100%; border-radius: 9999px; transition: width 600ms ease; }
+.main-content.dashboard-single-screen .ai-mini-bar-fill { height: 100%; border-radius: 9999px; transform-origin: left; transition: transform 600ms ease; }
 .main-content.dashboard-single-screen .ai-mini-bar-count { font-size: 9.5px; font-weight: 700; color: var(--ink); text-align: right; font-variant-numeric: tabular-nums; }
 .main-content.dashboard-single-screen .ai-bar-blue { background: var(--brand); }
 .main-content.dashboard-single-screen .ai-bar-violet { background: var(--vui-violet-500); }
@@ -1008,7 +1008,7 @@ a:hover {
 .main-content.dashboard-single-screen .ai-health-dot { width: 5px; height: 5px; border-radius: 50%; flex: none; }
 .main-content.dashboard-single-screen .ai-health-label { font-size: 9.5px; color: var(--muted); white-space: nowrap; }
 .main-content.dashboard-single-screen .ai-health-bar-track { height: 3px; border-radius: 9999px; background: rgba(255,255,255,0.06); overflow: hidden; }
-.main-content.dashboard-single-screen .ai-health-bar-fill { height: 100%; border-radius: 9999px; transition: width 600ms ease; }
+.main-content.dashboard-single-screen .ai-health-bar-fill { height: 100%; border-radius: 9999px; transform-origin: left; transition: transform 600ms ease; }
 .main-content.dashboard-single-screen .ai-health-count { font-size: 9.5px; font-weight: 700; color: var(--ink); text-align: right; font-variant-numeric: tabular-nums; }
 .ai-hero-health { line-height: 1.1; }
 .ai-hero-health.ai-health-strong { color: var(--status-hired); }
@@ -1022,7 +1022,7 @@ a:hover {
 .ai-risk-red { background: rgba(248, 113, 113, 0.18); color: var(--danger); }
 .main-content.dashboard-single-screen .ai-risk-gauge { position: relative; }
 .main-content.dashboard-single-screen .ai-risk-gauge-track { height: 4px; border-radius: 9999px; background: rgba(255,255,255,0.06); overflow: hidden; position: relative; }
-.main-content.dashboard-single-screen .ai-risk-gauge-fill { height: 100%; border-radius: 9999px; transition: width 600ms ease; }
+.main-content.dashboard-single-screen .ai-risk-gauge-fill { height: 100%; border-radius: 9999px; transform-origin: left; transition: transform 600ms ease; }
 .ai-risk-gauge-fill.tone-green { background: var(--status-hired); }
 .ai-risk-gauge-fill.tone-amber { background: var(--status-pending); }
 .ai-risk-gauge-fill.tone-red { background: var(--danger); }
@@ -1616,8 +1616,8 @@ a:hover {
   border: 1px solid transparent;
   color: var(--ink-secondary);
   position: relative;
-  min-width: 36px;
-  min-height: 36px;
+  min-width: 40px;
+  min-height: 40px;
   cursor: pointer;
   transition: background-color 200ms ease, color 200ms ease;
 }
@@ -2727,7 +2727,7 @@ a:hover {
   padding: var(--sp-1) var(--sp-2);
   font-size: var(--text-xs);
   border-radius: var(--radius-sm);
-  min-height: 32px;
+  min-height: 36px;
 }
 
 /* Visually hidden but available to screen readers */
