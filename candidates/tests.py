@@ -2,7 +2,7 @@ from io import BytesIO
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from accounts.models import Role
@@ -13,6 +13,12 @@ from notifications.models import Notification
 User = get_user_model()
 
 
+@override_settings(
+    STORAGES={
+        'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+        'staticfiles': {'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage'},
+    }
+)
 class CandidatesBaseTestCase(TestCase):
     def setUp(self):
         self.hr = User.objects.create_user(
@@ -348,3 +354,43 @@ class SearchFilterTests(CandidatesBaseTestCase):
         self.assertEqual(r.status_code, 200)
         r = self.client.get(reverse('candidates:list'), {'page': '-3'})
         self.assertEqual(r.status_code, 200)
+
+
+class CandidateRbacSecurityTests(CandidatesBaseTestCase):
+    def test_unassigned_interviewer_blocked_from_candidate_detail(self):
+        # Interviewer is NOT assigned to application
+        self.login('iv')
+        url = reverse('candidates:detail', kwargs={'pk': self.candidate.pk})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 403)
+
+    def test_assigned_interviewer_can_view_candidate_detail(self):
+        # Assign candidate application to interviewer
+        self.application.assigned_to = self.interviewer
+        self.application.save()
+        self.login('iv')
+        url = reverse('candidates:detail', kwargs={'pk': self.candidate.pk})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+
+    def test_unassigned_interviewer_blocked_from_ai_fit_assessment(self):
+        self.login('iv')
+        url = reverse('candidates:ai_fit', kwargs={'pk': self.application.pk})
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, 403)
+
+    def test_interviewer_blocked_from_hr_score_update(self):
+        self.login('iv')
+        url = reverse('candidates:score', kwargs={'pk': self.candidate.pk})
+        response = self.client.post(url, {'score': '95'}, follow=True)
+        # Should redirect or error, score remains unchanged
+        self.candidate.refresh_from_db()
+        self.assertNotEqual(self.candidate.score, 95)
+
+    def test_management_blocked_from_modifications(self):
+        self.login('mgmt')
+        url = reverse('candidates:score', kwargs={'pk': self.candidate.pk})
+        response = self.client.post(url, {'score': '95'})
+        self.assertEqual(response.status_code, 403)
+        self.candidate.refresh_from_db()
+        self.assertNotEqual(self.candidate.score, 95)

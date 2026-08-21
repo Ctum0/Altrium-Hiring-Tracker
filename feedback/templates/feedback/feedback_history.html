@@ -15,13 +15,13 @@
 </div>
 
 <div class="panel panel-pad" style="margin-bottom:var(--sp-4)">
-  <h3 style="font-size:var(--text-base);font-weight:650;margin-bottom:var(--sp-2)">Current version</h3>
+  <h3 style="font-size:var(--text-base);font-weight:700;margin-bottom:var(--sp-2)">Current version</h3>
   <span class="score-chip has-score" style="margin-bottom:var(--sp-2)">{{ feedback.score }}</span>
   <div style="white-space:pre-line;max-width:72ch;margin-bottom:var(--sp-3)">{{ feedback.notes }}</div>
   <span class="text-xs text-muted">Created {{ feedback.submitted_at|date:'M j, Y H:i' }}</span>
 </div>
 
-<h3 style="font-size:var(--text-base);font-weight:650;margin-bottom:var(--sp-3)">Revision history ({{ history|length }})</h3>
+<h3 style="font-size:var(--text-base);font-weight:700;margin-bottom:var(--sp-3)">Revision history ({{ history|length }})</h3>
 
 {% if history %}
 {% for entry in history %}

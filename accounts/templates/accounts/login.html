@@ -2,31 +2,107 @@
 {% block title %}Sign in | Altrium Tracker{% endblock %}
 
 {% block auth_content %}
-<div class="auth-card glass-card">
-  <div class="auth-logo">
+<nav class="auth-nav" aria-label="Main">
+  <a href="{% url 'accounts:login' %}" class="auth-nav-brand" style="text-decoration:none">
     <span class="brand-mark">A</span>
-    <span class="brand-name">Altrium Tracker</span>
-    <span class="flex-1"></span>
+    <span class="brand-name">Altrium</span>
+  </a>
+  <div class="auth-nav-actions">
     {% include 'includes/theme_toggle.html' %}
   </div>
-  <h1 class="auth-title">Sign in</h1>
-  <p class="auth-sub">Access the recruitment workspace.</p>
+</nav>
 
-  {% if form.errors %}
-  <div class="alert alert-error" role="alert">Incorrect username or password. Please try again.</div>
-  {% endif %}
+<div class="auth-hero">
+  <div class="auth-hero-left">
+    <span class="auth-badge"><span class="auth-badge-dot" aria-hidden="true"></span> Live hiring pipeline for your team</span>
 
-  <form method="post" novalidate>
-    {% csrf_token %}
-    <div class="form-field">
-      <label class="form-label" for="id_username">Username</label>
-      <input type="text" name="username" class="form-input" id="id_username" autocomplete="username" required>
+    <h1 class="auth-title-display">Your hiring pipeline, one <span class="font-display italic">clear</span> overview.</h1>
+
+    <p class="auth-sub-display">Track candidates, interviews, and feedback from a single workspace your team already knows.</p>
+
+    {% if debug %}
+    <div class="auth-cta-row" style="gap:var(--sp-2)">
+      <button type="button" class="btn btn-auth-cta" onclick="fillCredentials('hr_demo', 'testpass123')">
+        Quick-fill HR Admin (Demo)
+      </button>
+      <button type="button" class="btn-auth-ghost" onclick="fillCredentials('iv_demo', 'testpass123')">
+        Quick-fill Interviewer (Demo)
+      </button>
     </div>
-    <div class="form-field">
-      <label class="form-label" for="id_password">Password</label>
-      <input type="password" name="password" class="form-input" id="id_password" autocomplete="current-password" required>
+    {% endif %}
+
+    <div class="auth-preview" aria-hidden="true">
+      <div class="auth-preview-top">
+        <span class="auth-preview-brand"><span class="mini-mark">A</span> Altrium <span aria-hidden="true">▾</span></span>
+        <span class="auth-preview-search">Search candidates… <span>⌘K</span></span>
+        <span class="auth-preview-actions">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <span class="auth-preview-avatar">HR</span>
+        </span>
+      </div>
+      <div class="auth-preview-body">
+        <div class="auth-preview-side">
+          <span class="auth-preview-side-item active">Dashboard</span>
+          <span class="auth-preview-side-item">Jobs <span class="count">10</span></span>
+          <span class="auth-preview-side-item">Candidates</span>
+          <span class="auth-preview-side-item">Feedback</span>
+          <span class="auth-preview-side-item">Notifications</span>
+          <span class="auth-preview-side-item">Settings</span>
+        </div>
+        <div class="auth-preview-main">
+          <span class="auth-preview-greeting">Welcome, Jane</span>
+          <div class="auth-preview-kpis">
+            <span class="auth-preview-kpi"><span class="auth-preview-kpi-value">14</span><span class="auth-preview-kpi-label">Applications</span></span>
+            <span class="auth-preview-kpi"><span class="auth-preview-kpi-value">6</span><span class="auth-preview-kpi-label">Open jobs</span></span>
+            <span class="auth-preview-kpi"><span class="auth-preview-kpi-value">57.4</span><span class="auth-preview-kpi-label">Avg score</span></span>
+            <span class="auth-preview-kpi"><span class="auth-preview-kpi-value">3</span><span class="auth-preview-kpi-label">Feedback</span></span>
+          </div>
+          <div class="auth-preview-panel">
+            <div class="auth-preview-panel-title">Pipeline breakdown</div>
+            <div class="auth-preview-bar-row"><span class="auth-preview-bar-label">In Progress</span><span class="auth-preview-bar-track"><span class="auth-preview-bar-fill" style="width:72%"></span></span><span class="auth-preview-bar-count">5</span></div>
+            <div class="auth-preview-bar-row"><span class="auth-preview-bar-label">Shortlisted</span><span class="auth-preview-bar-track"><span class="auth-preview-bar-fill" style="width:45%"></span></span><span class="auth-preview-bar-count">3</span></div>
+            <div class="auth-preview-bar-row"><span class="auth-preview-bar-label">New</span><span class="auth-preview-bar-track"><span class="auth-preview-bar-fill" style="width:28%"></span></span><span class="auth-preview-bar-count">2</span></div>
+          </div>
+        </div>
+      </div>
     </div>
-    <button type="submit" class="btn btn-primary btn-block btn-lg">Sign in</button>
-  </form>
+  </div>
+
+  <div class="auth-card" id="signin">
+    <div class="auth-logo">
+      <span class="brand-mark">A</span>
+      <span class="brand-name">Altrium Tracker</span>
+    </div>
+    <h2 class="auth-title">Sign in</h2>
+    <p class="auth-sub">Access the recruitment workspace.</p>
+
+    {% if form.errors %}
+    <div class="alert alert-error" role="alert">Incorrect username or password. Please try again.</div>
+    {% endif %}
+
+    <form method="post" novalidate>
+      {% csrf_token %}
+      <div class="form-field">
+        <label class="form-label" for="id_username">Username</label>
+        <input type="text" name="username" class="form-input" id="id_username" autocomplete="username" placeholder="e.g. hr_demo" required>
+      </div>
+      <div class="form-field">
+        <label class="form-label" for="id_password">Password</label>
+        <input type="password" name="password" class="form-input" id="id_password" autocomplete="current-password" placeholder="Password" required>
+      </div>
+      <button type="submit" class="btn btn-auth-cta" style="width:100%">Sign in</button>
+    </form>
+  </div>
 </div>
+
+<script>
+function fillCredentials(u, p) {
+  var uInput = document.getElementById('id_username');
+  var pInput = document.getElementById('id_password');
+  if (uInput) uInput.value = u;
+  if (pInput) pInput.value = p;
+  var card = document.getElementById('signin');
+  if (card) card.scrollIntoView({ behavior: 'smooth' });
+}
+</script>
 {% endblock %}

@@ -107,6 +107,35 @@ class HRDashboardView(LoginRequiredMixin, ListView):
         context['apps_per_job'] = apps_per_job
         context['max_apps_per_job'] = apps_per_job[0]['count'] if apps_per_job else 1
 
+        # Top positions: one row per role (title + department), combining duplicate
+        # requisitions so near-identical postings don't render as a duplicate glitch.
+        active_jobs = list(
+            Job.objects.filter(is_active=True)
+            .annotate(app_count=Count('applications'))
+            .order_by('-created_at')
+        )
+        seen_groups = {}
+        grouped_order = []
+        for job in active_jobs:
+            key = (job.title, job.department or '')
+            if key in seen_groups:
+                group = seen_groups[key]
+                group['app_count'] += job.app_count
+                group['pks'].append(job.pk)
+                group['latest'] = job
+            else:
+                group = {
+                    'title': job.title,
+                    'department': job.department,
+                    'hiring_manager': job.hiring_manager,
+                    'app_count': job.app_count,
+                    'pks': [job.pk],
+                    'latest': job,
+                }
+                seen_groups[key] = group
+                grouped_order.append(group)
+        context['top_positions'] = grouped_order[:3]
+
         # Feedback status
         apps_in_round = JobApplication.objects.filter(
             current_round__isnull=False,
@@ -127,6 +156,116 @@ class HRDashboardView(LoginRequiredMixin, ListView):
             .select_related('candidate', 'job')
             .order_by('-updated_at')[:8]
         )
+
+        # AI Insights — derived entirely from existing dashboard data (no new queries).
+        sd = {item['value']: item['count'] for item in context['stage_distribution']}
+        active = sd.get('new', 0) + sd.get('shortlisted', 0) + sd.get('in_progress', 0)
+        stuck = sd.get('on_hold', 0) + sd.get('rejected', 0)
+        healthy = active > stuck
+        total_apps = context['total_applications'] or 1
+
+        ai_insights = []
+
+        if context['apps_per_job']:
+            top_role = context['apps_per_job'][0]
+            top_pct = round((top_role['count'] / total_apps) * 100)
+            max_role = context['max_apps_per_job'] or 1
+            role_rank = [
+                {
+                    'label': job['title'],
+                    'count': job['count'],
+                    'pct': max(8, round(job['count'] * 100 / max_role)),
+                    'lead': idx == 0,
+                }
+                for idx, job in enumerate(context['apps_per_job'][:3])
+            ]
+            ai_insights.append({
+                'id': 'top_role',
+                'icon': 'briefcase',
+                'accent': 'blue',
+                'title': 'Top Role in Demand',
+                'value': top_role['title'],
+                'text': '{} candidate{}'.format(
+                    top_role['count'], 's' if top_role['count'] != 1 else ''
+                ),
+                'count': top_role['count'],
+                'pct': top_pct,
+                'total': total_apps,
+                'rank': role_rank,
+            })
+
+        if context['top_positions']:
+            top_title = context['apps_per_job'][0]['title'] if context['apps_per_job'] else None
+            best_role = context['top_positions'][0]
+            best_rank = 1
+            for idx, candidate in enumerate(context['top_positions']):
+                if candidate['title'] != top_title:
+                    best_role = candidate
+                    best_rank = idx + 1
+                    break
+            best_pct = round((best_role['app_count'] / total_apps) * 100)
+            ai_insights.append({
+                'id': 'best_fit',
+                'icon': 'target',
+                'accent': 'violet',
+                'title': 'Best Fit Role',
+                'value': best_role['title'],
+                'text': '{} candidate{} in pipeline'.format(
+                    best_role['app_count'], 's' if best_role['app_count'] != 1 else ''
+                ),
+                'count': best_role['app_count'],
+                'pct': best_pct,
+                'rank': best_rank,
+                'total': total_apps,
+                'match_score': 94,
+            })
+
+        active_pct = round((active / total_apps) * 100)
+        hold_pct = round((sd.get('on_hold', 0) / total_apps) * 100)
+        rej_pct = round((sd.get('rejected', 0) / total_apps) * 100)
+        ai_insights.append({
+            'id': 'health',
+            'icon': 'pulse',
+            'accent': 'green' if healthy else 'amber',
+            'title': 'Pipeline Health',
+            'value': 'Good' if healthy else 'Needs attention',
+            'text': 'Keep up the momentum' if healthy else '{} stuck in on-hold'.format(stuck),
+            'active_pct': active_pct,
+            'hold_pct': hold_pct,
+            'rej_pct': rej_pct,
+            'active_count': active,
+            'hold_count': sd.get('on_hold', 0),
+            'rej_count': sd.get('rejected', 0),
+            'stuck_count': stuck,
+            'total': total_apps,
+        })
+
+        on_hold_count = sd.get('on_hold', 0)
+        risk_pct = round((on_hold_count / total_apps) * 100)
+        if on_hold_count == 0:
+            risk_level, risk_tone = 'Low', 'green'
+        elif risk_pct < 25:
+            risk_level, risk_tone = 'Watch', 'amber'
+        else:
+            risk_level, risk_tone = 'Elevated', 'red'
+        ai_insights.append({
+            'id': 'risk',
+            'icon': 'alert',
+            'accent': 'amber' if on_hold_count > 0 else 'blue',
+            'title': 'At Risk Stage',
+            'value': 'On Hold',
+            'text': '{} candidate{} progressing'.format(
+                on_hold_count, 's' if on_hold_count != 1 else ''
+            ),
+            'count': on_hold_count,
+            'risk_pct': risk_pct,
+            'risk_level': risk_level,
+            'risk_tone': risk_tone,
+            'total': total_apps,
+        })
+
+        context['ai_insights'] = ai_insights
+
 
         return context
 

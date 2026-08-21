@@ -5,23 +5,29 @@
 {% block content %}
 <div class="page-header">
   <div>
-    <h2 class="page-title">Notifications</h2>
+    <h1 class="page-title">Notifications</h1>
     <p class="page-sub">Updates on assignments and pipeline activity.</p>
   </div>
   <div class="page-actions">
-    <a href="{% url 'notifications:list' %}" class="btn btn-secondary {% if not request.GET.unread %}btn-primary{% endif %}">All</a>
-    <a href="?unread=1" class="btn btn-sm {% if request.GET.unread == '1' %}btn-primary{% else %}btn-secondary{% endif %}">Unread</a>
+    <a href="{% url 'notifications:list' %}" class="btn btn-sm {% if not request.GET.unread %}btn-primary{% else %}btn-secondary{% endif %}">All notifications</a>
+    <a href="?unread=1" class="btn btn-sm {% if request.GET.unread == '1' %}btn-primary{% else %}btn-secondary{% endif %}">Unread only</a>
   </div>
 </div>
 
 {% if notifications %}
-<div class="panel" style="overflow:hidden">
+<div class="panel glass-panel" style="overflow:hidden">
   {% for n in notifications %}
-  <div class="flex items-center justify-between gap-4 notification-row" style="{% if not forloop.last %}border-bottom:1px solid var(--border);{% endif %}padding:var(--sp-4) var(--sp-5)">
-    <div>
-      {% if n.link|safe_link %}<a href="{{ n.link|safe_link }}" class="strong">{{ n.message }}</a>
-      {% else %}<span class="strong">{{ n.message }}</span>{% endif %}
-      <div class="text-xs text-muted">{{ n.created_at|date:'M j, Y H:i' }}</div>
+  <div class="flex items-center justify-between gap-4 notification-row" style="{% if not forloop.last %}border-bottom:1px solid var(--border);{% endif %}padding:var(--sp-4) var(--sp-5);{% if not n.is_read %}background:rgba(0,117,255,0.04){% endif %}">
+    <div class="flex items-center gap-3">
+      <div class="activity-dot" style="width:8px;height:8px;{% if n.is_read %}background:var(--muted);box-shadow:none{% endif %}" aria-hidden="true"></div>
+      <div>
+        {% if n.link|safe_link %}
+        <a href="{{ n.link|safe_link }}" class="strong" style="color:var(--ink);text-decoration:none">{{ n.message }}</a>
+        {% else %}
+        <span class="strong">{{ n.message }}</span>
+        {% endif %}
+        <div class="text-xs text-muted" style="margin-top:2px">{{ n.created_at|date:'M j, Y H:i' }}</div>
+      </div>
     </div>
     {% if not n.is_read %}
     <form method="post" action="{% url 'notifications:mark_read' n.pk %}"
@@ -33,6 +39,8 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
       </button>
     </form>
+    {% else %}
+    <span class="badge badge-secondary" style="font-size:10px">Read</span>
     {% endif %}
   </div>
   {% endfor %}
@@ -58,8 +66,9 @@
 
 {% else %}
 <div class="empty-state">
+  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto 12px;color:var(--muted)" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
   <p class="empty-state-title">No notifications</p>
-  <p class="empty-state-body">When a candidate is assigned to you, you will be notified here.</p>
+  <p class="empty-state-body">When a candidate is assigned to you or pipeline status changes, you will be notified here.</p>
 </div>
 {% endif %}
 {% endblock %}

@@ -4,6 +4,7 @@
 {% block content %}
 <div class="page-header">
   <div>
+    <h1 class="page-title">{{ job.title }}</h1>
     <p class="page-sub">
       Created {{ job.created_at|date:'M j, Y' }} by {{ job.created_by.get_full_name|default:job.created_by.username }}
       {% if job.is_active %}&middot; <span class="badge badge-progress">Active</span>{% else %}&middot; <span class="badge badge-hold">Closed</span>{% endif %}
@@ -23,7 +24,7 @@
 
 <div class="grid-2">
   <div class="panel panel-pad">
-    <h3 style="font-size:var(--text-base);font-weight:650;margin-bottom:var(--sp-2)">Description</h3>
+    <h3 style="font-size:var(--text-base);font-weight:700;margin-bottom:var(--sp-2)">Description</h3>
     {% if job.description %}
     <p class="text-sm text-muted" style="white-space:pre-line;max-width:65ch">{{ job.description }}</p>
     {% else %}
@@ -31,7 +32,7 @@
     {% endif %}
 
     {% if job.requirements %}
-    <h3 style="font-size:var(--text-base);font-weight:650;margin:var(--sp-4) 0 var(--sp-2)">Required skills</h3>
+    <h3 style="font-size:var(--text-base);font-weight:700;margin:var(--sp-4) 0 var(--sp-2)">Required skills</h3>
     <div class="flex gap-2" style="flex-wrap:wrap">
       {% for skill in job.requirements.split %}
       <span class="badge badge-role">{{ skill }}</span>
@@ -41,7 +42,7 @@
   </div>
 
   <div class="panel panel-pad">
-    <h3 style="font-size:var(--text-base);font-weight:650;margin-bottom:var(--sp-1)">Details</h3>
+    <h3 style="font-size:var(--text-base);font-weight:700;margin-bottom:var(--sp-1)">Details</h3>
     <dl style="display:grid;grid-template-columns:max-content 1fr;gap:var(--sp-2) var(--sp-4);font-size:var(--text-sm);margin-top:var(--sp-2)">
       <dt class="text-muted">Hiring manager</dt>
       <dd>{% if job.hiring_manager %}{{ job.hiring_manager.get_full_name|default:job.hiring_manager.username }}{% else %}-{% endif %}</dd>
@@ -55,7 +56,7 @@
 
 <div class="panel panel-pad" style="margin-top:var(--sp-6)">
   <div class="flex items-center justify-between" style="margin-bottom:var(--sp-4)">
-    <h3 style="font-size:var(--text-base);font-weight:650">Interview rounds</h3>
+    <h3 style="font-size:var(--text-base);font-weight:700">Interview rounds</h3>
     <span class="text-sm text-muted">Candidates move through these stages on the candidate list and detail views.</span>
   </div>
 
@@ -104,11 +105,11 @@
     {% csrf_token %}
     <div style="flex:1;min-width:200px">
       <label class="form-label" for="{{ round_form.name.id_for_label }}">New round</label>
-      {{ round_form.name }}
+      <input type="text" name="{{ round_form.name.html_name }}" id="{{ round_form.name.id_for_label }}" class="form-input" value="{{ round_form.name.value|default:'' }}" {% if round_form.name.field.required %}required{% endif %}>
     </div>
     <div style="width:110px">
       <label class="form-label" for="{{ round_form.order.id_for_label }}">Order</label>
-      {{ round_form.order }}
+      <input type="number" name="{{ round_form.order.html_name }}" id="{{ round_form.order.id_for_label }}" class="form-input" value="{{ round_form.order.value|default:'' }}" {% if round_form.order.field.required %}required{% endif %}>
     </div>
     <button type="submit" class="btn btn-primary">Add round</button>
   </form>

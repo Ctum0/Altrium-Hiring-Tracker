@@ -54,7 +54,10 @@ class CandidateListView(LoginRequiredMixin, ListView):
             qs = qs.exclude(status__in=['hired', 'rejected'])
 
         if job_pk:
-            qs = qs.filter(job_id=job_pk)
+            if ',' in job_pk:
+                qs = qs.filter(job_id__in=[int(p) for p in job_pk.split(',') if p.isdigit()])
+            else:
+                qs = qs.filter(job_id=job_pk)
         if stage:
             qs = qs.filter(status=stage)
         if min_score:
@@ -100,7 +103,7 @@ class CandidateDetailView(LoginRequiredMixin, DetailView):
     context_object_name = 'candidate'
 
     def dispatch(self, request, *args, **kwargs):
-        if request.user.is_authenticated and getattr(request.user, 'role', None) == 'interviewer':
+        if request.user.is_authenticated and request.user.is_interviewer():
             candidate = self.get_object()
             assigned = JobApplication.objects.filter(
                 candidate=candidate, assigned_to=request.user
@@ -343,6 +346,8 @@ class AiFitSummaryView(LoginRequiredMixin, View):
             return HttpResponse('Management has read-only access.', status=403)
         if not request.user.is_hr() and not request.user.is_interviewer():
             return HttpResponse('You cannot generate this assessment.', status=403)
+        if request.user.is_interviewer() and app.assigned_to != request.user:
+            return HttpResponse('You can only generate assessments for assigned candidates.', status=403)
 
         summary = fit_summary(
             app.candidate.skills,

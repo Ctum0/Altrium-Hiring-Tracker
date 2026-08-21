@@ -13,7 +13,7 @@
 <div class="grid-2">
   {% for card in cards %}
   <div class="card card-pad">
-    <h3 style="font-size:var(--text-lg);font-weight:650;letter-spacing:-0.01em;margin-bottom:var(--sp-1)">{{ card.title }}</h3>
+    <h3 style="font-size:var(--text-lg);font-weight:700;letter-spacing:-0.01em;margin-bottom:var(--sp-1)">{{ card.title }}</h3>
     <p class="text-muted" style="margin-bottom:var(--sp-4);max-width:48ch">{{ card.body }}</p>
     <a href="{% url card.href %}" class="btn btn-primary btn-sm">{{ card.cta }}</a>
   </div>

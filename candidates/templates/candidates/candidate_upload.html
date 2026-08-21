@@ -4,33 +4,37 @@
 {% block content %}
 <div class="page-header">
   <div>
-    <h2 class="page-title">Upload candidate CVs</h2>
-    <p class="page-sub">The system reads each CV and extracts name, email, and skills automatically. Uploading multiple files is supported.</p>
+    <h1 class="page-title">Upload candidate CVs</h1>
+    <p class="page-sub">The system parses CV files, extracts key candidate information, and files them under the selected position.</p>
   </div>
 </div>
 
-<div class="panel panel-pad" style="max-width:640px">
+<div class="panel panel-pad glass-panel" style="max-width:640px;box-shadow:var(--shadow-md)">
   <form method="post" enctype="multipart/form-data" novalidate>
     {% csrf_token %}
     <div class="form-field">
       <label class="form-label" for="job">Position</label>
-      <select class="form-select" id="job" name="job" required>
-        <option value="">Select a position</option>
+      <select class="form-select" id="job" name="job" required style="font-size:var(--text-sm)">
+        <option value="">Select a position...</option>
         {% for job in jobs %}
         <option value="{{ job.pk }}">{{ job.title }}</option>
         {% endfor %}
       </select>
-      <p class="form-help">CVs will be filed under this position automatically.</p>
+      <p class="form-help">CVs will be attached to this role's recruitment pipeline.</p>
     </div>
 
-    <div class="form-field">
-      <label class="form-label" for="files">CV files</label>
-      <input class="form-input" type="file" id="files" name="files" accept=".pdf,.doc,.docx" multiple required>
-      <p class="form-help">PDF or DOCX. You can select multiple files at once.</p>
+    <div class="form-field" style="margin-top:var(--sp-5)">
+      <label class="form-label">CV Files (PDF / DOCX)</label>
+      <div style="border:2px dashed var(--glass-border);border-radius:var(--radius-lg);padding:var(--sp-6);text-align:center;background:rgba(255,255,255,0.02);transition:border-color 200ms ease" id="dropzone">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto 8px;color:var(--brand)" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <p style="font-size:var(--text-sm);font-weight:600;color:var(--ink);margin:0 0 4px">Choose files or drag & drop</p>
+        <p class="text-xs text-muted" style="margin-bottom:12px">Supports multiple .pdf, .doc, or .docx files</p>
+        <input class="form-input" type="file" id="files" name="files" accept=".pdf,.doc,.docx" multiple required style="max-width:280px;margin:0 auto">
+      </div>
     </div>
 
-    <div class="form-actions">
-      <button type="submit" class="btn btn-primary">Upload and parse</button>
+    <div class="form-actions" style="margin-top:var(--sp-6)">
+      <button type="submit" class="btn btn-primary">Upload and parse CVs</button>
       <a href="{% url 'candidates:list' %}" class="btn btn-secondary">Cancel</a>
     </div>
   </form>

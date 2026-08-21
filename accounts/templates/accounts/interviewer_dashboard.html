@@ -2,23 +2,35 @@
 {% block title %}My Candidates | Altrium Tracker{% endblock %}
 {% block page_title %}My Candidates{% endblock %}
 {% block content %}
-<div class="page-header">
-  <div>
-    <h2 class="page-title">Assigned candidates</h2>
-    <p class="page-sub">Candidates assigned to you for interview and feedback.</p>
+
+<!-- Summary Panel -->
+<div class="ref-kpi-row" style="grid-template-columns: repeat(2, 1fr); max-width: 640px; margin-bottom: var(--sp-5)">
+  <div class="ref-kpi-card glass-panel vui-card vui-card-hover">
+    <div class="ref-kpi-meta">
+      <span class="ref-kpi-label">Assigned Candidates</span>
+      <span class="ref-kpi-value">{{ assigned_apps|length }}</span>
+      <span class="kpi-trend kpi-trend-neutral">Your queue</span>
+    </div>
+    <div class="ref-kpi-icon-box ref-kpi-icon-blue" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    </div>
+  </div>
+
+  <div class="ref-kpi-card glass-panel vui-card vui-card-hover {% if pending_feedback > 0 %}kpi-card-danger-3d{% endif %}">
+    <div class="ref-kpi-meta">
+      <span class="ref-kpi-label">Pending Feedback</span>
+      <span class="ref-kpi-value">{{ pending_feedback }}</span>
+      <span class="kpi-trend {% if pending_feedback > 0 %}kpi-trend-down{% else %}kpi-trend-up{% endif %}">
+        {% if pending_feedback > 0 %}Action needed{% else %}All submitted{% endif %}
+      </span>
+    </div>
+    <div class="ref-kpi-icon-box {% if pending_feedback > 0 %}ref-kpi-icon-danger{% else %}ref-kpi-icon-teal{% endif %}" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+    </div>
   </div>
 </div>
 
 {% if assigned_apps %}
-<div class="panel panel-pad" style="margin-bottom:var(--sp-4)">
-  <div class="flex items-center gap-3">
-    <span class="text-sm strong">{{ assigned_apps|length }} assigned</span>
-    {% if pending_feedback %}
-    <span class="badge badge-shortlisted">{{ pending_feedback }} pending feedback</span>
-    {% endif %}
-  </div>
-</div>
-
 <div class="table-wrap">
   <table class="table">
     <thead>
@@ -34,18 +46,25 @@
     </thead>
     <tbody>
       {% for app in assigned_apps %}
-      <tr>
-        <td class="strong">
-          <a href="{% url 'candidates:detail' app.candidate.pk %}">{{ app.candidate.full_name }}</a>
-          <div class="text-xs text-muted">{{ app.candidate.email }}</div>
+      <tr class="cand-row">
+        <td>
+          <div class="cand-name-cell">
+            <div class="cand-avatar cand-avatar-{{ app.candidate.full_name|first|lower|make_list|first|default:'0'|slugify|last }}" aria-hidden="true">
+              {{ app.candidate.full_name|first|upper }}{% if app.candidate.full_name|wordcount > 1 %}{{ app.candidate.full_name|cut:" "|last|upper }}{% endif %}
+            </div>
+            <div class="cand-name-info">
+              <a href="{% url 'candidates:detail' app.candidate.pk %}" class="cand-name-main" style="text-decoration:none;color:inherit">{{ app.candidate.full_name }}</a>
+              <span class="cand-name-email">{{ app.candidate.email }}</span>
+            </div>
+          </div>
         </td>
-        <td>{{ app.job.title }}</td>
+        <td >{{ app.job.title }}</td>
         <td>{% if app.current_round %}<span class="badge badge-in_progress">{{ app.current_round.name }}</span>{% else %}-{% endif %}</td>
         <td>
           {% if app.interview_details %}
-          <div class="text-xs text-muted" style="white-space:pre-line">{{ app.interview_details }}</div>
+          <div class="text-xs text-muted" style="white-space:pre-line;max-width:200px">{{ app.interview_details }}</div>
           {% else %}
-          <span class="text-xs text-muted">-</span>
+          <span class="text-xs text-muted">—</span>
           {% endif %}
         </td>
         <td>
@@ -54,14 +73,23 @@
           {% elif app.current_round %}
           <a href="{% url 'feedback:form' app.pk app.current_round.pk %}" class="btn btn-primary btn-sm">Give feedback</a>
           {% else %}
-          <span class="text-muted">-</span>
+          <span class="text-muted">—</span>
           {% endif %}
         </td>
         <td>
-          {% if app.candidate.score is not None %}<span class="score-chip has-score">{{ app.candidate.score }}</span>
-          {% else %}<span class="text-muted">-</span>{% endif %}
+          {% if app.candidate.score is not None %}
+            {% if app.candidate.score >= 75 %}
+            <span class="score-ring score-ring-high">{{ app.candidate.score }}</span>
+            {% elif app.candidate.score >= 50 %}
+            <span class="score-ring score-ring-mid">{{ app.candidate.score }}</span>
+            {% else %}
+            <span class="score-ring score-ring-low">{{ app.candidate.score }}</span>
+            {% endif %}
+          {% else %}
+          <span class="score-ring score-ring-none">N/A</span>
+          {% endif %}
         </td>
-        <td class="text-muted">{{ app.updated_at|date:'M j, Y' }}</td>
+        <td class="text-muted text-xs">{{ app.updated_at|date:'M j, Y' }}</td>
       </tr>
       {% endfor %}
     </tbody>
@@ -69,8 +97,9 @@
 </div>
 {% else %}
 <div class="empty-state">
+  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto 12px;color:var(--muted)" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
   <p class="empty-state-title">No candidates assigned</p>
-  <p class="empty-state-body">When HR assigns candidates to you, they will appear here.</p>
+  <p class="empty-state-body">When HR assigns candidates to you, they will appear here for interview and feedback.</p>
 </div>
 {% endif %}
 {% endblock %}
