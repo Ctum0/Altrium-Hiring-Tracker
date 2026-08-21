@@ -32,10 +32,13 @@
 
 <!-- Wide 3D Glass Filter Card -->
 <div class="panel panel-pad glass-panel" style="margin-bottom:var(--sp-5);box-shadow:var(--shadow-md)">
-  <form method="get">
+  <form method="get" id="candidate-filter-form">
     <div class="form-row filter-grid">
       <div class="form-field filter-search" style="margin-bottom:0">
-        <label class="form-label" for="q">Search candidate</label>
+        <label class="form-label" for="q" style="display:flex;align-items:center;justify-content:space-between">
+          <span>Search candidate</span>
+          <kbd style="font-size:10px;padding:1px 5px;border-radius:4px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);color:var(--vui-text-muted);font-family:monospace" title="Press / to focus search">/</kbd>
+        </label>
         <input class="form-input" type="search" id="q" name="q" value="{{ filter_q }}" placeholder="Name, email, skill, or role">
       </div>
       <div class="form-field" style="margin-bottom:0">
@@ -62,8 +65,8 @@
       </div>
       <div class="form-field filter-actions" style="margin-bottom:0">
         <button type="submit" class="btn btn-primary">Filter</button>
-        {% if filter_q or filter_job or filter_stage or filter_min_score %}
-        <a href="{% url 'candidates:list' %}" class="btn btn-secondary">Clear</a>
+        {% if filter_q or filter_job or filter_stage or filter_min_score or show_all %}
+        <a href="{% url 'candidates:list' %}" class="btn btn-secondary">Clear filters</a>
         {% endif %}
       </div>
     </div>
@@ -196,4 +199,17 @@
   {% endif %}
 </div>
 {% endif %}
+
+<script>
+  document.addEventListener('keydown', function (e) {
+    if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA' && document.activeElement.tagName !== 'SELECT') {
+      e.preventDefault();
+      var qInput = document.getElementById('q');
+      if (qInput) {
+        qInput.focus();
+        qInput.select();
+      }
+    }
+  });
+</script>
 {% endblock %}
