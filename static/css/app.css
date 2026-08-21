@@ -936,7 +936,7 @@ a:hover {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 9px 11px 7px;
+  padding: 10px 11px 8px;
   border: 1px solid rgba(255,255,255,0.09);
   border-radius: var(--radius);
   background: linear-gradient(145deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.018) 45%, rgba(255,255,255,0.004) 100%), var(--surface-2);
@@ -952,137 +952,90 @@ a:hover {
   border-color: rgba(255,255,255,0.14);
   box-shadow: 0 10px 30px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.08), inset 0 -1px 0 rgba(255,255,255,0.03);
 }
-.main-content.dashboard-single-screen .ai-insight-head {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  min-width: 0;
-  justify-content: space-between;
-}
-.main-content.dashboard-single-screen .ai-insight-head-left {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  min-width: 0;
-}
-.main-content.dashboard-single-screen .ai-insight-icon {
-  flex: none;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.main-content.dashboard-single-screen .ai-accent-blue { background: rgba(2, 132, 199, 0.15); color: var(--brand); }
-.main-content.dashboard-single-screen .ai-accent-violet { background: rgba(99, 102, 241, 0.15); color: var(--accent-violet); }
-.main-content.dashboard-single-screen .ai-accent-green { background: rgba(5, 150, 105, 0.15); color: var(--status-hired); }
-.main-content.dashboard-single-screen .ai-accent-amber { background: rgba(217, 119, 6, 0.15); color: var(--status-pending); }
 
-.main-content.dashboard-single-screen .ai-insight-title {
-  font-size: var(--text-micro);
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.main-content.dashboard-single-screen .ai-insight-body {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-.main-content.dashboard-single-screen .ai-insight-value {
-  font-size: 13px;
-  font-weight: 800;
-  color: var(--ink);
-  line-height: 1.2;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.main-content.dashboard-single-screen .ai-insight-text {
-  font-size: 10.5px;
-  color: var(--muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+/* Top row: label cluster + ring/badge */
+.ai-top-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; }
+.ai-label-cluster { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+.ai-tiny-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ai-hero-value { font-size: 14.5px; font-weight: 800; color: var(--ink); line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -0.01em; }
+.ai-hero-unit { font-size: 10px; font-weight: 600; color: var(--muted); }
 
-.main-content.dashboard-single-screen .ai-insight-bar {
-  height: 3px;
-  width: 100%;
-  border-radius: 9999px;
-  margin-top: auto;
-}
-.main-content.dashboard-single-screen .accent-bar-blue { background: var(--brand); box-shadow: 0 0 6px var(--brand); }
-.main-content.dashboard-single-screen .accent-bar-violet { background: var(--vui-violet-500); box-shadow: 0 0 6px var(--vui-violet-500); }
-.main-content.dashboard-single-screen .accent-bar-green { background: var(--status-hired); box-shadow: 0 0 6px var(--status-hired); }
-.main-content.dashboard-single-screen .accent-bar-amber { background: var(--status-pending); box-shadow: 0 0 6px var(--status-pending); }
+/* Circular ring indicator */
+.ai-ring-wrap { position: relative; width: 36px; height: 36px; flex-shrink: 0; }
+.ai-ring { width: 36px; height: 36px; }
+.ai-ring-text { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; color: var(--ink); }
+.ai-ring-text-violet { color: var(--vui-violet-500); }
+.ai-ring-violet .ai-ring circle:nth-child(2) { stroke: var(--vui-violet-500); }
+.ai-ring-strong .ai-ring circle:nth-child(2) { stroke: var(--status-hired); }
+.ai-ring-ok .ai-ring circle:nth-child(2) { stroke: var(--status-pending); }
+.ai-ring-weak .ai-ring circle:nth-child(2) { stroke: var(--danger); }
 
-/* AI Insights — Refined internals (same footprint, higher information density) */
-.main-content.dashboard-single-screen .ai-insight-card .ai-insight-body { gap: 2px; }
-.main-content.dashboard-single-screen .ai-insight-card .ai-insight-value { font-size: 13.5px; font-weight: 800; color: var(--ink); line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -0.01em; }
-.main-content.dashboard-single-screen .ai-insight-card .ai-insight-support { font-size: 10.5px; font-weight: 600; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.main-content.dashboard-single-screen .ai-insight-support.ai-support-violet { color: rgba(129, 140, 248, 0.85); }
+/* Support line */
+.ai-support-line { font-size: 10px; font-weight: 500; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; }
+.ai-support-violet { color: rgba(129, 140, 248, 0.85); }
 
-/* Shared micro elements */
-.main-content.dashboard-single-screen .ai-chip-row { display: flex; flex-wrap: wrap; gap: 4px; }
-.main-content.dashboard-single-screen .ai-chip { font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 9999px; background: rgba(34, 211, 238, 0.14); color: var(--brand); white-space: nowrap; }
-.main-content.dashboard-single-screen .ai-chip-violet { background: rgba(129, 140, 248, 0.14); color: var(--accent-violet); }
+/* Chips */
+.ai-chip-row { display: flex; flex-wrap: wrap; gap: 3px; }
+.ai-chip { font-size: 8.5px; font-weight: 700; padding: 1.5px 5px; border-radius: 9999px; background: rgba(34, 211, 238, 0.12); color: var(--brand); white-space: nowrap; }
+.ai-chip-blue { background: rgba(34, 211, 238, 0.12); color: var(--brand); }
+.ai-chip-violet { background: rgba(129, 140, 248, 0.14); color: var(--vui-violet-500); }
 
-/* AI advice — single actionable+reason line, same vertical cost as old ai-line */
-.main-content.dashboard-single-screen .ai-advice { font-size: 9px; font-weight: 600; font-style: italic; color: var(--muted); line-height: 1.3; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 2px; }
-.main-content.dashboard-single-screen .ai-advice-violet { color: rgba(129, 140, 248, 0.85); }
-.main-content.dashboard-single-screen .ai-advice-amber { color: rgba(245, 158, 11, 0.9); }
-.main-content.dashboard-single-screen .ai-advice-green { color: rgba(52, 211, 153, 0.9); }
-.main-content.dashboard-single-screen .ai-advice-red { color: rgba(248, 113, 113, 0.9); }
+/* Advice line */
+.ai-advice { border-top: 1px solid rgba(255,255,255,0.05); padding-top: 3px; margin-top: auto; }
+.ai-advice-why { font-size: 9px; font-weight: 600; font-style: italic; color: var(--muted); line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+.ai-advice-blue .ai-advice-why { color: rgba(34, 211, 238, 0.8); }
+.ai-advice-violet .ai-advice-why { color: rgba(129, 140, 248, 0.85); }
+.ai-advice-green .ai-advice-why { color: rgba(52, 211, 153, 0.9); }
+.ai-advice-amber .ai-advice-why { color: rgba(245, 158, 11, 0.9); }
+.ai-advice-red .ai-advice-why { color: rgba(248, 113, 113, 0.9); }
 [data-theme="light"] .main-content.dashboard-single-screen .ai-advice { border-top-color: rgba(0,0,0,0.06); }
 
-/* Top Role — mini bar chart */
-.main-content.dashboard-single-screen .ai-mini-bars { display: flex; flex-direction: column; gap: 3px; margin-top: 1px; }
-.main-content.dashboard-single-screen .ai-mini-bar-row { display: grid; grid-template-columns: 1fr 44px 18px; align-items: center; gap: 5px; }
-.main-content.dashboard-single-screen .ai-mini-bar-label { font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Mini bars */
+.main-content.dashboard-single-screen .ai-mini-bars { display: flex; flex-direction: column; gap: 3px; }
+.main-content.dashboard-single-screen .ai-mini-bar-row { display: grid; grid-template-columns: 1fr 42px 16px; align-items: center; gap: 4px; }
+.main-content.dashboard-single-screen .ai-mini-bar-label { font-size: 9.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .main-content.dashboard-single-screen .ai-mini-bar-track { height: 3px; border-radius: 9999px; background: rgba(255,255,255,0.06); overflow: hidden; }
 .main-content.dashboard-single-screen .ai-mini-bar-fill { height: 100%; border-radius: 9999px; transition: width 600ms ease; }
-.main-content.dashboard-single-screen .ai-mini-bar-count { font-size: 10px; font-weight: 700; color: var(--ink); text-align: right; font-variant-numeric: tabular-nums; }
+.main-content.dashboard-single-screen .ai-mini-bar-count { font-size: 9.5px; font-weight: 700; color: var(--ink); text-align: right; font-variant-numeric: tabular-nums; }
 .main-content.dashboard-single-screen .ai-bar-blue { background: var(--brand); }
 .main-content.dashboard-single-screen .ai-bar-violet { background: var(--vui-violet-500); }
 .main-content.dashboard-single-screen .ai-bar-green { background: var(--status-hired); }
 .main-content.dashboard-single-screen .ai-bar-amber { background: var(--status-pending); }
 
-/* Best Fit — match bar */
-.main-content.dashboard-single-screen .ai-fit-bar-wrap { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
-.main-content.dashboard-single-screen .ai-fit-bar-track { flex: 1; height: 6px; border-radius: 9999px; background: rgba(255,255,255,0.06); overflow: hidden; }
-.main-content.dashboard-single-screen .ai-fit-bar-fill { height: 100%; border-radius: 9999px; background: var(--vui-violet-500); transition: width 600ms ease; }
-.main-content.dashboard-single-screen .ai-fit-bar-label { font-size: 9px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; }
-
-/* Pipeline Health — status bars */
-.main-content.dashboard-single-screen .ai-health-bars { display: flex; flex-direction: column; gap: 3px; margin-top: 1px; }
-.main-content.dashboard-single-screen .ai-health-bar-row { display: grid; grid-template-columns: 5px 34px 1fr 16px; align-items: center; gap: 4px; }
+/* Health bars */
+.main-content.dashboard-single-screen .ai-health-bars { display: flex; flex-direction: column; gap: 3px; }
+.main-content.dashboard-single-screen .ai-health-bar-row { display: grid; grid-template-columns: 5px 32px 1fr 14px; align-items: center; gap: 4px; }
 .main-content.dashboard-single-screen .ai-health-dot { width: 5px; height: 5px; border-radius: 50%; flex: none; }
-.main-content.dashboard-single-screen .ai-health-label { font-size: 10px; color: var(--muted); white-space: nowrap; }
+.main-content.dashboard-single-screen .ai-health-label { font-size: 9.5px; color: var(--muted); white-space: nowrap; }
 .main-content.dashboard-single-screen .ai-health-bar-track { height: 3px; border-radius: 9999px; background: rgba(255,255,255,0.06); overflow: hidden; }
 .main-content.dashboard-single-screen .ai-health-bar-fill { height: 100%; border-radius: 9999px; transition: width 600ms ease; }
-.main-content.dashboard-single-screen .ai-health-count { font-size: 10px; font-weight: 700; color: var(--ink); text-align: right; font-variant-numeric: tabular-nums; }
+.main-content.dashboard-single-screen .ai-health-count { font-size: 9.5px; font-weight: 700; color: var(--ink); text-align: right; font-variant-numeric: tabular-nums; }
+.ai-hero-health { line-height: 1.1; }
+.ai-hero-health.ai-health-strong { color: var(--status-hired); }
+.ai-hero-health.ai-health-ok { color: var(--status-pending); }
+.ai-hero-health.ai-health-weak { color: var(--danger); }
 
-/* At Risk — gauge */
-.main-content.dashboard-single-screen .ai-risk-gauge { margin-top: 2px; }
-.main-content.dashboard-single-screen .ai-risk-gauge-track { height: 4px; border-radius: 9999px; background: rgba(255,255,255,0.06); overflow: hidden; }
+/* Risk badge + gauge */
+.ai-risk-badge { font-size: 9px; font-weight: 800; padding: 2px 7px; border-radius: var(--radius-pill); white-space: nowrap; flex-shrink: 0; line-height: 1.3; }
+.ai-risk-green { background: rgba(52, 211, 153, 0.18); color: var(--status-hired); }
+.ai-risk-amber { background: rgba(245, 158, 11, 0.18); color: var(--status-pending); }
+.ai-risk-red { background: rgba(248, 113, 113, 0.18); color: var(--danger); }
+.main-content.dashboard-single-screen .ai-risk-gauge { position: relative; }
+.main-content.dashboard-single-screen .ai-risk-gauge-track { height: 4px; border-radius: 9999px; background: rgba(255,255,255,0.06); overflow: hidden; position: relative; }
 .main-content.dashboard-single-screen .ai-risk-gauge-fill { height: 100%; border-radius: 9999px; transition: width 600ms ease; }
-.main-content.dashboard-single-screen .ai-risk-gauge-fill.tone-green { background: var(--status-hired); }
-.main-content.dashboard-single-screen .ai-risk-gauge-fill.tone-amber { background: var(--status-pending); }
-.main-content.dashboard-single-screen .ai-risk-gauge-fill.tone-red { background: var(--danger); }
+.ai-risk-gauge-fill.tone-green { background: var(--status-hired); }
+.ai-risk-gauge-fill.tone-amber { background: var(--status-pending); }
+.ai-risk-gauge-fill.tone-red { background: var(--danger); }
+.ai-risk-gauge-segments { display: flex; gap: 3px; margin-top: 2px; }
+.ai-risk-gauge-segments span { flex: 1; height: 1.5px; border-radius: 9999px; background: rgba(255,255,255,0.04); }
 
-/* Light mode overrides for AI insight internals */
+/* Light mode */
 [data-theme="light"] .main-content.dashboard-single-screen .ai-insight-card { background: linear-gradient(145deg, rgba(255,255,255,0.84) 0%, rgba(255,255,255,0.52) 100%), var(--surface-2); border-color: rgba(0,0,0,0.06); box-shadow: 0 6px 22px rgba(0,0,0,0.09), inset 0 1px 0 rgba(255,255,255,0.98); }
 [data-theme="light"] .main-content.dashboard-single-screen .ai-insight-card:hover { box-shadow: 0 10px 30px rgba(0,0,0,0.14), inset 0 1px 0 rgba(255,255,255,0.98); }
 [data-theme="light"] .main-content.dashboard-single-screen .ai-mini-bar-track,
-[data-theme="light"] .main-content.dashboard-single-screen .ai-fit-bar-track,
 [data-theme="light"] .main-content.dashboard-single-screen .ai-health-bar-track,
 [data-theme="light"] .main-content.dashboard-single-screen .ai-risk-gauge-track { background: rgba(0,0,0,0.06); }
+[data-theme="light"] .main-content.dashboard-single-screen .ai-ring circle:first-child { stroke: rgba(0,0,0,0.06); }
 
 .main-content.wide {
   max-width: 100% !important;
