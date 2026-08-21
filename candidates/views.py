@@ -11,6 +11,7 @@ from django.views.generic import DetailView, ListView
 
 from ai.cv_parser import extract_text
 from ai.matching import auto_apply, job_fit
+from ai.panel import synthesize_panel_consensus
 from ai.services import fit_summary, parse_cv
 from jobs.models import Job
 from notifications.models import Notification
@@ -29,9 +30,9 @@ def visible_applications(user):
     """
     qs = JobApplication.objects.select_related(
         'candidate', 'job', 'current_round', 'assigned_to'
-    ).prefetch_related('job__rounds')
+    ).prefetch_related('job__rounds', 'panel_interviewers')
     if user.is_interviewer():
-        qs = qs.filter(assigned_to=user)
+        qs = qs.filter(Q(assigned_to=user) | Q(panel_interviewers=user)).distinct()
     return qs
 
 
@@ -106,7 +107,8 @@ class CandidateDetailView(LoginRequiredMixin, DetailView):
         if request.user.is_authenticated and request.user.is_interviewer():
             candidate = self.get_object()
             assigned = JobApplication.objects.filter(
-                candidate=candidate, assigned_to=request.user
+                Q(assigned_to=request.user) | Q(panel_interviewers=request.user),
+                candidate=candidate,
             ).exists()
             if not assigned:
                 return HttpResponse('You can only view assigned candidates.', status=403)
@@ -118,13 +120,19 @@ class CandidateDetailView(LoginRequiredMixin, DetailView):
         context['active_nav'] = 'candidates'
         applications = self.object.applications.select_related(
             'candidate', 'job', 'current_round', 'assigned_to'
-        ).prefetch_related('job__rounds', 'feedbacks', 'moves', 'moves__moved_by')
+        ).prefetch_related('job__rounds', 'feedbacks', 'panel_interviewers', 'moves', 'moves__moved_by')
         context['applications'] = applications
         context['is_hr'] = self.request.user.is_hr()
         context['is_management'] = self.request.user.is_management()
         context['interviewers'] = User.objects.filter(role='IV').order_by(
             'first_name', 'last_name'
         )
+
+        # Compute AI Panel Consensus & Conflict Resolution for each application.
+        context['panel_consensus'] = {
+            app.pk: synthesize_panel_consensus(app)
+            for app in applications
+        }
 
         # Per-application skill overlap breakdown for the fit panel.
         context['fit'] = [
@@ -423,6 +431,7 @@ class AssignApplicationView(LoginRequiredMixin, View):
         interviewer = get_object_or_404(User, pk=interviewer_id, role='IV')
         previous = app.assigned_to
         app.assigned_to = interviewer
+        app.panel_interviewers.add(interviewer)
         app.save(update_fields=['assigned_to', 'updated_at'])
 
         if previous != interviewer:
