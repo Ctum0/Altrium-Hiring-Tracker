@@ -30,7 +30,7 @@ ALLOWED_HOSTS = _env(
 # Dev and tunnel hosts stay available regardless of DJANGO_ALLOWED_HOSTS;
 # .onrender.com covers the Render domain, and Render sets the exact public
 # host in RENDER_EXTERNAL_HOSTNAME, which is appended when present.
-for _host in ("localhost", "127.0.0.1", ".trycloudflare.com", ".onrender.com"):
+for _host in ("localhost", "127.0.0.1", ".trycloudflare.com", ".onrender.com", ".up.railway.app"):
     if _host not in ALLOWED_HOSTS:
         ALLOWED_HOSTS.append(_host)
 RENDER_EXTERNAL_HOSTNAME = _env('RENDER_EXTERNAL_HOSTNAME', default='')
@@ -40,6 +40,7 @@ if RENDER_EXTERNAL_HOSTNAME:
 CSRF_TRUSTED_ORIGINS = [
     "https://*.trycloudflare.com",
     "https://*.onrender.com",
+    "https://*.up.railway.app",
 ]
 # Application definition
 
