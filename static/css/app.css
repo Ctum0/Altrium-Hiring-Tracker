@@ -257,22 +257,22 @@
   --bg-2: #EAF1F8;
   --bg-gradient: var(--vui-bg-page-gradient);
   --surface: var(--vui-glass-card-bg);
-  --surface-2: rgba(255, 255, 255, 0.42);
-  --surface-hover: linear-gradient(135deg, rgba(255, 255, 255, 0.65) 0%, rgba(255, 255, 255, 0.42) 100%);
-  --border: rgba(255, 255, 255, 0.55);
-  --border-strong: rgba(255, 255, 255, 0.80);
+  --surface-2: rgba(255, 255, 255, 0.65);
+  --surface-hover: linear-gradient(135deg, rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0.65) 100%);
+  --border: rgba(10, 33, 56, 0.14);
+  --border-strong: rgba(10, 33, 56, 0.28);
 
   /* Crisp Slate Ink typography */
-  --ink: #0A2138;
-  --ink-secondary: #1E3A56;
-  --muted: #3E5C7B;
-  --hero-subtitle: #1E3A56;
+  --ink: #081A2C;
+  --ink-secondary: #132E48;
+  --muted: #334D66;
+  --hero-subtitle: #132E48;
 
-  --vui-text-white: #0A2138;
-  --vui-text-muted: #1E3A56;
-  --vui-text-subtle: #3E5C7B;
-  --vui-border-glass-subtle: rgba(255, 255, 255, 0.55);
-  --vui-border-glass-highlight: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.20) 100%);
+  --vui-text-white: #081A2C;
+  --vui-text-muted: #132E48;
+  --vui-text-subtle: #334D66;
+  --vui-border-glass-subtle: rgba(10, 33, 56, 0.14);
+  --vui-border-glass-highlight: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(10, 33, 56, 0.08) 100%);
 
   --status-new: #0284C7;
   --status-new-bg: rgba(2, 132, 199, 0.14);
@@ -300,12 +300,12 @@
   --shadow-dashboard: 0 12px 32px rgba(10, 33, 56, 0.10);
 
   --glass-bg: var(--vui-glass-card-bg);
-  --glass-border: rgba(255, 255, 255, 0.55);
-  --glass-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.75), 0 12px 32px rgba(10, 33, 56, 0.10);
-  --glass-highlight: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.20) 100%);
+  --glass-border: rgba(10, 33, 56, 0.14);
+  --glass-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.90), 0 10px 28px rgba(10, 33, 56, 0.08);
+  --glass-highlight: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(10, 33, 56, 0.08) 100%);
 
   --fg: var(--ink);
-  --border-subtle: rgba(255, 255, 255, 0.55);
+  --border-subtle: rgba(10, 33, 56, 0.10);
   --accent-border: rgba(2, 132, 199, 0.28);
 
   --transition: 200ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -1424,6 +1424,41 @@ a:hover {
   background: rgba(2, 132, 199, 0.1);
   color: #0284c7;
   border-color: rgba(2, 132, 199, 0.25);
+}
+
+/* Light Theme Card & List Item Borders (Fixes invisible gray/white lines & missing borders) */
+:root[data-theme='light'] .main-content.dashboard-single-screen .ref-card,
+:root[data-theme='light'] .main-content.dashboard-single-screen .ref-kpi-card,
+:root[data-theme='light'] .main-content.dashboard-single-screen .dash-chart-card,
+:root[data-theme='light'] .glass-panel,
+:root[data-theme='light'] .vui-card,
+:root[data-theme='light'] .glass-card,
+:root[data-theme='light'] .ref-card,
+:root[data-theme='light'] .ref-kpi-card,
+:root[data-theme='light'] .dash-chart-card {
+  border: 1px solid rgba(10, 33, 56, 0.16) !important;
+  box-shadow: 0 8px 24px rgba(10, 33, 56, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.90) !important;
+}
+
+:root[data-theme='light'] .main-content.dashboard-single-screen .activity-item,
+:root[data-theme='light'] .activity-item {
+  border-bottom: 1px solid rgba(10, 33, 56, 0.12) !important;
+}
+
+:root[data-theme='light'] .activity-dot-line {
+  background: rgba(10, 33, 56, 0.16) !important;
+}
+
+:root[data-theme='light'] .ref-job-item {
+  background: rgba(255, 255, 255, 0.85) !important;
+  border: 1px solid rgba(10, 33, 56, 0.14) !important;
+  box-shadow: 0 2px 6px rgba(10, 33, 56, 0.04);
+}
+
+:root[data-theme='light'] .ref-bar-track,
+:root[data-theme='light'] .velocity-bar-track,
+:root[data-theme='light'] .main-content.dashboard-single-screen .ref-bar-track {
+  background: rgba(10, 33, 56, 0.09) !important;
 }
 
 
