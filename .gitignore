@@ -26,6 +26,7 @@ media/
 # Python cache
 .pytest_cache/
 .mypy_cache/
+.ruff_cache/
 
 # Dev-only requirements (lint tooling, kept out of production)
 requirements-dev.txt
@@ -38,6 +39,8 @@ requirements-dev.txt
 .agents
 .agents/
 .artifacts/
+.impeccable/
+.zcode/
 
 # Node (toolkit deps for playwright a11y audits)
 node_modules/
