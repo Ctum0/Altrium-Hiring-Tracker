@@ -190,105 +190,115 @@
       <div class="ai-insights-grid">
         {% for insight in ai_insights %}
         <div class="ai-insight-card ai-insight-{{ insight.id }}">
-          <div class="ai-insight-head">
-            <div class="ai-insight-head-left">
-              <div class="ai-insight-icon ai-accent-{{ insight.accent }}" aria-hidden="true">
-                {% if insight.icon == 'briefcase' %}
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
-                {% elif insight.icon == 'target' %}
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
-                {% elif insight.icon == 'pulse' %}
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-                {% else %}
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                {% endif %}
-              </div>
-              <span class="ai-insight-title">{{ insight.title }}</span>
-            </div>
-          </div>
 
           {% if insight.id == 'top_role' and insight.rank %}
-          <div class="ai-insight-body">
-            <span class="ai-insight-value">{{ insight.value }}</span>
-            <span class="ai-insight-support">Demand {{ insight.demand_score }}% · {{ insight.leader_label }}</span>
+          <div class="ai-top-row">
+            <div class="ai-label-cluster">
+              <span class="ai-tiny-label">Top Role</span>
+              <span class="ai-hero-value">{{ insight.value|truncatechars:22 }}</span>
+            </div>
+            <div class="ai-ring-wrap" aria-label="Demand score {{ insight.demand_score }} percent">
+              <svg class="ai-ring" viewBox="0 0 36 36" aria-hidden="true">
+                <circle cx="18" cy="18" r="15.5" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="3"/>
+                <circle cx="18" cy="18" r="15.5" fill="none" stroke="var(--brand)" stroke-width="3" stroke-linecap="round"
+                  stroke-dasharray="{{ insight.demand_score }} 100" transform="rotate(-90 18 18)"/>
+              </svg>
+              <span class="ai-ring-text">{{ insight.demand_score }}</span>
+            </div>
           </div>
+          <span class="ai-support-line">{{ insight.count }} candidates · {{ insight.pct }}% of pipeline · {{ insight.leader_label }}</span>
           <div class="ai-mini-bars">
             {% for r in insight.rank|slice:":2" %}
             <div class="ai-mini-bar-row">
-              <span class="ai-mini-bar-label">{{ r.label|truncatechars:15 }}</span>
-              <div class="ai-mini-bar-track">
-                <div class="ai-mini-bar-fill ai-bar-blue" style="width:{{ r.pct }}%"></div>
-              </div>
+              <span class="ai-mini-bar-label">{{ r.label|truncatechars:14 }}</span>
+              <div class="ai-mini-bar-track"><div class="ai-mini-bar-fill ai-bar-blue" style="width:{{ r.pct }}%"></div></div>
               <span class="ai-mini-bar-count">{{ r.count }}</span>
             </div>
             {% endfor %}
           </div>
-          {% if insight.skill_tokens %}<div class="ai-chip-row">{% for chip in insight.skill_tokens|slice:":2" %}<span class="ai-chip">{{ chip }}</span>{% endfor %}</div>{% endif %}
-          <span class="ai-advice">{{ insight.ai_line }} · {{ insight.ai_reason }}</span>
+          {% if insight.skill_tokens %}<div class="ai-chip-row">{% for chip in insight.skill_tokens|slice:":3" %}<span class="ai-chip ai-chip-blue">{{ chip }}</span>{% endfor %}</div>{% endif %}
+          <div class="ai-advice ai-advice-blue"><span class="ai-advice-why">{{ insight.ai_reason }}</span></div>
 
           {% elif insight.id == 'best_fit' %}
-          <div class="ai-insight-body">
-            <span class="ai-insight-value">{{ insight.value }}</span>
-            <span class="ai-insight-support ai-support-{{ insight.accent }}">{{ insight.match_score }}% match · {{ insight.match_band }}</span>
-          </div>
-          <div class="ai-fit-bar-wrap">
-            <div class="ai-fit-bar-track">
-              <div class="ai-fit-bar-fill ai-bar-{{ insight.accent }}" style="width:{{ insight.match_score }}%"></div>
+          <div class="ai-top-row">
+            <div class="ai-label-cluster">
+              <span class="ai-tiny-label">Best Fit</span>
+              <span class="ai-hero-value">{{ insight.value }}</span>
             </div>
-            <span class="ai-fit-bar-label">{{ insight.count }} cand.</span>
+            <div class="ai-ring-wrap ai-ring-violet" aria-label="Match score {{ insight.match_score }} percent">
+              <svg class="ai-ring" viewBox="0 0 36 36" aria-hidden="true">
+                <circle cx="18" cy="18" r="15.5" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="3"/>
+                <circle cx="18" cy="18" r="15.5" fill="none" stroke="var(--vui-violet-500)" stroke-width="3" stroke-linecap="round"
+                  stroke-dasharray="{{ insight.match_score }} 100" transform="rotate(-90 18 18)"/>
+              </svg>
+              <span class="ai-ring-text ai-ring-text-violet">{{ insight.match_score }}%</span>
+            </div>
           </div>
+          <span class="ai-support-line ai-support-violet">{{ insight.match_band }} match · {{ insight.count }} candidate{{ insight.count|pluralize }} in pipeline</span>
           {% if insight.skill_chips %}
-          <div class="ai-chip-row">
-            {% for chip in insight.skill_chips|slice:":2" %}<span class="ai-chip ai-chip-{{ insight.accent }}">{{ chip }}</span>{% endfor %}
-          </div>
+          <div class="ai-chip-row">{% for chip in insight.skill_chips|slice:":3" %}<span class="ai-chip ai-chip-violet">{{ chip }}</span>{% endfor %}</div>
           {% endif %}
-          <span class="ai-advice ai-advice-{{ insight.accent }}">{{ insight.ai_line_best }} · {{ insight.ai_reason_best }}</span>
+          <div class="ai-advice ai-advice-violet"><span class="ai-advice-why">{{ insight.ai_reason_best }}</span></div>
 
           {% elif insight.id == 'health' %}
-          <div class="ai-insight-body">
-            <span class="ai-insight-value">Score {{ insight.health_score }} — {{ insight.value }}</span>
-            <span class="ai-insight-support">{{ insight.active_pct }}% active pipeline</span>
+          <div class="ai-top-row">
+            <div class="ai-label-cluster">
+              <span class="ai-tiny-label">Pipeline Health</span>
+              <span class="ai-hero-value ai-hero-health ai-health-{{ insight.health_band }}">{{ insight.health_score }}<span class="ai-hero-unit">/100</span></span>
+            </div>
+            <div class="ai-ring-wrap ai-ring-{{ insight.health_band }}" aria-label="Health score {{ insight.health_score }}">
+              <svg class="ai-ring" viewBox="0 0 36 36" aria-hidden="true">
+                <circle cx="18" cy="18" r="15.5" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="3"/>
+                <circle cx="18" cy="18" r="15.5" fill="none" stroke="{% if insight.health_band == 'strong' %}var(--status-hired){% elif insight.health_band == 'ok' %}var(--status-pending){% else %}var(--danger){% endif %}" stroke-width="3" stroke-linecap="round"
+                  stroke-dasharray="{{ insight.health_score }} 100" transform="rotate(-90 18 18)"/>
+              </svg>
+              <span class="ai-ring-text">{{ insight.health_score }}</span>
+            </div>
           </div>
+          <span class="ai-support-line">{{ insight.active_pct }}% active · {{ insight.hold_count }} on hold · {{ insight.rej_count }} rejected</span>
           <div class="ai-health-bars">
             <div class="ai-health-bar-row">
               <span class="ai-health-dot" style="background:var(--status-hired)"></span>
               <span class="ai-health-label">Active</span>
-              <div class="ai-health-bar-track">
-                <div class="ai-health-bar-fill" style="width:{{ insight.active_pct }}%;background:var(--status-hired)"></div>
-              </div>
+              <div class="ai-health-bar-track"><div class="ai-health-bar-fill" style="width:{{ insight.active_pct }}%;background:var(--status-hired)"></div></div>
               <span class="ai-health-count">{{ insight.active_count }}</span>
             </div>
             <div class="ai-health-bar-row">
               <span class="ai-health-dot" style="background:var(--status-pending)"></span>
               <span class="ai-health-label">On hold</span>
-              <div class="ai-health-bar-track">
-                <div class="ai-health-bar-fill" style="width:{{ insight.hold_pct }}%;background:var(--status-pending)"></div>
-              </div>
+              <div class="ai-health-bar-track"><div class="ai-health-bar-fill" style="width:{{ insight.hold_pct }}%;background:var(--status-pending)"></div></div>
               <span class="ai-health-count">{{ insight.hold_count }}</span>
             </div>
           </div>
-          <span class="ai-advice ai-advice-{{ insight.accent }}">{{ insight.bottleneck_line }} · {{ insight.bottleneck_reason }}</span>
+          <div class="ai-advice ai-advice-{{ insight.accent }}"><span class="ai-advice-why">{{ insight.bottleneck_reason }}</span></div>
 
           {% elif insight.id == 'risk' %}
-          <div class="ai-insight-body">
-            <span class="ai-insight-value">{{ insight.value }}</span>
-            <span class="ai-insight-support">{{ insight.risk_level }} · {{ insight.count }} on hold ({{ insight.risk_pct }}%)</span>
+          <div class="ai-top-row">
+            <div class="ai-label-cluster">
+              <span class="ai-tiny-label">At Risk</span>
+              <span class="ai-hero-value">{{ insight.value }}</span>
+            </div>
+            <div class="ai-risk-badge ai-risk-{{ insight.risk_tone }}">{{ insight.risk_level }}</div>
           </div>
+          <span class="ai-support-line">{{ insight.count }} candidate{{ insight.count|pluralize }} on hold · {{ insight.risk_pct }}% of pipeline</span>
           <div class="ai-risk-gauge">
             <div class="ai-risk-gauge-track">
-              <div class="ai-risk-gauge-fill tone-{{ insight.risk_tone }}" style="width:{{ insight.risk_pct }}%"></div>
+              <div class="ai-risk-gauge-fill tone-{{ insight.risk_tone }}" style="width:{% widthratio insight.count insight.total 100 %}%"></div>
+            </div>
+            <div class="ai-risk-gauge-segments" aria-hidden="true">
+              <span></span><span></span><span></span>
             </div>
           </div>
-          <span class="ai-advice ai-advice-{{ insight.risk_tone }}">{{ insight.risk_ai }} · {{ insight.risk_reason }}</span>
+          <div class="ai-advice ai-advice-{{ insight.risk_tone }}"><span class="ai-advice-why">{{ insight.risk_ai }}</span></div>
 
           {% else %}
-          <div class="ai-insight-body">
-            <span class="ai-insight-value">{{ insight.value }}</span>
-            <span class="ai-insight-text">{{ insight.text }}</span>
+          <div class="ai-label-cluster">
+            <span class="ai-tiny-label">{{ insight.title }}</span>
+            <span class="ai-hero-value">{{ insight.value }}</span>
           </div>
+          <span class="ai-support-line">{{ insight.text }}</span>
           {% endif %}
 
-          <div class="ai-insight-bar accent-bar-{{ insight.accent }}"></div>
         </div>
         {% endfor %}
       </div>
