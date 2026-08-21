@@ -31,6 +31,7 @@ class FeedbackListView(LoginRequiredMixin, ListView):
     def get_queryset(self):
         qs = _feedback_queryset(self.request.user)
         app_pk = self.request.GET.get('application')
+        status = self.request.GET.get('status')
         if app_pk:
             qs = qs.filter(application_id=app_pk)
         return qs.order_by('-submitted_at')
@@ -38,13 +39,40 @@ class FeedbackListView(LoginRequiredMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['active_nav'] = 'feedback'
+        user = self.request.user
         app_pk = self.request.GET.get('application')
+        status = self.request.GET.get('status', '')
+        context['filter_status'] = status
+
         if app_pk:
             from candidates.models import JobApplication
             app = JobApplication.objects.filter(pk=app_pk).select_related('candidate').first()
             context['filter_candidate'] = app.candidate.full_name if app else None
         else:
             context['filter_candidate'] = None
+
+        # Calculate pending vs submitted feedback counts
+        from candidates.models import JobApplication
+        pending_qs = JobApplication.objects.filter(
+            current_round__isnull=False,
+            feedback_submitted=False,
+        ).exclude(status__in=['hired', 'rejected']).select_related(
+            'candidate', 'job', 'current_round', 'assigned_to'
+        ).prefetch_related('panel_interviewers')
+
+        if user.is_interviewer():
+            pending_qs = pending_qs.filter(
+                models.Q(assigned_to=user) | models.Q(panel_interviewers=user)
+            ).distinct()
+
+        context['pending_count'] = pending_qs.count()
+        context['submitted_count'] = context['paginator'].count if context.get('paginator') else self.get_queryset().count()
+
+        if status == 'pending':
+            context['pending_applications'] = pending_qs.order_by('-updated_at')
+        else:
+            context['pending_applications'] = None
+
         return context
 
 

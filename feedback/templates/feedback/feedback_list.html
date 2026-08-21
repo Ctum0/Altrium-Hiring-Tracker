@@ -7,82 +7,156 @@
     <h2 class="page-title">
       {% if filter_candidate %}
         {{ filter_candidate }}
+      {% elif filter_status == 'pending' %}
+        Pending Feedback Requests
       {% else %}
-        All feedback
+        All Submitted Feedback
       {% endif %}
     </h2>
     <p class="page-sub">Interview feedback across all candidates and rounds.</p>
   </div>
+  <div class="page-actions" style="display:flex;gap:8px">
+    <a href="{% url 'feedback:list' %}" class="btn btn-sm {% if filter_status != 'pending' %}btn-primary{% else %}btn-secondary{% endif %}">
+      Submitted Feedback ({{ submitted_count }})
+    </a>
+    <a href="{% url 'feedback:list' %}?status=pending" class="btn btn-sm {% if filter_status == 'pending' %}btn-primary{% else %}btn-secondary{% endif %}">
+      Pending Feedback ({{ pending_count }})
+    </a>
+  </div>
 </div>
 
-{% if feedbacks %}
-<div class="table-wrap">
-  <table class="table">
-    <thead>
-      <tr>
-        <th>Candidate</th>
-        <th>Position</th>
-        <th>Round</th>
-        <th>Score</th>
-        <th>Interviewer</th>
-        <th>Submitted</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for fb in feedbacks %}
-      <tr class="cand-row">
-        <td>
-          <div class="cand-name-cell">
-            <div class="cand-avatar cand-avatar-{{ fb.application.candidate.full_name|first|lower|make_list|first|default:'0'|slugify|last }}" aria-hidden="true">
-              {{ fb.application.candidate.full_name|first|upper }}{% if fb.application.candidate.full_name|wordcount > 1 %}{{ fb.application.candidate.full_name|cut:" "|last|upper }}{% endif %}
-            </div>
-            <div class="cand-name-info">
-              <a href="{% url 'feedback:detail' fb.pk %}" class="cand-name-main" style="text-decoration:none;color:inherit">{{ fb.application.candidate.full_name }}</a>
-            </div>
-          </div>
-        </td>
-        <td >{{ fb.application.job.title }}</td>
-        <td><span class="badge badge-in_progress">{{ fb.round.name }}</span></td>
-        <td>
-          {% if fb.score >= 75 %}
-          <span class="score-ring score-ring-high">{{ fb.score }}</span>
-          {% elif fb.score >= 50 %}
-          <span class="score-ring score-ring-mid">{{ fb.score }}</span>
-          {% else %}
-          <span class="score-ring score-ring-low">{{ fb.score }}</span>
-          {% endif %}
-        </td>
-        <td >{{ fb.interviewer.get_full_name|default:fb.interviewer.username }}</td>
-        <td class="text-muted text-xs">{{ fb.submitted_at|date:'M j, Y' }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
+{% if filter_status == 'pending' %}
 
-{% if is_paginated and page_obj.paginator.num_pages > 1 %}
-<nav class="pagination" aria-label="Pagination">
-  {% if page_obj.has_previous %}
-  <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.application %}&application={{ request.GET.application }}{% endif %}">Previous</a>
+  {% if pending_applications %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Candidate</th>
+          <th>Position</th>
+          <th>Current Round</th>
+          <th>Assigned Interviewer</th>
+          <th>Status</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for app in pending_applications %}
+        <tr class="cand-row">
+          <td>
+            <div class="cand-name-cell">
+              <div class="cand-avatar cand-avatar-{{ app.candidate.full_name|first|lower|make_list|first|default:'0'|slugify|last }}" aria-hidden="true">
+                {{ app.candidate.full_name|first|upper }}{% if app.candidate.full_name|wordcount > 1 %}{{ app.candidate.full_name|cut:" "|last|upper }}{% endif %}
+              </div>
+              <div class="cand-name-info">
+                <a href="{% url 'candidates:detail' app.candidate.pk %}" class="cand-name-main" style="text-decoration:none;color:inherit">{{ app.candidate.full_name }}</a>
+              </div>
+            </div>
+          </td>
+          <td>{{ app.job.title }}</td>
+          <td><span class="badge badge-in_progress">{{ app.current_round.name }}</span></td>
+          <td>
+            {% if app.assigned_to %}
+              {{ app.assigned_to.get_full_name|default:app.assigned_to.username }}
+            {% elif app.panel_interviewers.exists %}
+              Panel ({{ app.panel_interviewers.count }})
+            {% else %}
+              <span class="text-muted">Unassigned</span>
+            {% endif %}
+          </td>
+          <td><span class="badge badge-pending">Feedback Pending</span></td>
+          <td>
+            {% if user.is_interviewer and app.assigned_to == user and app.current_round %}
+            <a href="{% url 'feedback:submit' app.pk app.current_round.pk %}" class="btn btn-primary btn-xs">Submit Feedback</a>
+            {% else %}
+            <a href="{% url 'candidates:detail' app.candidate.pk %}" class="btn btn-secondary btn-xs">View Candidate &rarr;</a>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto 12px;color:var(--muted)" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+    <p class="empty-state-title">No pending feedback requests</p>
+    <p class="empty-state-body">All active interview candidates have round feedback submitted.</p>
+  </div>
   {% endif %}
-  {% for num in page_obj.paginator.page_range %}
-    {% if num == page_obj.number %}
-    <span class="page-link current">{{ num }}</span>
-    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
-    <a class="page-link" href="?page={{ num }}{% if request.GET.application %}&application={{ request.GET.application }}{% endif %}">{{ num }}</a>
-    {% endif %}
-  {% endfor %}
-  {% if page_obj.has_next %}
-  <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.application %}&application={{ request.GET.application }}{% endif %}">Next</a>
-  {% endif %}
-</nav>
-{% endif %}
 
 {% else %}
-<div class="empty-state">
-  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto 12px;color:var(--muted)" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-  <p class="empty-state-title">No feedback yet</p>
-  <p class="empty-state-body">When interviewers submit feedback, it will appear here.</p>
-</div>
+
+  {% if feedbacks %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Candidate</th>
+          <th>Position</th>
+          <th>Round</th>
+          <th>Score</th>
+          <th>Interviewer</th>
+          <th>Submitted</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for fb in feedbacks %}
+        <tr class="cand-row">
+          <td>
+            <div class="cand-name-cell">
+              <div class="cand-avatar cand-avatar-{{ fb.application.candidate.full_name|first|lower|make_list|first|default:'0'|slugify|last }}" aria-hidden="true">
+                {{ fb.application.candidate.full_name|first|upper }}{% if fb.application.candidate.full_name|wordcount > 1 %}{{ fb.application.candidate.full_name|cut:" "|last|upper }}{% endif %}
+              </div>
+              <div class="cand-name-info">
+                <a href="{% url 'feedback:detail' fb.pk %}" class="cand-name-main" style="text-decoration:none;color:inherit">{{ fb.application.candidate.full_name }}</a>
+              </div>
+            </div>
+          </td>
+          <td>{{ fb.application.job.title }}</td>
+          <td><span class="badge badge-in_progress">{{ fb.round.name }}</span></td>
+          <td>
+            {% if fb.score >= 75 %}
+            <span class="score-ring score-ring-high">{{ fb.score }}</span>
+            {% elif fb.score >= 50 %}
+            <span class="score-ring score-ring-mid">{{ fb.score }}</span>
+            {% else %}
+            <span class="score-ring score-ring-low">{{ fb.score }}</span>
+            {% endif %}
+          </td>
+          <td>{{ fb.interviewer.get_full_name|default:fb.interviewer.username }}</td>
+          <td class="text-muted text-xs">{{ fb.submitted_at|date:'M j, Y' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if is_paginated and page_obj.paginator.num_pages > 1 %}
+  <nav class="pagination" aria-label="Pagination">
+    {% if page_obj.has_previous %}
+    <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.application %}&application={{ request.GET.application }}{% endif %}">Previous</a>
+    {% endif %}
+    {% for num in page_obj.paginator.page_range %}
+      {% if num == page_obj.number %}
+      <span class="page-link current">{{ num }}</span>
+      {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+      <a class="page-link" href="?page={{ num }}{% if request.GET.application %}&application={{ request.GET.application }}{% endif %}">{{ num }}</a>
+      {% endif %}
+    {% endfor %}
+    {% if page_obj.has_next %}
+    <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.application %}&application={{ request.GET.application }}{% endif %}">Next</a>
+    {% endif %}
+  </nav>
+  {% endif %}
+
+  {% else %}
+  <div class="empty-state">
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto 12px;color:var(--muted)" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+    <p class="empty-state-title">No submitted feedback yet</p>
+    <p class="empty-state-body">When interviewers submit feedback, it will appear here.</p>
+  </div>
+  {% endif %}
+
 {% endif %}
 {% endblock %}
