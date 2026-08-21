@@ -38,7 +38,13 @@ class FeedbackListView(LoginRequiredMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['active_nav'] = 'feedback'
-        return context
+        app_pk = self.request.GET.get('application')
+        if app_pk:
+            from candidates.models import JobApplication
+            app = JobApplication.objects.filter(pk=app_pk).select_related('candidate').first()
+            context['filter_candidate'] = app.candidate.full_name if app else None
+        else:
+            context['filter_candidate'] = None
         return context
 
 

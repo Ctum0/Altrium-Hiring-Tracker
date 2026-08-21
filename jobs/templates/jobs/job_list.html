@@ -2,48 +2,49 @@
 {% block title %}Jobs | Altrium Tracker{% endblock %}
 {% block page_title %}Jobs{% endblock %}
 {% block content %}
+
 <div class="page-header">
   <div>
-    <h2 class="page-title">Job postings</h2>
+    <h1 class="page-title">Job Postings</h1>
     <p class="page-sub">Active roles and their pipelines.</p>
   </div>
   <div class="page-actions">
     {% if user.is_hr %}
-    <a href="{% url 'jobs:create' %}" class="btn btn-primary">New job</a>
+    <a href="{% url 'jobs:create' %}" class="btn btn-primary">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      New job
+    </a>
     {% endif %}
   </div>
 </div>
 
 {% if jobs %}
-<div class="table-wrap">
-  <table class="table">
-    <thead>
-      <tr>
-        <th>Title</th>
-        <th>Hiring manager</th>
-        <th>Candidates</th>
-        <th>Created</th>
-        <th>Status</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for job in jobs %}
-      <tr>
-        <td class="strong"><a href="{% url 'jobs:detail' job.pk %}">{{ job.title }}</a></td>
-        <td>{% if job.hiring_manager %}{{ job.hiring_manager.get_full_name|default:job.hiring_manager.username }}{% else %}-{% endif %}</td>
-        <td class="mono">{{ job.num_applications }}</td>
-        <td>{{ job.created_at|date:'M j, Y' }}</td>
-        <td>
-          {% if job.is_active %}
-          <span class="badge badge-progress">Active</span>
-          {% else %}
-          <span class="badge badge-hold">Closed</span>
-          {% endif %}
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+<div class="jobs-card-grid">
+  {% for job in jobs %}
+  <a href="{% url 'jobs:detail' job.pk %}" class="job-card-premium">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:var(--sp-2)">
+      <div style="flex:1;min-width:0">
+        <h3 class="job-card-title">{{ job.title }}</h3>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">
+          {{ job.created_at|date:'M j, Y' }}
+          {% if job.hiring_manager %}&middot; {{ job.hiring_manager.get_full_name|default:job.hiring_manager.username }}{% endif %}
+        </div>
+      </div>
+      {% if job.is_active %}
+      <span class="badge badge-in_progress" style="flex-shrink:0;font-size:10px;padding:2px 7px">Active</span>
+      {% else %}
+      <span class="badge badge-hold" style="flex-shrink:0;font-size:10px;padding:2px 7px">Closed</span>
+      {% endif %}
+    </div>
+    <div class="job-card-meta">
+      <span class="job-card-count">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle;margin-right:3px"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+        {{ job.num_applications }} candidate{{ job.num_applications|pluralize }}
+      </span>
+      <span style="font-size:11px;color:var(--brand)">View &rarr;</span>
+    </div>
+  </a>
+  {% endfor %}
 </div>
 
 {% if is_paginated and page_obj.paginator.num_pages > 1 %}
@@ -63,8 +64,10 @@
   {% endif %}
 </nav>
 {% endif %}
+
 {% else %}
 <div class="empty-state">
+  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto 12px;color:var(--muted)" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 8h6"/><path d="M9 12h6"/><path d="M9 16h4"/></svg>
   <p class="empty-state-title">No jobs yet</p>
   <p class="empty-state-body">Create your first job posting to start configuring interview rounds and accepting CVs.</p>
   {% if user.is_hr %}

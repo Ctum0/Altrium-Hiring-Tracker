@@ -7,7 +7,7 @@
   <title>{% block title %}Altrium Tracker{% endblock %}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
   <script>
   (function () {
     var KEY = 'altrium-theme';
@@ -16,7 +16,7 @@
         var s = localStorage.getItem(KEY);
         if (s === 'light' || s === 'dark') return s;
       } catch (e) {}
-      return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      return 'dark';
     }
     var root = document.documentElement;
     root.dataset.theme = current();
@@ -25,13 +25,6 @@
       root.dataset.theme = next;
       try { localStorage.setItem(KEY, next); } catch (e) {}
     };
-    if (window.matchMedia) {
-      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function (e) {
-        try {
-          if (!localStorage.getItem(KEY)) root.dataset.theme = e.matches ? 'dark' : 'light';
-        } catch (err) {}
-      });
-    }
   })();
   </script>
   <link rel="stylesheet" href="{% static 'css/app.css' %}">
@@ -39,6 +32,8 @@
   {% block head %}{% endblock %}
 </head>
 <body class="auth-body">
+  <div class="vui-ambient-glow vui-glow-blue" aria-hidden="true"></div>
+  <div class="vui-ambient-glow vui-glow-purple" aria-hidden="true"></div>
   <main class="auth-shell">
     {% block auth_content %}{% endblock %}
   </main>

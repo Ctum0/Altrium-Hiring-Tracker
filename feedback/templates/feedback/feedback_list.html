@@ -5,8 +5,8 @@
 <div class="page-header">
   <div>
     <h2 class="page-title">
-      {% if feedbacks.0.application %}
-        {{ feedbacks.0.application.candidate.full_name }}
+      {% if filter_candidate %}
+        {{ filter_candidate }}
       {% else %}
         All feedback
       {% endif %}
@@ -30,15 +30,30 @@
     </thead>
     <tbody>
       {% for fb in feedbacks %}
-      <tr>
-        <td class="strong">
-          <a href="{% url 'feedback:detail' fb.pk %}">{{ fb.application.candidate.full_name }}</a>
+      <tr class="cand-row">
+        <td>
+          <div class="cand-name-cell">
+            <div class="cand-avatar cand-avatar-{{ fb.application.candidate.full_name|first|lower|make_list|first|default:'0'|slugify|last }}" aria-hidden="true">
+              {{ fb.application.candidate.full_name|first|upper }}{% if fb.application.candidate.full_name|wordcount > 1 %}{{ fb.application.candidate.full_name|cut:" "|last|upper }}{% endif %}
+            </div>
+            <div class="cand-name-info">
+              <a href="{% url 'feedback:detail' fb.pk %}" class="cand-name-main" style="text-decoration:none;color:inherit">{{ fb.application.candidate.full_name }}</a>
+            </div>
+          </div>
         </td>
-        <td>{{ fb.application.job.title }}</td>
-        <td>{{ fb.round.name }}</td>
-        <td><span class="score-chip has-score">{{ fb.score }}</span></td>
-        <td>{{ fb.interviewer.get_full_name|default:fb.interviewer.username }}</td>
-        <td class="text-muted">{{ fb.submitted_at|date:'M j, Y' }}</td>
+        <td >{{ fb.application.job.title }}</td>
+        <td><span class="badge badge-in_progress">{{ fb.round.name }}</span></td>
+        <td>
+          {% if fb.score >= 75 %}
+          <span class="score-ring score-ring-high">{{ fb.score }}</span>
+          {% elif fb.score >= 50 %}
+          <span class="score-ring score-ring-mid">{{ fb.score }}</span>
+          {% else %}
+          <span class="score-ring score-ring-low">{{ fb.score }}</span>
+          {% endif %}
+        </td>
+        <td >{{ fb.interviewer.get_full_name|default:fb.interviewer.username }}</td>
+        <td class="text-muted text-xs">{{ fb.submitted_at|date:'M j, Y' }}</td>
       </tr>
       {% endfor %}
     </tbody>
@@ -65,6 +80,7 @@
 
 {% else %}
 <div class="empty-state">
+  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto 12px;color:var(--muted)" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
   <p class="empty-state-title">No feedback yet</p>
   <p class="empty-state-body">When interviewers submit feedback, it will appear here.</p>
 </div>

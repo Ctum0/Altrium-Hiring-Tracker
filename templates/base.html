@@ -5,9 +5,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Altrium Tracker{% endblock %}</title>
+  <link rel="icon" type="image/png" href="{% static 'img/logo.png' %}">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Local system fonts fallback for instant zero-latency rendering -->
   <script>
   (function () {
     var KEY = 'altrium-theme';
@@ -16,7 +17,7 @@
         var s = localStorage.getItem(KEY);
         if (s === 'light' || s === 'dark') return s;
       } catch (e) {}
-      return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      return 'dark';
     }
     var root = document.documentElement;
     root.dataset.theme = current();
@@ -24,22 +25,19 @@
       var next = root.dataset.theme === 'dark' ? 'light' : 'dark';
       root.dataset.theme = next;
       try { localStorage.setItem(KEY, next); } catch (e) {}
+      document.dispatchEvent(new CustomEvent('themechange', { detail: { theme: next } }));
     };
-    if (window.matchMedia) {
-      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function (e) {
-        try {
-          if (!localStorage.getItem(KEY)) root.dataset.theme = e.matches ? 'dark' : 'light';
-        } catch (err) {}
-      });
-    }
   })();
   </script>
   <link rel="stylesheet" href="{% static 'css/app.css' %}">
   <script src="{% static 'vendor/htmx.min.js' %}"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <meta name="csrf-token" content="{{ csrf_token }}">
   {% block head %}{% endblock %}
 </head>
 <body>
+<div class="vui-ambient-glow vui-glow-blue" aria-hidden="true"></div>
+<div class="vui-ambient-glow vui-glow-purple" aria-hidden="true"></div>
 <a href="#main-content" class="skip-link">Skip to content</a>
 <div class="app-shell">
   <aside class="sidebar glass-sidebar">
@@ -68,6 +66,10 @@
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
         Feedback
       </a>
+      <a href="{% url 'notifications:list' %}" class="nav-link {% if active_nav == 'notifications' %}active{% endif %}">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        Notifications
+      </a>
     </nav>
 
     <div class="sidebar-footer">
@@ -87,13 +89,22 @@
 
   <div class="main">
     <header class="topbar glass-topbar">
-      <p class="topbar-title">{% block page_title %}{% endblock %}</p>
+      <div class="topbar-left">
+        <span class="topbar-breadcrumb">Altrium Tracker</span>
+        <p class="topbar-title">{% block page_title %}{% endblock %}</p>
+      </div>
+      <div class="topbar-center">
+        <label class="topbar-search" for="topbar-search-input">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="search" id="topbar-search-input" placeholder="Search candidates, jobs..." aria-label="Search" autocomplete="off">
+        </label>
+      </div>
       <div class="topbar-actions">
         {% include 'includes/theme_toggle.html' %}
         {% if user.is_authenticated %}
         <div class="notif-dropdown-wrapper">
           <button type="button" class="btn-icon" id="notif-trigger" aria-label="Notifications" aria-haspopup="true" aria-expanded="false" onclick="toggleNotifPopover(event)">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
             <span class="notif-badge">
               <span class="notif-count"
                     hx-get="{% url 'notifications:unread_count' %}"
@@ -116,6 +127,9 @@
             </div>
           </div>
         </div>
+        <span class="topbar-user-avatar" title="{{ user.get_full_name|default:user.username }}" aria-hidden="true">
+          {{ user.first_name|first|default:user.username|first|upper }}
+        </span>
         {% endif %}
       </div>
     </header>
@@ -149,7 +163,7 @@
 <script>
 (function() {
   // Attach the CSRF token to every HTMX request so POSTs work on any page,
-  // regardless of whether a {% raw %}{% csrf_token %}{% endraw %} input exists.
+  // regardless of whether a {% templatetag openblock %} csrf_token {% templatetag closeblock %} input exists.
   document.body.addEventListener('htmx:configRequest', function(e) {
     var token = document.querySelector('meta[name="csrf-token"]');
     if (token) e.detail.headers['X-CSRFToken'] = token.getAttribute('content');
