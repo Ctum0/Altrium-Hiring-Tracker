@@ -894,7 +894,8 @@ a:hover {
 .main-content.dashboard-single-screen .ref-feedback-col .ref-bar-track { height: 7px; border-radius: 9999px; margin-top: 2px; }
 
 .main-content.dashboard-single-screen .activity-timeline { flex: 1; overflow: hidden; }
-.main-content.dashboard-single-screen .activity-item { padding: var(--sp-2) 0; }
+.main-content.dashboard-single-screen .activity-item { padding: var(--sp-2) 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+.main-content.dashboard-single-screen .activity-item:last-child { border-bottom: none; }
 .main-content.dashboard-single-screen .activity-dot { width: var(--sp-2); height: var(--sp-2); }
 .main-content.dashboard-single-screen .activity-content { padding-bottom: var(--sp-1); }
 .main-content.dashboard-single-screen .activity-meta-row { margin-top: var(--sp-1); }
@@ -924,8 +925,8 @@ a:hover {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: var(--sp-1);
-  padding: var(--sp-2) var(--sp-3);
+  gap: 4px;
+  padding: var(--sp-2) var(--sp-3) 6px;
   border: 1px solid var(--glass-border);
   border-radius: var(--radius);
   background: var(--surface-2);
@@ -1006,6 +1007,60 @@ a:hover {
 .main-content.dashboard-single-screen .accent-bar-violet { background: var(--vui-violet-500); box-shadow: 0 0 6px var(--vui-violet-500); }
 .main-content.dashboard-single-screen .accent-bar-green { background: var(--status-hired); box-shadow: 0 0 6px var(--status-hired); }
 .main-content.dashboard-single-screen .accent-bar-amber { background: var(--status-pending); box-shadow: 0 0 6px var(--status-pending); }
+
+/* AI Insights — Enhanced type-specific internals */
+.main-content.dashboard-single-screen .ai-insight-card .ai-insight-body { gap: 1px; }
+
+/* Top Role — mini bar chart */
+.main-content.dashboard-single-screen .ai-mini-bars { display: flex; flex-direction: column; gap: 3px; margin-top: 1px; }
+.main-content.dashboard-single-screen .ai-mini-bar-row { display: grid; grid-template-columns: 1fr 44px 18px; align-items: center; gap: 5px; }
+.main-content.dashboard-single-screen .ai-mini-bar-label { font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.main-content.dashboard-single-screen .ai-mini-bar-track { height: 3px; border-radius: 9999px; background: rgba(255,255,255,0.06); overflow: hidden; }
+.main-content.dashboard-single-screen .ai-mini-bar-fill { height: 100%; border-radius: 9999px; transition: width 600ms ease; }
+.main-content.dashboard-single-screen .ai-mini-bar-count { font-size: 10px; font-weight: 700; color: var(--ink); text-align: right; font-variant-numeric: tabular-nums; }
+.main-content.dashboard-single-screen .ai-bar-blue { background: var(--brand); }
+.main-content.dashboard-single-screen .ai-bar-violet { background: var(--vui-violet-500); }
+.main-content.dashboard-single-screen .ai-bar-green { background: var(--status-hired); }
+.main-content.dashboard-single-screen .ai-bar-amber { background: var(--status-pending); }
+
+/* Best Fit — match score badge */
+.main-content.dashboard-single-screen .ai-fit-row { display: flex; align-items: baseline; gap: var(--sp-2); }
+.main-content.dashboard-single-screen .ai-fit-score { font-size: var(--text-micro); font-weight: 800; padding: 2px 7px; border-radius: var(--radius-pill); white-space: nowrap; }
+.main-content.dashboard-single-screen .ai-fit-violet { background: rgba(99, 102, 241, 0.18); color: var(--vui-violet-500); }
+.main-content.dashboard-single-screen .ai-fit-bar-wrap { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
+.main-content.dashboard-single-screen .ai-fit-bar-track { flex: 1; height: 6px; border-radius: 9999px; background: rgba(255,255,255,0.06); overflow: hidden; }
+.main-content.dashboard-single-screen .ai-fit-bar-fill { height: 100%; border-radius: 9999px; background: var(--vui-violet-500); transition: width 600ms ease; }
+.main-content.dashboard-single-screen .ai-fit-bar-label { font-size: 9px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; }
+
+/* Pipeline Health — stacked status bars */
+.main-content.dashboard-single-screen .ai-health-row { display: flex; align-items: baseline; gap: var(--sp-2); }
+.main-content.dashboard-single-screen .ai-health-badge { font-size: var(--text-micro); font-weight: 700; padding: 2px 7px; border-radius: var(--radius-pill); white-space: nowrap; }
+.main-content.dashboard-single-screen .ai-health-green { background: rgba(52, 211, 153, 0.18); color: var(--status-hired); }
+.main-content.dashboard-single-screen .ai-health-amber { background: rgba(245, 158, 11, 0.18); color: var(--status-pending); }
+.main-content.dashboard-single-screen .ai-health-bars { display: flex; flex-direction: column; gap: 3px; margin-top: 1px; }
+.main-content.dashboard-single-screen .ai-health-bar-row { display: grid; grid-template-columns: 5px 34px 1fr 16px; align-items: center; gap: 4px; }
+.main-content.dashboard-single-screen .ai-health-dot { width: 5px; height: 5px; border-radius: 50%; flex: none; }
+.main-content.dashboard-single-screen .ai-health-label { font-size: 10px; color: var(--muted); white-space: nowrap; }
+.main-content.dashboard-single-screen .ai-health-bar-track { height: 3px; border-radius: 9999px; background: rgba(255,255,255,0.06); overflow: hidden; }
+.main-content.dashboard-single-screen .ai-health-bar-fill { height: 100%; border-radius: 9999px; transition: width 600ms ease; }
+.main-content.dashboard-single-screen .ai-health-count { font-size: 10px; font-weight: 700; color: var(--ink); text-align: right; font-variant-numeric: tabular-nums; }
+
+/* At Risk — risk gauge */
+.main-content.dashboard-single-screen .ai-risk-row { display: flex; align-items: baseline; gap: var(--sp-2); }
+.main-content.dashboard-single-screen .ai-risk-badge { font-size: var(--text-micro); font-weight: 700; padding: 2px 7px; border-radius: var(--radius-pill); white-space: nowrap; }
+.main-content.dashboard-single-screen .ai-risk-green { background: rgba(52, 211, 153, 0.18); color: var(--status-hired); }
+.main-content.dashboard-single-screen .ai-risk-amber { background: rgba(245, 158, 11, 0.18); color: var(--status-pending); }
+.main-content.dashboard-single-screen .ai-risk-red { background: rgba(248, 113, 113, 0.18); color: var(--danger); }
+.main-content.dashboard-single-screen .ai-risk-gauge { margin-top: 2px; }
+.main-content.dashboard-single-screen .ai-risk-gauge-track { height: 4px; border-radius: 9999px; background: rgba(255,255,255,0.06); overflow: hidden; }
+.main-content.dashboard-single-screen .ai-risk-gauge-fill { height: 100%; border-radius: 9999px; background: var(--status-pending); transition: width 600ms ease; }
+.main-content.dashboard-single-screen .ai-risk-gauge-label { font-size: 9px; font-weight: 600; color: var(--muted); margin-top: 2px; display: block; }
+
+/* Light mode overrides for AI insight internals */
+[data-theme="light"] .main-content.dashboard-single-screen .ai-mini-bar-track,
+[data-theme="light"] .main-content.dashboard-single-screen .ai-fit-bar-track,
+[data-theme="light"] .main-content.dashboard-single-screen .ai-health-bar-track,
+[data-theme="light"] .main-content.dashboard-single-screen .ai-risk-gauge-track { background: rgba(0,0,0,0.06); }
 
 .main-content.wide {
   max-width: 100% !important;
