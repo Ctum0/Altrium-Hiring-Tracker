@@ -931,111 +931,103 @@ a:hover {
     grid-template-columns: 1fr;
   }
 }
-.main-content.dashboard-single-screen .ai-insight-card {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 10px 11px 8px;
-  border: 1px solid rgba(255,255,255,0.09);
-  border-radius: var(--radius);
-  background: linear-gradient(145deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.018) 45%, rgba(255,255,255,0.004) 100%), var(--surface-2);
-  backdrop-filter: blur(20px) saturate(140%);
-  -webkit-backdrop-filter: blur(20px) saturate(140%);
-  min-height: 0;
-  overflow: hidden;
-  box-shadow: 0 6px 22px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.06), inset 0 -1px 0 rgba(255,255,255,0.02);
-  transition: transform 200ms ease, border-color 200ms ease, box-shadow 200ms ease;
-}
-.main-content.dashboard-single-screen .ai-insight-card:hover {
-  transform: translateY(-2px);
-  border-color: rgba(255,255,255,0.14);
-  box-shadow: 0 10px 30px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.08), inset 0 -1px 0 rgba(255,255,255,0.03);
-}
+/* AI Insights — Insight Panel internals */
+.ai-panel-cat { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); display: flex; align-items: center; gap: 5px; margin-bottom: 2px; }
+.ai-cat-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+.ai-cat-blue { background: var(--brand); }
+.ai-cat-violet { background: var(--vui-violet-500); }
+.ai-cat-green { background: var(--status-hired); }
+.ai-cat-amber { background: var(--status-pending); }
+.ai-cat-red { background: var(--danger); }
 
-/* Top row: label cluster + ring/badge */
-.ai-top-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; }
-.ai-label-cluster { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
-.ai-tiny-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ai-hero-value { font-size: 13.5px; font-weight: 800; color: var(--ink); line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -0.01em; }
-.ai-hero-unit { font-size: 10px; font-weight: 600; color: var(--muted); }
+.ai-panel-finding { font-size: 12px; font-weight: 800; color: var(--ink); line-height: 1.2; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px; }
+.ai-finding-sm { font-size: 10.5px; font-weight: 700; }
 
-/* Circular ring indicator */
-.ai-ring-wrap { position: relative; width: 36px; height: 36px; flex-shrink: 0; }
-.ai-ring { width: 36px; height: 36px; }
-.ai-ring-text { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; color: var(--ink); }
-.ai-ring-text-violet { color: var(--vui-violet-500); }
-.ai-ring-violet .ai-ring circle:nth-child(2) { stroke: var(--vui-violet-500); }
-.ai-ring-strong .ai-ring circle:nth-child(2) { stroke: var(--status-hired); }
-.ai-ring-ok .ai-ring circle:nth-child(2) { stroke: var(--status-pending); }
-.ai-ring-weak .ai-ring circle:nth-child(2) { stroke: var(--danger); }
+.ai-panel-score-row { display: flex; align-items: baseline; gap: 5px; flex-wrap: wrap; }
+.ai-panel-score-num { font-size: 16px; font-weight: 800; line-height: 1; }
+.ai-text-blue { color: var(--brand); }
+.ai-text-violet { color: var(--vui-violet-500); }
+.ai-text-strong { color: var(--status-hired); }
+.ai-text-ok { color: var(--status-pending); }
+.ai-text-weak { color: var(--danger); }
+.ai-panel-score-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+.ai-panel-evidence { font-size: 10px; font-weight: 500; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
+.ai-evidence-sm { display: block; font-size: 10px; margin-top: 1px; }
 
-/* Support line */
-.ai-support-line { font-size: 10px; font-weight: 500; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; }
-.ai-support-violet { color: rgba(129, 140, 248, 0.85); }
+/* Sparkline */
+.ai-sparkline { height: 24px; margin: 2px 0; }
+.ai-sparkline svg { width: 100%; height: 100%; }
 
-/* Chips */
-.ai-chip-row { display: flex; flex-wrap: wrap; gap: 3px; }
-.ai-chip { font-size: 8.5px; font-weight: 700; padding: 1.5px 5px; border-radius: 9999px; background: rgba(34, 211, 238, 0.12); color: var(--brand); white-space: nowrap; }
-.ai-chip-blue { background: rgba(34, 211, 238, 0.12); color: var(--brand); }
-.ai-chip-violet { background: rgba(129, 140, 248, 0.14); color: var(--vui-violet-500); }
+/* Panel bars (replaces old mini-bars) */
+.ai-panel-bars { display: flex; flex-direction: column; gap: 3px; }
+.ai-bar-row { display: grid; grid-template-columns: 1fr 40px 16px; align-items: center; gap: 4px; }
+.ai-bar-label { font-size: 9.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ai-bar-track { height: 3px; border-radius: 9999px; background: rgba(255,255,255,0.06); overflow: hidden; }
+.ai-bar-fill { height: 100%; border-radius: 9999px; transform-origin: left; transition: transform 600ms ease; }
+.ai-fill-blue { background: var(--brand); }
+.ai-fill-violet { background: var(--vui-violet-500); }
+.ai-fill-green { background: var(--status-hired); }
+.ai-fill-amber { background: var(--status-pending); }
+.ai-bar-val { font-size: 9.5px; font-weight: 700; color: var(--ink); text-align: right; font-variant-numeric: tabular-nums; }
 
-/* Advice line */
-.ai-advice { border-top: 1px solid rgba(255,255,255,0.05); padding-top: 3px; margin-top: auto; }
-.ai-advice-why { font-size: 9px; font-weight: 600; font-style: italic; color: var(--muted); line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
-.ai-advice-blue .ai-advice-why { color: rgba(34, 211, 238, 0.8); }
-.ai-advice-violet .ai-advice-why { color: rgba(129, 140, 248, 0.85); }
-.ai-advice-green .ai-advice-why { color: rgba(52, 211, 153, 0.9); }
-.ai-advice-amber .ai-advice-why { color: rgba(245, 158, 11, 0.9); }
-.ai-advice-red .ai-advice-why { color: rgba(248, 113, 113, 0.9); }
-[data-theme="light"] .main-content.dashboard-single-screen .ai-advice { border-top-color: rgba(0,0,0,0.06); }
+/* Skill chips */
+.ai-skill-row { display: flex; gap: 3px; margin-top: 1px; }
+.ai-skill { font-size: 8.5px; font-weight: 700; padding: 1.5px 5px; border-radius: 9999px; background: rgba(34, 211, 238, 0.12); color: var(--brand); white-space: nowrap; }
+.ai-skill-blue { background: rgba(34, 211, 238, 0.12); color: var(--brand); }
+.ai-skill-violet { background: rgba(129, 140, 248, 0.14); color: var(--vui-violet-500); }
 
-/* Mini bars */
-.main-content.dashboard-single-screen .ai-mini-bars { display: flex; flex-direction: column; gap: 3px; }
-.main-content.dashboard-single-screen .ai-mini-bar-row { display: grid; grid-template-columns: 1fr 42px 16px; align-items: center; gap: 4px; }
-.main-content.dashboard-single-screen .ai-mini-bar-label { font-size: 9.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.main-content.dashboard-single-screen .ai-mini-bar-track { height: 3px; border-radius: 9999px; background: rgba(255,255,255,0.06); overflow: hidden; }
-.main-content.dashboard-single-screen .ai-mini-bar-fill { height: 100%; border-radius: 9999px; transform-origin: left; transition: transform 600ms ease; }
-.main-content.dashboard-single-screen .ai-mini-bar-count { font-size: 9.5px; font-weight: 700; color: var(--ink); text-align: right; font-variant-numeric: tabular-nums; }
-.main-content.dashboard-single-screen .ai-bar-blue { background: var(--brand); }
-.main-content.dashboard-single-screen .ai-bar-violet { background: var(--vui-violet-500); }
-.main-content.dashboard-single-screen .ai-bar-green { background: var(--status-hired); }
-.main-content.dashboard-single-screen .ai-bar-amber { background: var(--status-pending); }
+/* Skill factors (Best Fit card) */
+.ai-factors { display: flex; flex-direction: column; gap: 3px; }
+.ai-factor-row { display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 4px; }
+.ai-factor-name { font-size: 9.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ai-factor-track { height: 3px; border-radius: 9999px; background: rgba(255,255,255,0.06); overflow: hidden; }
+.ai-factor-fill { height: 100%; border-radius: 9999px; transform-origin: left; transition: transform 600ms ease; }
 
-/* Health bars */
-.main-content.dashboard-single-screen .ai-health-bars { display: flex; flex-direction: column; gap: 3px; }
-.main-content.dashboard-single-screen .ai-health-bar-row { display: grid; grid-template-columns: 5px 32px 1fr 14px; align-items: center; gap: 4px; }
-.main-content.dashboard-single-screen .ai-health-dot { width: 5px; height: 5px; border-radius: 50%; flex: none; }
-.main-content.dashboard-single-screen .ai-health-label { font-size: 9.5px; color: var(--muted); white-space: nowrap; }
-.main-content.dashboard-single-screen .ai-health-bar-track { height: 3px; border-radius: 9999px; background: rgba(255,255,255,0.06); overflow: hidden; }
-.main-content.dashboard-single-screen .ai-health-bar-fill { height: 100%; border-radius: 9999px; transform-origin: left; transition: transform 600ms ease; }
-.main-content.dashboard-single-screen .ai-health-count { font-size: 9.5px; font-weight: 700; color: var(--ink); text-align: right; font-variant-numeric: tabular-nums; }
-.ai-hero-health { line-height: 1.1; }
-.ai-hero-health.ai-health-strong { color: var(--status-hired); }
-.ai-hero-health.ai-health-ok { color: var(--status-pending); }
-.ai-hero-health.ai-health-weak { color: var(--danger); }
+/* Stage flow (Health card) */
+.ai-flow { display: flex; align-items: center; gap: 3px; flex-wrap: wrap; margin: 3px 0; }
+.ai-flow-stage { font-size: 9px; font-weight: 600; padding: 1.5px 5px; border-radius: var(--radius-sm); background: rgba(255,255,255,0.04); color: var(--muted); white-space: nowrap; }
+.ai-flow-bottleneck { background: rgba(248, 113, 113, 0.15); color: var(--danger); border: 1px solid rgba(248, 113, 113, 0.2); }
+.ai-flow-arrow { font-size: 10px; color: rgba(255,255,255,0.2); }
 
-/* Risk badge + gauge */
-.ai-risk-badge { font-size: 9px; font-weight: 800; padding: 2px 7px; border-radius: var(--radius-pill); white-space: nowrap; flex-shrink: 0; line-height: 1.3; }
+/* Health mini counts */
+.ai-health-mini-bars { display: flex; flex-direction: column; gap: 2px; }
+.ai-mini-row { display: flex; align-items: center; gap: 5px; }
+.ai-mini-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+.ai-mini-lbl { font-size: 9px; color: var(--muted); min-width: 30px; }
+.ai-mini-val { font-size: 9px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+/* Risk level badge */
+.ai-risk-level { font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: var(--radius-pill); display: inline-block; margin-bottom: 2px; }
 .ai-risk-green { background: rgba(52, 211, 153, 0.18); color: var(--status-hired); }
 .ai-risk-amber { background: rgba(245, 158, 11, 0.18); color: var(--status-pending); }
 .ai-risk-red { background: rgba(248, 113, 113, 0.18); color: var(--danger); }
-.main-content.dashboard-single-screen .ai-risk-gauge { position: relative; }
-.main-content.dashboard-single-screen .ai-risk-gauge-track { height: 4px; border-radius: 9999px; background: rgba(255,255,255,0.06); overflow: hidden; position: relative; }
-.main-content.dashboard-single-screen .ai-risk-gauge-fill { height: 100%; border-radius: 9999px; transform-origin: left; transition: transform 600ms ease; }
-.ai-risk-gauge-fill.tone-green { background: var(--status-hired); }
-.ai-risk-gauge-fill.tone-amber { background: var(--status-pending); }
-.ai-risk-gauge-fill.tone-red { background: var(--danger); }
-.ai-risk-gauge-segments { display: flex; gap: 3px; margin-top: 2px; }
-.ai-risk-gauge-segments span { flex: 1; height: 1.5px; border-radius: 9999px; background: rgba(255,255,255,0.04); }
+
+/* Risk meter */
+.ai-risk-meter { margin: 3px 0; }
+.ai-risk-meter-track { height: 4px; border-radius: 9999px; background: rgba(255,255,255,0.06); overflow: hidden; }
+.ai-risk-meter-fill { height: 100%; border-radius: 9999px; transform-origin: left; transition: transform 600ms ease; }
+.ai-risk-meter-fill.tone-green { background: var(--status-hired); }
+.ai-risk-meter-fill.tone-amber { background: var(--status-pending); }
+.ai-risk-meter-fill.tone-red { background: var(--danger); }
+
+/* Action line */
+.ai-panel-action { font-size: 9px; font-weight: 700; margin-top: auto; padding-top: 3px; border-top: 1px solid rgba(255,255,255,0.05); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ai-action-blue { color: rgba(34, 211, 238, 0.85); }
+.ai-action-violet { color: rgba(129, 140, 248, 0.9); }
+.ai-action-green { color: rgba(52, 211, 153, 0.9); }
+.ai-action-amber { color: rgba(245, 158, 11, 0.9); }
+.ai-action-red { color: rgba(248, 113, 113, 0.9); }
 
 /* Light mode */
 [data-theme="light"] .main-content.dashboard-single-screen .ai-insight-card { background: linear-gradient(145deg, rgba(255,255,255,0.84) 0%, rgba(255,255,255,0.52) 100%), var(--surface-2); border-color: rgba(0,0,0,0.06); box-shadow: 0 6px 22px rgba(0,0,0,0.09), inset 0 1px 0 rgba(255,255,255,0.98); }
 [data-theme="light"] .main-content.dashboard-single-screen .ai-insight-card:hover { box-shadow: 0 10px 30px rgba(0,0,0,0.14), inset 0 1px 0 rgba(255,255,255,0.98); }
-[data-theme="light"] .main-content.dashboard-single-screen .ai-mini-bar-track,
-[data-theme="light"] .main-content.dashboard-single-screen .ai-health-bar-track,
-[data-theme="light"] .main-content.dashboard-single-screen .ai-risk-gauge-track { background: rgba(0,0,0,0.06); }
-[data-theme="light"] .main-content.dashboard-single-screen .ai-ring circle:first-child { stroke: rgba(0,0,0,0.06); }
+[data-theme="light"] .main-content.dashboard-single-screen .ai-bar-track,
+[data-theme="light"] .main-content.dashboard-single-screen .ai-factor-track,
+[data-theme="light"] .main-content.dashboard-single-screen .ai-risk-meter-track { background: rgba(0,0,0,0.06); }
+[data-theme="light"] .ai-panel-action { border-top-color: rgba(0,0,0,0.06); }
+[data-theme="light"] .ai-flow-arrow { color: rgba(0,0,0,0.2); }
+[data-theme="light"] .ai-flow-stage { background: rgba(0,0,0,0.04); }
+
 
 .main-content.wide {
   max-width: 100% !important;

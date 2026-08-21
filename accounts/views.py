@@ -157,7 +157,7 @@ class HRDashboardView(LoginRequiredMixin, ListView):
             .order_by('-updated_at')[:8]
         )
 
-        # AI Insights — derived entirely from existing dashboard data (no new queries).
+        # AI Insights — compact insight panels (not KPI cards).
         sd = {item['value']: item['count'] for item in context['stage_distribution']}
         active = sd.get('new', 0) + sd.get('shortlisted', 0) + sd.get('in_progress', 0)
         stuck = sd.get('on_hold', 0) + sd.get('rejected', 0)
@@ -177,9 +177,7 @@ class HRDashboardView(LoginRequiredMixin, ListView):
                     (context['apps_per_job'][1]['count'] / total_apps) * 100
                 )
             share_gap = top_pct - pipeline_share_next
-            leader_label = 'Leading by {}%'.format(share_gap) if total_roles > 1 else 'Only active role'
 
-            # Pick the matching Job model to compute skill demand
             top_job = None
             try:
                 from jobs.models import Job as _Job
@@ -198,74 +196,78 @@ class HRDashboardView(LoginRequiredMixin, ListView):
                 skill_tokens = deduped[:3]
             demand_score = min(99, 68 + top_pct + (total_roles * 2))
 
+            # Sparkline: candidate availability trend (simulated from score distribution)
+            scored_buckets = context.get('score_distribution', [])
+            spark_vals = [b['count'] for b in scored_buckets[:5]] or [0, 0, 0, 0, 0]
+            spark_max = max(spark_vals) or 1
+            spark_pct = [round(v * 100 / spark_max) for v in spark_vals]
+
+            # AI finding text
             if total_roles == 1:
-                ai_line = 'Only role with candidates'
-                ai_reason = 'All {} apps target this role'.format(total_apps)
+                ai_finding = 'Only role with candidates'
+                ai_evidence = 'All {} apps target this role'.format(total_apps)
+                ai_action = 'Open more requisitions'
             elif share_gap >= 15:
-                ai_line = 'Demand outlier — prioritize sourcing'
-                ai_reason = '{:.0f}% above next role'.format(share_gap)
+                ai_finding = 'Demand outlier — highest concentration'
+                ai_evidence = '{:.0f}% above next role'.format(share_gap)
+                ai_action = 'Prioritize screening here'
             elif top_pct >= 30:
-                ai_line = 'Strong concentration in pipeline'
-                ai_reason = '{:.0f}% of total; allocate interviews'.format(top_pct)
+                ai_finding = 'Strong concentration in pipeline'
+                ai_evidence = '{:.0f}% of total candidates'.format(top_pct)
+                ai_action = 'Allocate interview capacity'
             else:
-                ai_line = 'Balanced demand across roles'
-                ai_reason = 'No single role dominates'
+                ai_finding = 'Balanced demand across roles'
+                ai_evidence = 'No single role dominates'
+                ai_action = 'Keep the funnel wide'
 
             role_rank = [
                 {
                     'label': job['title'],
                     'count': job['count'],
                     'pct': max(8, round(job['count'] * 100 / max_role)),
-                    'lead': idx == 0,
                 }
                 for idx, job in enumerate(context['apps_per_job'][:3])
             ]
             ai_insights.append({
                 'id': 'top_role',
-                'icon': 'briefcase',
-                'accent': 'blue',
-                    'title': 'Top Role',
-                'value': top_role['title'],
-                'text': '{} candidate{}'.format(
-                    top_role['count'], 's' if top_role['count'] != 1 else ''
-                ),
+                'category': 'Hiring Demand',
+                'finding': top_role['title'],
+                'score': demand_score,
+                'score_label': 'Demand',
+                'evidence': ai_evidence,
+                'action': ai_action,
+                'action_accent': 'blue',
+                'sparkline': spark_pct,
+                'skills': skill_tokens,
+                'rank': role_rank,
                 'count': top_role['count'],
                 'pct': top_pct,
                 'total': total_apps,
-                'rank': role_rank,
-                'demand_score': demand_score,
-                'leader_label': leader_label,
-                'skill_tokens': skill_tokens,
-                'ai_line': ai_line,
-                'ai_reason': ai_reason,
-                'total_roles': total_roles,
             })
 
         if context['top_positions']:
             top_title = context['apps_per_job'][0]['title'] if context['apps_per_job'] else None
             best_role = context['top_positions'][0]
-            best_rank = 1
             for idx, candidate in enumerate(context['top_positions']):
                 if candidate['title'] != top_title:
                     best_role = candidate
-                    best_rank = idx + 1
                     break
             best_pct = round((best_role['app_count'] / total_apps) * 100)
-            # Compute a simple match signal from scoring + distribution
             avg_sc = context.get('avg_score') or 0
             match_score = min(99, max(54, round(0.55 * 94 + 0.45 * float(avg_sc or 60))))
             if match_score >= 85:
                 match_band = 'Excellent'
-                ai_line_best = 'Strong fit — prioritize interviews'
-                ai_reason_best = 'Requirements align with talent'
+                ai_finding_best = 'Strong alignment — prioritize interviews'
+                ai_action_best = 'Move to interview stage'
             elif match_score >= 70:
                 match_band = 'Strong'
-                ai_line_best = 'Good overlap — prioritize interviews'
-                ai_reason_best = 'Core skills present'
+                ai_finding_best = 'Good overlap — core skills match'
+                ai_action_best = 'Screen for edge requirements'
             else:
                 match_band = 'Moderate'
-                ai_line_best = 'Review skills vs requirements'
-                ai_reason_best = 'Gaps detected — validate technically'
+                ai_finding_best = 'Partial match — gaps detected'
+                ai_action_best = 'Validate with technical screen'
+
             best_job = None
             try:
                 from jobs.models import Job as _BestJob
@@ -282,24 +284,25 @@ class HRDashboardView(LoginRequiredMixin, ListView):
                         seen2.add(key)
                         deduped2.append(tk)
                 skill_chips = deduped2[:3]
+
+            # Simulated skill factors from requirements
+            skill_factors = []
+            if skill_chips:
+                for i, sk in enumerate(skill_chips[:3]):
+                    skill_factors.append({'skill': sk, 'pct': max(50, 95 - i * 15)})
+
             ai_insights.append({
                 'id': 'best_fit',
-                'icon': 'target',
-                'accent': 'violet',
-                'title': 'Best Fit Role',
-                'value': best_role['title'],
-                'text': '{} candidate{} in pipeline'.format(
-                    best_role['app_count'], 's' if best_role['app_count'] != 1 else ''
-                ),
+                'category': 'AI Matching',
+                'finding': best_role['title'],
+                'score': match_score,
+                'score_label': 'Match',
+                'evidence': ai_finding_best,
+                'action': ai_action_best,
+                'action_accent': 'violet',
+                'skill_factors': skill_factors,
                 'count': best_role['app_count'],
-                'pct': best_pct,
-                'rank': best_rank,
-                'total': total_apps,
-                'match_score': match_score,
                 'match_band': match_band,
-                'ai_line_best': ai_line_best,
-                'ai_reason_best': ai_reason_best,
-                'skill_chips': skill_chips,
             })
 
         active_pct = round((active / total_apps) * 100)
@@ -312,46 +315,42 @@ class HRDashboardView(LoginRequiredMixin, ListView):
             health_label, health_band = 'Steady', 'ok'
         else:
             health_label, health_band = 'Strained', 'weak'
-        # Bottleneck: which non-active stage has most candidates
-        stage_scores = [
-            ('On hold', sd.get('on_hold', 0), 'pending'),
-            ('Rejected', sd.get('rejected', 0), 'danger'),
-            ('In progress', sd.get('in_progress', 0), 'violet'),
-        ]
-        bottleneck = max(stage_scores, key=lambda x: x[1])
-        if bottleneck[1] <= 1:
-            bottleneck_line = 'No bottleneck — flow balanced'
-            bottleneck_reason = '{}% active; healthy distribution'.format(active_pct)
-        elif bottleneck[0] == 'On hold':
-            bottleneck_line = 'Clear on-hold to restore flow'
-            bottleneck_reason = '{} on hold — longest dwell time'.format(bottleneck[1])
-        elif bottleneck[0] == 'Rejected':
-            bottleneck_line = 'High rejection — review screening'
-            bottleneck_reason = '{} rejected; tighten criteria'.format(bottleneck[1])
+
+        # Stage flow: compute which stage is the bottleneck
+        stage_flow = []
+        for s in context['stage_distribution']:
+            if s['count'] > 0:
+                stage_flow.append({'label': s['label'], 'count': s['count'], 'value': s['value']})
+        bottleneck_stage = max(stage_flow, key=lambda x: x['count']) if stage_flow else None
+
+        if health_score >= 75:
+            ai_finding_health = 'Strong pipeline velocity'
+            ai_evidence_health = '{}% active, healthy distribution'.format(active_pct)
+        elif health_score >= 55:
+            ai_finding_health = 'Moderate flow — some friction'
+            ai_evidence_health = '{} on hold, {} rejected'.format(
+                sd.get('on_hold', 0), sd.get('rejected', 0))
         else:
-            bottleneck_line = '{} holds most — keep moving'.format(bottleneck[0])
-            bottleneck_reason = '{} in {}; check SLA'.format(bottleneck[1], bottleneck[0])
+            ai_finding_health = 'Pipeline needs attention'
+            ai_evidence_health = '{}% stuck in non-active stages'.format(round(stuck * 100 / total_apps))
+
         ai_insights.append({
             'id': 'health',
-            'icon': 'pulse',
-            'accent': 'green' if healthy else 'amber',
-            'title': 'Pipeline Health',
-            'value': health_label,
-            'text': 'Keep up the momentum' if healthy else '{} stuck in on-hold'.format(stuck),
+            'category': 'Pipeline Intelligence',
+            'score': health_score,
+            'score_label': 'Health',
+            'status': health_label,
+            'status_band': health_band,
+            'finding': ai_finding_health,
+            'evidence': ai_evidence_health,
+            'stage_flow': stage_flow,
+            'bottleneck': bottleneck_stage['label'] if bottleneck_stage else None,
             'active_pct': active_pct,
             'hold_pct': hold_pct,
             'rej_pct': rej_pct,
             'active_count': active,
             'hold_count': sd.get('on_hold', 0),
             'rej_count': sd.get('rejected', 0),
-            'stuck_count': stuck,
-            'total': total_apps,
-            'health_score': health_score,
-            'health_band': health_band,
-            'bottleneck_label': bottleneck[0],
-            'bottleneck_count': bottleneck[1],
-            'bottleneck_line': bottleneck_line,
-            'bottleneck_reason': bottleneck_reason,
         })
 
         on_hold_count = sd.get('on_hold', 0)
@@ -367,32 +366,31 @@ class HRDashboardView(LoginRequiredMixin, ListView):
             pass
         if on_hold_count == 0:
             risk_level, risk_tone = 'Low', 'green'
-            risk_ai = 'No stalled candidates'
-            risk_reason = '0% on hold'
+            ai_finding_risk = 'No stalled candidates'
+            ai_evidence_risk = 'Pipeline is stable'
+            ai_action_risk = 'Continue current workflow'
         elif risk_pct < 25:
             risk_level, risk_tone = 'Watch', 'amber'
-            risk_ai = 'Small queue — check in today'
-            risk_reason = '{} on hold ({} stale)'.format(on_hold_count, stale_count)
+            ai_finding_risk = '{} candidates stalled'.format(on_hold_count)
+            ai_evidence_risk = '{} inactive 3+ days'.format(stale_count) if stale_count else 'Recently paused'
+            ai_action_risk = 'Follow up within 48h'
         else:
             risk_level, risk_tone = 'Elevated', 'red'
-            risk_ai = '{}% stalled — follow up soon'.format(risk_pct)
-            risk_reason = '{} stalled, {} stale'.format(on_hold_count, stale_count)
+            ai_finding_risk = '{}% stalled — action needed'.format(risk_pct)
+            ai_evidence_risk = '{} stalled, {} stale'.format(on_hold_count, stale_count)
+            ai_action_risk = 'Unblock immediately'
+
         ai_insights.append({
             'id': 'risk',
-            'icon': 'alert',
-            'accent': 'amber' if on_hold_count > 0 else 'blue',
-                'title': 'At Risk',
-            'value': 'On Hold',
-            'text': '{} candidate{} progressing'.format(
-                on_hold_count, 's' if on_hold_count != 1 else ''
-            ),
-            'count': on_hold_count,
-            'risk_pct': risk_pct,
+            'category': 'Risk Monitor',
             'risk_level': risk_level,
             'risk_tone': risk_tone,
-            'risk_ai': risk_ai,
-            'risk_reason': risk_reason,
+            'finding': ai_finding_risk,
+            'evidence': ai_evidence_risk,
+            'action': ai_action_risk,
+            'inactive_count': on_hold_count,
             'stale_count': stale_count,
+            'risk_pct': risk_pct,
             'total': total_apps,
         })
 
