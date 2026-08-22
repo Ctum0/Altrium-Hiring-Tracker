@@ -829,7 +829,7 @@ html.dashboard-page, body.dashboard-page {
 }
 
 .main-content.dashboard-single-screen {
-  padding: 10px 24px 10px 24px !important;
+  padding: 8px 24px 8px 24px !important;
   overflow: hidden !important;
   overflow-y: hidden !important;
   overflow-x: hidden !important;
@@ -843,14 +843,20 @@ html.dashboard-page, body.dashboard-page {
   flex: 1 !important;
   min-height: 0 !important;
   overflow: hidden !important;
-  overflow-y: hidden !important;
 }
 
 .main-content.dashboard-single-screen .ref-dash-col {
   min-height: 0 !important;
   height: 100% !important;
-  overflow: hidden !important;
-  overflow-y: hidden !important;
+  overflow-y: auto !important;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+.main-content.dashboard-single-screen .ref-dash-col::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 
 /* ===== HR Dashboard single-screen density (4pt scale, compact but rhythmized) ===== */
