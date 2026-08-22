@@ -826,8 +826,32 @@ a:hover {
 
 @media (min-width: 1024px) {
   .main-content.dashboard-single-screen {
-    padding: 14px 24px 14px 24px !important;
-    overflow-y: auto;
+    padding: 12px 24px 12px 24px !important;
+    overflow: hidden !important;
+    height: calc(100vh - 60px) !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+  .main-content.dashboard-single-screen .ref-dash-grid {
+    flex: 1 !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+  .main-content.dashboard-single-screen .ref-dash-col {
+    min-height: 0 !important;
+    height: 100% !important;
+    overflow-y: auto !important;
+    padding-right: 4px !important;
+  }
+  .main-content.dashboard-single-screen .ref-dash-col::-webkit-scrollbar {
+    width: 4px;
+  }
+  .main-content.dashboard-single-screen .ref-dash-col::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.18);
+    border-radius: 9999px;
+  }
+  [data-theme="light"] .main-content.dashboard-single-screen .ref-dash-col::-webkit-scrollbar-thumb {
+    background: rgba(10, 33, 56, 0.18);
   }
 }
 
