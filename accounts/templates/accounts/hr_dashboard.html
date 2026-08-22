@@ -90,6 +90,7 @@
         <div class="seg-control" role="tablist" aria-label="Analytics view" id="analytics-tablist">
           <button type="button" role="tab" aria-selected="true" aria-controls="panel-trend" id="tab-btn-trend" class="seg-btn active" tabindex="0" onclick="switchMainChart('trend')">By Stage</button>
           <button type="button" role="tab" aria-selected="false" aria-controls="panel-score" id="tab-btn-score" class="seg-btn" tabindex="-1" onclick="switchMainChart('score')">Scores</button>
+          <button type="button" role="tab" aria-selected="false" aria-controls="panel-ai" id="tab-btn-ai" class="seg-btn" tabindex="-1" onclick="switchMainChart('ai')">AI Insights</button>
         </div>
       </div>
 
@@ -115,272 +116,63 @@
             </tbody>
           </table>
         </div>
-      </div>
-    </div>
-
-    <!-- Dual Metric Cards Side-by-Side (Breakdown & Feedback) -->
-    <div class="ref-metric-duo">
-
-      <!-- Pipeline Velocity & Escalation Monitor -->
-      <div class="panel panel-pad ref-card">
-        <div class="ref-card-header">
-          <h3 class="ref-card-title">Pipeline Velocity</h3>
-          <span class="text-xs text-muted">7-day monitor</span>
-        </div>
-        <div class="ref-velocity-list">
-          <div class="ref-velocity-item">
-            <div class="velocity-meta">
-              <span class="velocity-label">Screening Avg Time</span>
-              <span class="velocity-val mono">{{ velocity_screening }} days</span>
-            </div>
-            <div class="velocity-bar-track">
-              <div class="velocity-bar-fill fill-blue" style="width: 45%;"></div>
-            </div>
-          </div>
-          <div class="ref-velocity-item">
-            <div class="velocity-meta">
-              <span class="velocity-label">Interview Stage Avg</span>
-              <span class="velocity-val mono">{{ velocity_interview }} days</span>
-            </div>
-            <div class="velocity-bar-track">
-              <div class="velocity-bar-fill fill-amber" style="width: 72%;"></div>
-            </div>
-          </div>
-          <div class="ref-velocity-item">
-            <div class="velocity-meta">
-              <span class="velocity-label">Offer SLA Pace</span>
-              <span class="velocity-val mono text-success">{{ velocity_offer }} days</span>
-            </div>
-            <div class="velocity-bar-track">
-              <div class="velocity-bar-fill fill-green" style="width: 30%;"></div>
-            </div>
-          </div>
-          <div class="ref-velocity-flag">
-            <span class="flag-dot {% if stalled_count > 0 %}dot-amber{% else %}dot-green{% endif %}"></span>
-            <span class="flag-text">{{ stalled_count }} candidate{{ stalled_count|pluralize }} stalled over 7 days</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Feedback Turnaround -->
-      <div class="panel panel-pad ref-card ref-card-stack">
-        <div class="ref-card-header">
-          <h3 class="ref-card-title">Feedback Completion</h3>
-          <a href="{% url 'feedback:list' %}" class="text-xs ref-card-link">Details &rarr;</a>
-        </div>
-        <div class="ref-feedback-analytics">
-          <div class="ref-feedback-col">
-            <div class="feedback-metric-head">
-              <span class="ref-feedback-num text-success">{{ feedback_submitted }}</span>
-              <span class="feedback-pct text-success">{% widthratio feedback_submitted total_feedback|default:1 100 %}%</span>
-            </div>
-            <span class="ref-feedback-label">Completed</span>
-            <div class="ref-bar-track">
-              <div class="ref-bar-fill bar-glass-hired" style="width:{% widthratio feedback_submitted total_feedback|default:1 100 %}%"></div>
-            </div>
-          </div>
-          <div class="ref-feedback-col">
-            <div class="feedback-metric-head">
-              <span class="ref-feedback-num text-pending">{{ feedback_pending }}</span>
-              <span class="feedback-pct text-pending">{% widthratio feedback_pending total_feedback|default:1 100 %}%</span>
-            </div>
-            <span class="ref-feedback-label">Pending</span>
-            <div class="ref-bar-track">
-              <div class="ref-bar-fill bar-glass-pending" style="width:{% widthratio feedback_pending total_feedback|default:1 100 %}%"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-    </div>
-
-    <!-- AI Insights / Pipeline Intelligence -->
-    <div class="panel panel-pad ref-card ref-card-stack ai-insights">
-      <div class="ref-card-header">
-        <h3 class="ref-card-title">AI Insights</h3>
-        <a href="{% url 'candidates:list' %}" class="text-xs ref-card-link">View all insights &rarr;</a>
-      </div>
-      <div class="ai-insights-grid">
-        {% for insight in ai_insights %}
-        <div class="ai-insight-card ai-insight-{{ insight.id }}">
-
-          {% if insight.id == 'top_role' %}
-          <!-- Section 1: Insight Header -->
-          <div class="ai-card-sec-head">
-            <span class="ai-sec-icon" aria-hidden="true">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ai-head-svg"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
-            </span>
-            <span class="ai-sec-cat">Hiring Demand</span>
-          </div>
-
-          <!-- Section 2: Main Finding -->
-          <div class="ai-card-sec-finding">
-            <h4 class="ai-main-title" title="{{ insight.finding }}">{{ insight.finding }}</h4>
-            <div class="ai-sub-score"><span class="ai-score-label">Demand Score:</span> <span class="ai-score-val ai-text-blue">{{ insight.demand_score }}%</span></div>
-          </div>
-
-          <!-- Section 3: Supporting Intelligence -->
-          <div class="ai-card-sec-intel">
-            <div class="ai-intel-text"><span class="ai-intel-dot ai-dot-blue"></span>{{ insight.ai_finding }}</div>
-            {% if insight.skills %}
-            <div class="ai-skills-detected">
-              <span class="ai-skills-label">Skills detected:</span>
-              <div class="ai-skill-chips">
-                {% for s in insight.skills %}
-                <span class="ai-skill-chip ai-skill-blue">{{ s }}</span>
-                {% endfor %}
+        <div role="tabpanel" id="panel-ai" aria-labelledby="tab-btn-ai" tabindex="0" hidden style="height:100%;overflow-y:auto;padding-right:2px">
+          <div class="ai-insights-grid" style="display:grid;grid-template-columns:repeat(2, 1fr);gap:8px">
+            {% for insight in ai_insights %}
+            <div class="ai-insight-card ai-insight-{{ insight.id }}" style="padding:10px 12px">
+              {% if insight.id == 'top_role' %}
+              <div class="ai-card-sec-head">
+                <span class="ai-sec-icon" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg></span>
+                <span class="ai-sec-cat">Hiring Demand</span>
               </div>
-            </div>
-            {% endif %}
-          </div>
-
-          <!-- Section 4: Visualization (Candidate Distribution Bars) -->
-          <div class="ai-card-sec-vis">
-            <div class="ai-vis-header">Candidate distribution:</div>
-            <div class="ai-dist-bars">
-              {% for item in insight.distribution %}
-              <div class="ai-dist-row">
-                <span class="ai-dist-label" title="{{ item.label }}">{{ item.label }}</span>
-                <div class="ai-dist-track"><div class="ai-dist-fill ai-fill-blue" style="width: {{ item.pct }}%;"></div></div>
-                <span class="ai-dist-val">{{ item.count }}</span>
+              <div class="ai-card-sec-finding">
+                <h4 class="ai-main-title">{{ insight.finding }}</h4>
+                <div class="ai-sub-score"><span class="ai-score-label">Demand Score:</span> <span class="ai-score-val ai-text-blue">{{ insight.demand_score }}%</span></div>
               </div>
-              {% endfor %}
-            </div>
-          </div>          <!-- Action Line -->
-          <div class="ai-card-action ai-action-blue">
-            <span class="ai-action-lbl">Action:</span> <a href="{% url 'candidates:list' %}?job_role=Senior+Backend+Engineer" class="ai-action-link">{{ insight.recommendation }} &rarr;</a>
-          </div>
-
-          {% elif insight.id == 'best_fit' %}
-          <!-- Section 1: Insight Header -->
-          <div class="ai-card-sec-head">
-            <span class="ai-sec-icon" aria-hidden="true">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--vui-violet-500, #818cf8)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ai-head-svg"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
-            </span>
-            <span class="ai-sec-cat">AI Candidate Matching</span>
-          </div>
-
-          <!-- Section 2: Main Finding -->
-          <div class="ai-card-sec-finding">
-            <h4 class="ai-main-title" title="{{ insight.finding }}">{{ insight.finding }}</h4>
-            <div class="ai-sub-score"><span class="ai-score-val ai-text-violet">{{ insight.compatibility }}%</span> <span class="ai-score-label">compatibility</span></div>
-          </div>
-
-          <!-- Section 3: Supporting Intelligence -->
-          <div class="ai-card-sec-intel">
-            <div class="ai-intel-text"><span class="ai-intel-dot ai-dot-violet"></span>Reason: "{{ insight.reason }}"</div>
-            <div class="ai-factors-list">
-              <span class="ai-factors-label">AI Match Factors:</span>
-              <div class="ai-factors-grid">
-                {% for f in insight.skill_factors %}
-                <div class="ai-factor-item">
-                  <span class="ai-factor-name">{{ f.skill }}</span>
-                  <div class="ai-factor-track"><div class="ai-factor-fill ai-fill-violet" style="width: {{ f.pct }}%;"></div></div>
-                </div>
-                {% endfor %}
+              <div class="ai-card-action ai-action-blue">
+                <span class="ai-action-lbl">Action:</span> <a href="{% url 'candidates:list' %}?job_role=Senior+Backend+Engineer" class="ai-action-link">{{ insight.recommendation }} &rarr;</a>
               </div>
+              {% elif insight.id == 'best_fit' %}
+              <div class="ai-card-sec-head">
+                <span class="ai-sec-icon" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--vui-violet-500, #818cf8)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></span>
+                <span class="ai-sec-cat">AI Matching</span>
+              </div>
+              <div class="ai-card-sec-finding">
+                <h4 class="ai-main-title">{{ insight.finding }}</h4>
+                <div class="ai-sub-score"><span class="ai-score-val ai-text-violet">{{ insight.compatibility }}%</span> <span class="ai-score-label">compatibility</span></div>
+              </div>
+              <div class="ai-card-action ai-action-violet">
+                <span class="ai-action-lbl">Action:</span> <a href="{% url 'candidates:list' %}?role=Lead+Cloud+Architect" class="ai-action-link">{{ insight.recommendation }} &rarr;</a>
+              </div>
+              {% elif insight.id == 'health' %}
+              <div class="ai-card-sec-head">
+                <span class="ai-sec-icon" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg></span>
+                <span class="ai-sec-cat">Pipeline Health</span>
+              </div>
+              <div class="ai-card-sec-finding">
+                <h4 class="ai-main-title">{{ insight.ai_detection }}</h4>
+                <div class="ai-sub-score"><span class="ai-score-val ai-text-amber">{{ insight.score }}/{{ insight.score_max }}</span> <span class="ai-status-badge ai-badge-amber">Status: {{ insight.status }}</span></div>
+              </div>
+              <div class="ai-card-action ai-action-amber">
+                <span class="ai-action-lbl">Action:</span> <a href="{% url 'candidates:list' %}?stage=Rejected" class="ai-action-link">{{ insight.recommendation }} &rarr;</a>
+              </div>
+              {% elif insight.id == 'risk' %}
+              <div class="ai-card-sec-head">
+                <span class="ai-sec-icon" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
+                <span class="ai-sec-cat">Risk Monitor</span>
+              </div>
+              <div class="ai-card-sec-finding">
+                <h4 class="ai-main-title">Risk Status</h4>
+                <span class="ai-risk-badge ai-risk-badge-{{ insight.risk_tone }}">{{ insight.risk_level }} ({{ insight.inactive_count }} inactive)</span>
+              </div>
+              <div class="ai-card-action ai-action-green">
+                <span class="ai-action-lbl">Action:</span> <a href="{% url 'jobs:list' %}" class="ai-action-link">{{ insight.recommendation }} &rarr;</a>
+              </div>
+              {% endif %}
             </div>
+            {% endfor %}
           </div>
-
-          <!-- Section 4: Visualization (Circular Match Meter) -->
-          <div class="ai-card-sec-vis ai-vis-radial-wrap">
-            <div class="ai-radial-gauge">
-              <svg viewBox="0 0 36 36" class="ai-radial-svg">
-                <path class="ai-radial-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                <path class="ai-radial-stroke ai-stroke-violet" stroke-dasharray="{{ insight.compatibility }}, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-              </svg>
-              <div class="ai-radial-text">{{ insight.compatibility }}%</div>
-            </div>
-            <div class="ai-radial-label">Match Meter</div>
-          </div>
-
-          <!-- Action Line -->
-          <div class="ai-card-action ai-action-violet">
-            <span class="ai-action-lbl">Action:</span> <a href="{% url 'candidates:list' %}?role=Lead+Cloud+Architect" class="ai-action-link">{{ insight.recommendation }} &rarr;</a>
-          </div>
-
-          {% elif insight.id == 'health' %}
-          <!-- Section 1: Insight Header -->
-          <div class="ai-card-sec-head">
-            <span class="ai-sec-icon" aria-hidden="true">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ai-head-svg"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>
-            </span>
-            <span class="ai-sec-cat">Recruitment Pipeline Intelligence</span>
-          </div>
-
-          <!-- Section 2: Main Finding -->
-          <div class="ai-card-sec-finding">
-            <h4 class="ai-main-title">Pipeline Health</h4>
-            <div class="ai-sub-score">
-              <span class="ai-score-val ai-text-amber">{{ insight.score }}/{{ insight.score_max }}</span>
-              <span class="ai-status-badge ai-badge-amber">Status: {{ insight.status }}</span>
-            </div>
-          </div>
-
-          <!-- Section 3: Supporting Intelligence -->
-          <div class="ai-card-sec-intel">
-            <div class="ai-intel-text"><span class="ai-intel-dot ai-dot-amber"></span>AI Detection: "{{ insight.ai_detection }}"</div>
-          </div>
-
-          <!-- Section 4: Visualization (Stage Flow Sequence) -->
-          <div class="ai-card-sec-vis">
-            <div class="ai-vis-header">Stage flow:</div>
-            <div class="ai-stage-flow-row">
-              {% for s in insight.stage_flow %}
-              <span class="ai-flow-step {% if s.label == insight.bottleneck %}ai-flow-bottleneck{% endif %}">
-                {{ s.label }}
-              </span>
-              {% if not forloop.last %}<span class="ai-flow-step-arrow">&rarr;</span>{% endif %}
-              {% endfor %}
-            </div>
-            <div class="ai-flow-note">Highlighted bottleneck stage: <strong>{{ insight.bottleneck }}</strong></div>
-          </div>
-
-          <!-- Action Line -->
-          <div class="ai-card-action ai-action-amber">
-            <span class="ai-action-lbl">Action:</span> <a href="{% url 'candidates:list' %}?stage=Rejected" class="ai-action-link">{{ insight.recommendation }} &rarr;</a>
-          </div>
-
-          {% elif insight.id == 'risk' %}
-          <!-- Section 1: Insight Header -->
-          <div class="ai-card-sec-head">
-            <span class="ai-sec-icon" aria-hidden="true">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ai-head-svg"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-            </span>
-            <span class="ai-sec-cat">Recruitment Risk Monitor</span>
-          </div>
-
-          <!-- Section 2: Main Finding -->
-          <div class="ai-card-sec-finding">
-            <h4 class="ai-main-title">Risk Status</h4>
-            <span class="ai-risk-badge ai-risk-badge-{{ insight.risk_tone }}">{{ insight.risk_level }}</span>
-          </div>
-
-          <!-- Section 3: Supporting Intelligence -->
-          <div class="ai-card-sec-intel">
-            <div class="ai-intel-text"><span class="ai-intel-dot ai-dot-green"></span>Current condition: "{{ insight.condition }}"</div>
-            <div class="ai-monitoring-stat">Monitoring: <strong>{{ insight.inactive_count }}</strong> inactive candidates</div>
-          </div>
-
-          <!-- Section 4: Visualization (Risk Meter Gauge) -->
-          <div class="ai-card-sec-vis">
-            <div class="ai-vis-header">Risk Gauge:</div>
-            <div class="ai-risk-meter-bar">
-              <div class="ai-risk-segment ai-risk-seg-green {% if insight.risk_tone == 'green' %}active{% endif %}">LOW</div>
-              <div class="ai-risk-segment ai-risk-seg-amber {% if insight.risk_tone == 'amber' %}active{% endif %}">MED</div>
-              <div class="ai-risk-segment ai-risk-seg-red {% if insight.risk_tone == 'red' %}active{% endif %}">HIGH</div>
-            </div>
-          </div>
-
-          <!-- Action Line -->
-          <div class="ai-card-action ai-action-green">
-            <span class="ai-action-lbl">Action:</span> <a href="{% url 'jobs:list' %}" class="ai-action-link">{{ insight.recommendation }} &rarr;</a>
-          </div>
-
-          {% endif %}
-
         </div>
-        {% endfor %}
       </div>
     </div>
 
@@ -613,28 +405,33 @@
 function switchMainChart(mode) {
   var panelTrend = document.getElementById('panel-trend');
   var panelScore = document.getElementById('panel-score');
+  var panelAi = document.getElementById('panel-ai');
   var title = document.getElementById('analytics-chart-title');
   var sub = document.getElementById('analytics-chart-sub');
 
   var btnTrend = document.getElementById('tab-btn-trend');
   var btnScore = document.getElementById('tab-btn-score');
+  var btnAi = document.getElementById('tab-btn-ai');
+
+  panelTrend.hidden = (mode !== 'trend');
+  panelScore.hidden = (mode !== 'score');
+  if (panelAi) panelAi.hidden = (mode !== 'ai');
+
+  btnTrend.classList.toggle('active', mode === 'trend'); btnTrend.setAttribute('aria-selected', mode === 'trend' ? 'true' : 'false'); btnTrend.tabIndex = (mode === 'trend' ? 0 : -1);
+  btnScore.classList.toggle('active', mode === 'score'); btnScore.setAttribute('aria-selected', mode === 'score' ? 'true' : 'false'); btnScore.tabIndex = (mode === 'score' ? 0 : -1);
+  if (btnAi) { btnAi.classList.toggle('active', mode === 'ai'); btnAi.setAttribute('aria-selected', mode === 'ai' ? 'true' : 'false'); btnAi.tabIndex = (mode === 'ai' ? 0 : -1); }
 
   if (mode === 'trend') {
-    panelScore.hidden = true;
-    panelTrend.hidden = false;
     title.textContent = 'Candidates by Stage';
     sub.textContent = 'Current candidates at each pipeline stage';
-    btnTrend.classList.add('active'); btnTrend.setAttribute('aria-selected', 'true'); btnTrend.tabIndex = 0;
-    btnScore.classList.remove('active'); btnScore.setAttribute('aria-selected', 'false'); btnScore.tabIndex = -1;
     if (window.trendChartObj) window.trendChartObj.resize();
-  } else {
-    panelTrend.hidden = true;
-    panelScore.hidden = false;
+  } else if (mode === 'score') {
     title.textContent = 'Score Distribution';
     sub.textContent = 'AI qualification score buckets';
-    btnScore.classList.add('active'); btnScore.setAttribute('aria-selected', 'true'); btnScore.tabIndex = 0;
-    btnTrend.classList.remove('active'); btnTrend.setAttribute('aria-selected', 'false'); btnTrend.tabIndex = -1;
     if (window.scoreChartObj) window.scoreChartObj.resize();
+  } else {
+    title.textContent = 'AI Insights & Intelligence';
+    sub.textContent = 'Automated matching, demand, and risk monitor';
   }
 }
 
@@ -643,7 +440,11 @@ function switchMainChart(mode) {
   if (!tablist) return;
   var tabs = Array.prototype.slice.call(tablist.querySelectorAll('[role="tab"]'));
   if (!tabs.length) return;
-  var modeFor = function(btn) { return btn.id === 'tab-btn-score' ? 'score' : 'trend'; };
+  var modeFor = function(btn) {
+    if (btn.id === 'tab-btn-score') return 'score';
+    if (btn.id === 'tab-btn-ai') return 'ai';
+    return 'trend';
+  };
   tablist.addEventListener('keydown', function(e) {
     var idx = tabs.indexOf(document.activeElement);
     if (idx === -1) return;
