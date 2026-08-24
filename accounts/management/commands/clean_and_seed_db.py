@@ -80,13 +80,12 @@ class Command(BaseCommand):
 
             users_by_username = {}
             for username, role, f_name, l_name, pwd in users_spec:
-                u, _ = User.objects.get_or_create(
-                    username=username,
-                    defaults={'role': role, 'first_name': f_name, 'last_name': l_name},
-                )
-                if not u.check_password(pwd):
-                    u.set_password(pwd)
-                    u.save()
+                u, _ = User.objects.get_or_create(username=username)
+                u.role = role
+                u.first_name = f_name
+                u.last_name = l_name
+                u.set_password(pwd)
+                u.save()
                 users_by_username[username] = u
 
             hr_main = users_by_username['hr_demo']
