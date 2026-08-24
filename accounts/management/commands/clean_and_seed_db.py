@@ -55,39 +55,36 @@ class Command(BaseCommand):
         force = options.get('force', False)
         existing_jobs = Job.objects.filter(is_active=True).count()
         existing_candidates = Candidate.objects.count()
+        team_user_count = User.objects.filter(username__in=['hr_demo', 'hr_sarah', 'iv_demo', 'iv_chen', 'iv_rachel', 'iv_patel', 'mgmt_demo', 'mgmt_davis']).count()
 
-        if not force and existing_jobs == 5 and existing_candidates >= 10:
-            self.stdout.write(self.style.SUCCESS('Database is already clean and seeded with enterprise dataset (5 jobs, 10+ candidates). Skipping wipe.'))
+        # Always ensure team user accounts exist
+        users_spec = [
+            ('hr_demo', Role.HR, 'Hana', 'Miller', 'testpass123'),
+            ('hr_sarah', Role.HR, 'Sarah', 'Jenkins', 'testpass123'),
+            ('iv_demo', Role.INTERVIEWER, 'Ivan', 'Vance', 'testpass123'),
+            ('iv_chen', Role.INTERVIEWER, 'Marcus', 'Chen', 'testpass123'),
+            ('iv_rachel', Role.INTERVIEWER, 'Rachel', 'Adams', 'testpass123'),
+            ('iv_patel', Role.INTERVIEWER, 'Vikram', 'Patel', 'testpass123'),
+            ('mgmt_demo', Role.MANAGEMENT, 'Mia', 'Thorne', 'testpass123'),
+            ('mgmt_davis', Role.MANAGEMENT, 'David', 'Ross', 'testpass123'),
+        ]
+        users_by_username = {}
+        for username, role, f_name, l_name, pwd in users_spec:
+            u, _ = User.objects.get_or_create(username=username)
+            u.role = role
+            u.first_name = f_name
+            u.last_name = l_name
+            u.set_password(pwd)
+            u.save()
+            users_by_username[username] = u
+
+        if not force and existing_jobs == 5 and existing_candidates >= 10 and team_user_count == 8:
+            self.stdout.write(self.style.SUCCESS('Database is already clean and seeded with enterprise dataset (5 jobs, 10+ candidates, 8 team accounts). Skipping wipe.'))
             return
 
         self.stdout.write(self.style.WARNING('Starting database cleanup and enterprise seeding...'))
 
         with transaction.atomic():
-            # 1. Seed Realistic Hiring Team Accounts
-            users_spec = [
-                # HR Team
-                ('hr_demo', Role.HR, 'Hana', 'Miller', 'testpass123'),
-                ('hr_sarah', Role.HR, 'Sarah', 'Jenkins', 'testpass123'),
-                # Interviewer Team
-                ('iv_demo', Role.INTERVIEWER, 'Ivan', 'Vance', 'testpass123'),
-                ('iv_chen', Role.INTERVIEWER, 'Marcus', 'Chen', 'testpass123'),
-                ('iv_rachel', Role.INTERVIEWER, 'Rachel', 'Adams', 'testpass123'),
-                ('iv_patel', Role.INTERVIEWER, 'Vikram', 'Patel', 'testpass123'),
-                # Management Team
-                ('mgmt_demo', Role.MANAGEMENT, 'Mia', 'Thorne', 'testpass123'),
-                ('mgmt_davis', Role.MANAGEMENT, 'David', 'Ross', 'testpass123'),
-            ]
-
-            users_by_username = {}
-            for username, role, f_name, l_name, pwd in users_spec:
-                u, _ = User.objects.get_or_create(username=username)
-                u.role = role
-                u.first_name = f_name
-                u.last_name = l_name
-                u.set_password(pwd)
-                u.save()
-                users_by_username[username] = u
-
             hr_main = users_by_username['hr_demo']
             mgmt_main = users_by_username['mgmt_demo']
             iv_demo = users_by_username['iv_demo']
