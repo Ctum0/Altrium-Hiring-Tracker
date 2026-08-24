@@ -1,151 +1,85 @@
 # Altrium Hiring Tracker
 
-> **Enterprise Internal Recruitment Operations & Candidate Pipeline Platform**  
-> Developed for **Altrium** | Internal Human Resources & Technical Recruitment Operations
+> Internal recruitment management and candidate evaluation platform developed for **Altrium**.
 
 ---
 
-## 📌 Executive Summary
+## 📌 Project Overview
 
-**Altrium Hiring Tracker** is a centralized internal recruitment management platform engineered for **Altrium** to streamline candidate evaluations, standardize multi-stage interview workflows, and provide executive visibility over hiring pipelines.
+**Altrium Hiring Tracker** is a web application built for Altrium's internal HR team, technical interviewers, and engineering management to track candidates, schedule interviews, and manage feedback in one place.
 
-The platform is strictly an **internal-only tool** — candidates do not have access to the system. It replaces a fragmented legacy process of shared Google Drive folders, manual Slack threads, and uncoordinated email communications with a single, role-governed workspace.
-
----
-
-## 🎯 Business Problem & Client Context
-
-As Altrium scaled hiring across technical and non-technical departments, recruitment operations faced critical bottlenecks:
-
-### 1. Process Fragmentation Across Disparate Tools
-- Candidates applied via email or portals, while CVs were uploaded into unorganized shared Google Drive folders (1,000+ files per position).
-- Interview feedback was communicated back and forth across ephemeral Slack channels, causing critical evaluator notes to scroll away and get lost.
-- Interview scheduling and follow-ups relied on manual memory and uncoordinated Gmail threads.
-
-### 2. Multi-Reviewer Collision & Visibility Deficit
-- When multiple interviewers reviewed CVs in shared drives, there was zero visibility into who had reviewed a candidate, what score was given, or why a candidate was shortlisted or passed over.
-- HR could not track overall hiring pipeline status, candidate progression rates, or position closure timelines without manually querying team leads and compiling ad-hoc Excel spreadsheets.
-
-### 3. Rigid, One-Size-Fits-All Evaluation Paths
-- Different roles require fundamentally different interview workflows (e.g., technical roles require coding assessments and architecture panels; non-technical roles require portfolio reviews and behavioral interviews).
-- Shared drive folders and static tracking sheets failed to support role-specific interview stages or enforce stage-completion rules.
-
-### Core Business Challenge
-The central business challenge for Altrium was **organizing recruitment communication, candidate evaluation, interview feedback, and hiring progress in one centralized internal system** with full historical auditability.
+It is an **internal system only** (candidates do not log in). It replaces a manual process that relied on shared Google Drive folders, lost Slack messages, and unorganized email threads.
 
 ---
 
-## 🔄 Operational Workflow Transformation
+## 🎯 Business Problem & Context
 
-| Legacy Fragmented Workflow | Altrium Hiring Tracker Platform |
+Before this application, Altrium managed hiring across multiple disconnected tools:
+
+1. **Lost Data & Files**: CVs were uploaded into crowded shared Google Drive folders without any tracking of who reviewed which file or what score was given.
+2. **Scattered Feedback**: Interviewers sent notes in Slack channels, where they were easily missed or buried in chat history.
+3. **No Central Pipeline View**: HR had to manually message team leads or compile spreadsheets to check application status or see how long candidates were stuck in an interview stage.
+4. **Different Roles Needed Different Stages**: Technical roles required coding tests and architecture interviews, while non-technical roles needed portfolio reviews. Shared folders couldn't handle role-specific interview rounds.
+
+---
+
+## 🔄 Workflow Comparison
+
+| Old Manual Workflow | Altrium Hiring Tracker |
 | :--- | :--- |
-| **Position Setup**: HR manually created shared Drive folders & Slack channels per role. | **Position Setup**: HR initializes jobs in the portal with position-specific, configurable interview rounds. |
-| **CV Collection**: CV PDFs piled up in shared folders (1,000+ per position). | **CV Ingestion**: CVs are uploaded, automatically parsed via AI, and candidate profiles are imported with skill tags. |
-| **Shortlisting**: Reviewers manually opened PDFs in Drive without seeing prior reviewer notes. | **Shortlisting**: Automated skill scoring, multi-field search/filtering, and centralized candidate profile views. |
-| **Feedback Collection**: Notes sent via Slack messages, easily lost or forgotten. | **Feedback Collection**: Structured evaluation scorecards tied directly to specific candidate applications. |
-| **Stage Progression**: Candidates manually dragged across loose sheets without feedback validation. | **Stage Progression**: Stage-gated Kanban pipeline enforcing evaluation completion before advancement. |
-| **Reporting**: HR manually compiled Excel sheets to answer management status inquiries. | **Reporting**: Real-time management dashboards with pipeline velocity, SLA escalation flags, and live KPIs. |
+| **Position Setup**: HR created shared Drive folders and Slack channels manually. | **Position Setup**: HR creates job posts with custom interview rounds (e.g. Screening, Tech Interview, Offer). |
+| **CV Collection**: CVs piled up in Google Drive folders. | **CV Ingestion**: CVs (PDF/DOCX) are uploaded and parsed into candidate profiles with extracted skills. |
+| **Shortlisting**: Reviewers opened PDFs individually with no record of past notes. | **Shortlisting**: Search, filter by skills/score, and view full candidate history in one view. |
+| **Feedback**: Notes sent in random Slack threads. | **Feedback**: Evaluation scorecards and AI panel consensus directly linked to the candidate. |
+| **Stage Progression**: Candidates moved manually on spreadsheets without checks. | **Stage Progression**: Interactive pipeline board with feedback checks before moving stages. |
+| **Reporting**: HR compiled manual Excel sheets for management updates. | **Reporting**: Real-time management dashboard with pipeline metrics and SLA alerts. |
 
 ---
 
-## 💡 The Solution & Core System Capabilities
+## 💡 Key Features & Roles
 
-Altrium Hiring Tracker replaces ad-hoc operations with an enterprise-grade internal platform providing:
+The system uses Role-Based Access Control (RBAC) to control access:
 
-1. **Internal-Only Security & Governance**: Strict Role-Based Access Control (RBAC) ensuring internal users see only what their role demands. Candidates have zero system access.
-2. **Job-Specific Adaptable Workflows**: Custom interview workflows and multi-round configurations tailored to specific job functions (Technical vs. Non-Technical).
-3. **Structured Evaluation & Audit Trails**: Standardized interviewer scorecards, detailed technical evaluation notes, and version-controlled feedback edit histories where edits maintain previous versions.
-4. **Centralized Candidate History & Data Retention**: Complete record of candidate applications across multiple positions, maintaining evaluation history even after positions close.
-5. **Management Analytics & Oversight**: Executive dashboard with live pipeline metrics, SLA escalation alerts, and recruitment pipeline visibility for leadership.
+- **HR Manager (`hr_demo`, `hr_sarah`)**: Full access. Opens job positions, ingests and parses CVs, assigns interviewers, moves candidates across stages, overrides shortlist scores, and can remove candidates.
+- **Interviewer (`iv_demo`, `iv_chen`, `iv_rachel`, `iv_patel`)**: Role-scoped access. Sees only candidates assigned to them, submits interview scorecards, and uses AI note polishing.
+- **Management (`mgmt_demo`, `mgmt_davis`)**: Read-only executive access. Views real-time hiring metrics, pipeline health, SLA escalation alerts, and AI panel consensus.
 
 ---
 
-## 👥 Role-Based Access Control (RBAC) Architecture
-
-The application enforces strict internal role boundaries:
-
-| User Role | System Capabilities & Access Scope |
-| :--- | :--- |
-| **HR Manager** *(Process Owner)* | Full operational authority: opens job positions, configures interview stages, ingests & parses CVs, assigns interviewers, advances/rejects candidates, and closes positions. |
-| **Interviewer** *(Evaluator)* | Restricted access: views only candidates explicitly assigned to them, submits structured evaluation scorecards, and utilizes note-polishing tooling for their assignments. |
-| **Management / Leadership** *(Oversight)* | Read-only access: live KPI analytics dashboard, pipeline health metrics, 7-day SLA escalation alerts, and report exports. |
-
----
-
-## 📈 Development Status & Milestone Roadmap
-
-Development is organized in structured milestones. The project is currently at the completion of **Sprint 1**, establishing the core operational foundation.
+## 📈 Development Status & Roadmap
 
 ### 🟢 Sprint 1 (Completed Foundation)
-The primary focus of Sprint 1 was establishing the core data architecture, security model, and essential candidate processing pipelines:
+- User authentication and role-based views (HR, Interviewer, Management).
+- Job creation with configurable interview rounds.
+- CV file upload (PDF/DOCX) and text extraction.
+- CV parsing engine with zero-failure local fallback parser for contacts & skills.
+- Candidate profile management, scoring rules, and multi-field search.
+- Interviewer assignment and in-app notifications.
+- Interactive candidate pipeline board and stage tracking.
 
-- **Authentication & RBAC**: Custom user model, secure authentication, and role-based view enforcement for HR, Interviewer, and Management roles.
-- **Job Creation & Configurable Stages**: Ability for HR to create job listings and define custom multi-round interview stages (e.g., Screening, Tech Assessment, Panel Interview, Offer).
-- **CV Upload & Raw Text Extraction**: File upload pipeline supporting PDF/Docx CV files with raw text extraction.
-- **AI CV Parsing**: Groq LLM integration (`llama-3.3-70b-versatile`) extracting candidate contact details, summary, and skill arrays.
-- **Candidate Profile Importing**: Centralized candidate profile creation from parsed CV data.
-- **Automated Skill Scoring**: Automated scoring rules evaluating candidate skill sets against job requirements.
-- **Candidate Search, Filtering & Management**: Multi-field search, status filtering, and paginated candidate listings.
-- **Interviewer Assignment**: HR management interface for assigning specific interviewers to candidate applications.
-- **In-App Notifications**: Notification engine informing interviewers of new assignments and HR of feedback submissions.
-- **Candidate Pipeline Management**: Application tracking models linking candidates, jobs, stages, and assignments.
-- **Kanban-Based Recruitment Workflow**: Interactive board for visualizing and managing candidate applications across hiring stages.
-
----
-
-### 🟡 Sprint 2 & Future Roadmap (Planned Enhancements)
-
-> [!NOTE]
-> While the Sprint 1 foundation is operational, the Kanban board and pipeline automation tools are currently in a foundational state and planned for further enhancement in Sprint 2. Future sprints will continue improving recruitment automation, reporting, communication, and operational efficiency.
-
-#### Planned Sprint 2 Work:
-- **Enhanced Interactive Kanban Board**: Fluid drag-and-drop mechanics with instant HTMX state updates and live round counters.
-- **Interview Scheduling Integration**: Embedded scheduling links and calendar integration directly within candidate application details.
-- **Feedback Edit Version History**: Audit logging for feedback edits that preserves full prior version history for quality and compliance.
-- **Automated Position Closure & Rejection Emails**: AI-generated personalized rejection email dispatch upon position closure.
-- **Executive Analytics & Export**: Live 7-day escalation flags for stalled candidates and CSV/Excel report exporter for leadership review.
+### 🟡 Sprint 2 & Future Roadmap
+- **Feedback-Gated Stage Progression**: Prevents advancing a candidate to the next round unless feedback exists for the current round.
+- **7-Day SLA Escalation Alerts**: Flags candidates stuck in an active stage without feedback for over 7 days directly on the management dashboard.
+- **Enhanced AI Panel Consensus**: Distinguishes single-evaluator summaries from multi-interviewer panel consensus, highlighting vote tallies (Hire/Hold/Reject) and flagging panel divergence.
+- **Feedback Version History**: Immutable audit log preserving prior versions when interview notes are edited.
+- **Interview Details & Scheduling**: Fast management interface for adding meeting links and interview instructions.
 
 ---
 
-## 🎯 Featured Sprint 2 Functional Highlight
+## 🛠️ Tech Stack
 
-To deliver immediate business value beyond cosmetic UI updates, Sprint 2 prioritizes a high-impact operational feature:
-
-### 🌟 Business Feature: Feedback-Gated Stage Progression & 7-Day SLA Escalation Engine
-
-#### Business Problem Addressed:
-In the legacy workflow, candidates were frequently advanced to subsequent interview rounds before previous interviewers submitted their feedback, or candidates remained stalled in an interview stage for weeks because no one followed up on missing feedback. This wasted candidate and interviewer time and created severe HR tracking debt.
-
-#### High-Value Business Solution:
-1. **Feedback-Enforced Stage Gating**: The system blocks candidate progression to the next interview round unless at least one completed evaluation scorecard exists for the current round (returning HTTP 409 Conflict if feedback is missing).
-2. **Automated 7-Day SLA Escalation Flags**: The pipeline engine automatically flags any candidate application that has remained in an active stage without feedback for >7 days, alerting HR and Management on the executive dashboard to eliminate recruitment bottlenecks.
-
-**Business Value Delivered**:
-- **Reduces Manual HR Chasing**: Eliminates manual Slack messages from HR asking interviewers if feedback was completed.
-- **Guarantees Evaluation Rigor**: Prevents candidates from reaching final rounds without documented evaluation notes.
-- **Improves Hiring Velocity**: Directly reduces time-to-hire by highlighting stalled candidates in real time.
-
----
-
-## 🛠️ Tech Stack & System Architecture
-
-| Layer | Technology |
-| :--- | :--- |
-| **Backend Framework** | Django 5 (Python 3.12) |
-| **Frontend / Interactivity** | HTMX, Vanilla JavaScript, Custom OKLCH CSS Design System |
-| **Database** | SQLite (Development) / PostgreSQL (Production ready) |
-| **Object Storage** | Cloudflare R2 / S3-compatible storage (for candidate CV files) |
-| **AI Services** | Groq LLM API (`llama-3.3-70b-versatile` / `mixtral-8x7b-32768`) |
-| **Deployment** | Docker, Docker Compose, Gunicorn, Render/Railway configuration |
+- **Backend**: Django 5 (Python 3.12)
+- **Frontend**: HTML5, Vanilla JavaScript, HTMX, Custom Glassmorphism CSS
+- **Database**: PostgreSQL (Production) / SQLite (Local dev)
+- **AI Services**: Groq LLM API (`llama-3.3-70b-versatile`) + Local Heuristic Fallback Engine
+- **Deployment**: Docker, Docker Compose, Gunicorn, Railway
 
 ---
 
 ## 💻 Local Setup & Quick Start
 
-### 1. Virtual Environment Setup
-
 ```bash
-# Clone the repository
+# Clone repository
 git clone https://github.com/Ctum0/Altrium-Hiring-Tracker.git
 cd Altrium-Hiring-Tracker
 
@@ -156,46 +90,36 @@ source .venv/bin/activate
 # Install dependencies
 pip install -r requirements.txt
 
-# Configure environment variables
-cp .env.example .env
-
-# Run database migrations & seed test accounts
+# Run migrations and seed clean enterprise test data
 python manage.py migrate
-python manage.py seed_users
+python manage.py clean_and_seed_db --force
 
-# Start development server
+# Start local server
 python manage.py runserver
 ```
 
-Access the application at `http://127.0.0.1:8000`.
+Access the app at `http://127.0.0.1:8000`.
 
 ---
 
-### 2. Docker Setup
+## 🔑 Test Accounts (Password: `testpass123`)
 
-Run the full web application and PostgreSQL database stack using Docker Compose:
-
-```bash
-docker compose up --build
-```
-
----
-
-## 🔑 Demo User Accounts
-
-The `seed_users` management command automatically populates test accounts for evaluation:
-
-| Role | Username | Password | Operational Access Level |
+| Role | Username | Name & Role | Access Level |
 | :--- | :--- | :--- | :--- |
-| **HR Manager** | `hr_demo` | `testpass123` | Full administrative pipeline, job creation, candidate import & assignment |
-| **Interviewer** | `iv_demo` | `testpass123` | Assigned candidates, scorecards & note-polishing tools |
-| **Management** | `mgmt_demo` | `testpass123` | Executive KPI dashboard, SLA escalation flags & reporting |
+| **HR Manager** | `hr_demo` | Hana Miller (Lead Talent Partner) | Full admin access, job creation, candidate & stage management |
+| **HR Partner** | `hr_sarah` | Sarah Jenkins (Senior Recruiter) | Full admin access, candidate upload & assignment |
+| **Interviewer** | `iv_demo` | Ivan Vance (Backend Lead) | Assigned candidates, scorecards & AI note tools |
+| **Interviewer** | `iv_chen` | Dr. Marcus Chen (Frontend Architect) | Assigned candidates & frontend technical scorecards |
+| **Interviewer** | `iv_rachel` | Rachel Adams (DevOps Manager) | Assigned candidates & infrastructure evaluation |
+| **Interviewer** | `iv_patel` | Vikram Patel (QA Engineering Lead) | Assigned candidates & automation evaluation |
+| **Management** | `mgmt_demo` | Mia Thorne (VP of Engineering) | Read-only executive dashboard & SLA alerts |
+| **Management** | `mgmt_davis` | David Ross (Director of Product) | Read-only pipeline metrics & panel consensus |
 
 ---
 
-## 🧪 Testing & Quality Assurance
+## 🧪 Testing
 
-Run the comprehensive Django automated test suite:
+Run the Django automated test suite:
 
 ```bash
 python manage.py test
@@ -203,6 +127,6 @@ python manage.py test
 
 ---
 
-## 📄 License & Client Attribution
+## 📄 License & Attribution
 
-Developed as a client-based internal software engineering project for **Altrium**. All rights reserved.
+University client project developed for **Altrium**. All rights reserved.
