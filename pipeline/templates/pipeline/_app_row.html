@@ -66,7 +66,6 @@
     {% if is_hr %}
     <div class="app-card-control-group">
       <label class="app-card-control-label">Move Stage</label>
-      {% if app.status != 'hired' and app.status != 'rejected' and app.status != 'on_hold' %}
       <select class="stage-select" name="stage"
               aria-label="Move {{ app.candidate.full_name }} to another stage"
               onchange="confirmStageMove(this)"
@@ -83,14 +82,11 @@
         {% endfor %}
         </optgroup>
         <optgroup label="End candidacy">
-        <option value="status:hired">Hired</option>
-        <option value="status:rejected">Rejected</option>
-        <option value="status:on_hold">On Hold</option>
+        <option value="status:hired" {% if app.status == 'hired' %}selected{% endif %}>Hired</option>
+        <option value="status:rejected" {% if app.status == 'rejected' %}selected{% endif %}>Rejected</option>
+        <option value="status:on_hold" {% if app.status == 'on_hold' %}selected{% endif %}>On Hold</option>
         </optgroup>
       </select>
-      {% else %}
-      <span class="text-xs text-muted">Final state</span>
-      {% endif %}
     </div>
     {% endif %}
   </div>

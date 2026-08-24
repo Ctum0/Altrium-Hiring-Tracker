@@ -484,3 +484,19 @@ class InterviewDetailsView(LoginRequiredMixin, View):
             )
 
         return redirect('candidates:detail', pk=app.candidate_id)
+
+
+class CandidateDeleteView(LoginRequiredMixin, View):
+    """HR only: permanently remove a candidate profile and associated applications."""
+
+    def post(self, request, pk):
+        candidate = get_object_or_404(Candidate, pk=pk)
+        if not request.user.is_hr():
+            messages.error(request, 'Only HR can remove candidate profiles.')
+            return redirect('candidates:detail', pk=pk)
+
+        name = candidate.full_name
+        candidate.delete()
+        messages.success(request, f'Candidate profile for "{name}" has been permanently removed.')
+        return redirect('candidates:list')
+

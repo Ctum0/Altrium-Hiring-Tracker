@@ -15,6 +15,12 @@
       </p>
     </div>
     <div class="page-actions flex gap-2">
+      {% if is_hr %}
+      <form method="post" action="{% url 'candidates:delete' candidate.pk %}" onsubmit="return confirm('Are you sure you want to permanently remove this candidate profile and all associated applications?');">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger btn-sm" style="padding:4px 10px;font-size:var(--text-xs)">Remove Candidate</button>
+      </form>
+      {% endif %}
       <a href="{% url 'candidates:list' %}" class="btn btn-secondary btn-sm">All candidates</a>
     </div>
   </div>
