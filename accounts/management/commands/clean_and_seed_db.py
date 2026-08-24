@@ -162,7 +162,18 @@ REALISTIC_CANDIDATES = [
 class Command(BaseCommand):
     help = 'Clean duplicate/test jobs and seed a clean enterprise hiring scenario.'
 
+    def add_arguments(self, parser):
+        parser.add_argument('--force', action='store_true', help='Force wipe and re-seed even if database is already clean.')
+
     def handle(self, *args, **options):
+        force = options.get('force', False)
+        existing_jobs = Job.objects.filter(is_active=True).count()
+        existing_candidates = Candidate.objects.count()
+
+        if not force and existing_jobs == 5 and existing_candidates >= 10:
+            self.stdout.write(self.style.SUCCESS('Database is already clean and seeded with enterprise dataset (5 jobs, 10+ candidates). Skipping wipe.'))
+            return
+
         self.stdout.write(self.style.WARNING('Starting database cleanup and enterprise seeding...'))
 
         with transaction.atomic():
