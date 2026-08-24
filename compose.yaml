@@ -1,23 +1,30 @@
 services:
-  playwright-mcp:
-    image: mcr.microsoft.com/playwright/mcp
-    container_name: playwright-mcp
-    restart: unless-stopped
-    network_mode: host
-    ports:
-      - "8931:8931"
+  web:
+    build: .
+    command: python manage.py runserver 0.0.0.0:8000
     volumes:
-      - ./.artifacts/browser:/artifacts
-    command:
-      - --headless
-      - --browser
-      - chromium
-      - --no-sandbox
-      - --port
-      - "8931"
-      - --host
-      - 0.0.0.0
-      - --output-dir
-      - /artifacts
-      - --caps
-      - vision,devtools
+      - .:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - DJANGO_DEBUG=True
+      - DJANGO_SECRET_KEY=dev-secret-key-change-in-production
+      - DATABASE_URL=postgres://altrium:altrium_pass@db:5432/altrium_db
+    depends_on:
+      - db
+
+  db:
+    image: postgres:16-alpine
+    container_name: altrium_postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=altrium_db
+      - POSTGRES_USER=altrium
+      - POSTGRES_PASSWORD=altrium_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
