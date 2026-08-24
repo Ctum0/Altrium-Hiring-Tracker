@@ -29,6 +29,6 @@ One radius system: 20px for glass cards, 12px for controls/buttons, pill (999px)
 ## Components
 Top bar + side nav (product standard). Buttons: primary, secondary, ghost, danger. Forms: label above input, error below. Tables: single bottom border per row. Kanban: columns per round, cards with candidate, job, score, assignee. Empty states that teach. Skeleton on load.
 
-## Bans
+## Design Constraints
 No em-dashes in UI copy. No gradient text. No decorative motion. No modal-first thinking. Data never clipped without a scroll affordance — content must remain reachable at every viewport height.
 Frosted glass and ambient glow are the allowed surface language (not accidental glassmorphism) — they must stay structural and readable, with dark-mode surfaces that retain enough contrast to read the layering.

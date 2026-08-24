@@ -8,19 +8,17 @@ services:
       - "8000:8000"
     environment:
       - DJANGO_DEBUG=True
-      - DJANGO_SECRET_KEY=dev-secret-key-change-in-production
       - DATABASE_URL=postgres://altrium:altrium_pass@db:5432/altrium_db
     depends_on:
       - db
 
   db:
     image: postgres:16-alpine
-    container_name: altrium_postgres
-    restart: unless-stopped
+    container_name: altrium_db
     environment:
-      - POSTGRES_DB=altrium_db
       - POSTGRES_USER=altrium
       - POSTGRES_PASSWORD=altrium_pass
+      - POSTGRES_DB=altrium_db
     ports:
       - "5432:5432"
     volumes:
