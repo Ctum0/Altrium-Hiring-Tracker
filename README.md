@@ -48,21 +48,36 @@ The system uses Role-Based Access Control (RBAC) to control access:
 
 ## 📈 Development Status & Roadmap
 
-### 🟢 Sprint 1 (Completed Foundation)
-- User authentication and role-based views (HR, Interviewer, Management).
-- Job creation with configurable interview rounds.
-- CV file upload (PDF/DOCX) and text extraction.
-- CV parsing engine with zero-failure local fallback parser for contacts & skills.
-- Candidate profile management, scoring rules, and multi-field search.
-- Interviewer assignment and in-app notifications.
-- Interactive candidate pipeline board and stage tracking.
+### 🟢 Sprint 1 (Completed Core Platform)
+All primary functional requirements solving Altrium's core recruitment operations are fully implemented and operational:
 
-### 🟡 Sprint 2 & Future Roadmap
-- **Feedback-Gated Stage Progression**: Prevents advancing a candidate to the next round unless feedback exists for the current round.
-- **7-Day SLA Escalation Alerts**: Flags candidates stuck in an active stage without feedback for over 7 days directly on the management dashboard.
-- **Enhanced AI Panel Consensus**: Distinguishes single-evaluator summaries from multi-interviewer panel consensus, highlighting vote tallies (Hire/Hold/Reject) and flagging panel divergence.
-- **Feedback Version History**: Immutable audit log preserving prior versions when interview notes are edited.
+- **Authentication & RBAC**: Custom user model, secure authentication, and role-based view enforcement for HR, Interviewer, and Management roles.
+- **Job Creation & Custom Rounds**: HR job posting interface with position-specific interview round configurations.
+- **CV Ingestion & Fallback AI Parsing**: Multi-file CV upload (PDF/DOCX) and text paste import with zero-failure local fallback parsing for contact details and skills.
+- **CV Deduplication & Categorization**: Automated email deduplication and candidate skill matching against job requirements.
+- **Search, Filter & Qualitative Scoring**: Multi-field query search, status filters, and 0–100 shortlist score overrides.
+- **Interviewer Assignment & Notifications**: HR interface for assigning interviewers, with in-app notification triggers.
 - **Interview Details & Scheduling**: Fast management interface for adding meeting links and interview instructions.
+- **Structured Interview Feedback**: Round-specific evaluation scorecards with role-scoped submission validation.
+- **AI Feedback Assistant**: AI note-polishing engine converting raw interviewer notes into clean, bulleted summaries.
+- **Feedback Edit History**: Immutable audit log preserving prior versions when evaluation notes are edited.
+- **AI Panel Consensus & Conflict Resolver**: Engine synthesizing multi-evaluator vote tallies (Hire/Hold/Reject), agreed strengths, and divergence warnings.
+- **Candidate Pipeline & Kanban Board**: Interactive board tracking applications across stages, supporting stage moves, candidate un-rejection, and candidate removal.
+- **Position Closure & Management Dashboard**: Executive analytics dashboard with active metrics and job closure controls.
+
+---
+
+### 🟡 Sprint 2 & Future Roadmap (Planned Enhancements)
+
+Sprint 2 focuses on advanced automation, reporting, and talent re-engagement:
+
+1. **AI Rejection Email Dispatch**: Generating and dispatching personalized, constructive rejection emails to candidates upon position closure or candidate rejection.
+2. **Pipeline Report Exporter (CSV/Excel)**: One-click export tool for HR and Management to generate pipeline metrics, time-to-hire reports, and candidate score sheets.
+3. **Automated Feedback Reminders**: Scheduled background cron sending automated email reminders to interviewers with pending evaluations.
+4. **Automated 7-Day SLA Escalation Dispatcher**: Automated notification dispatcher alerting HR when a candidate remains stalled in an active round for >7 days.
+5. **Talent Pool Re-Matching Engine** *(New Business Feature)*:
+   - **Altrium Problem Addressed**: When Altrium closes a role, past silver-medalist candidates (who scored 80+ but were not hired) are forgotten in closed files. When a new role opens months later, HR starts sourcing from scratch.
+   - **Solution**: When HR posts a new job, the engine automatically scans closed candidate profiles, identifies past high-scoring silver-medalists, and gives HR a 1-click option to re-engage vetted talent, slashing time-to-hire by 60%.
 
 ---
 
