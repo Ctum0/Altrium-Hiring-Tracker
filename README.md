@@ -1,43 +1,75 @@
 # Altrium Hiring Tracker
 
-An enterprise-grade applicant tracking and recruitment operations platform designed for high-density hiring workflows. Replaces fragmented spreadsheets, chat threads, and cloud drive folders with centralized candidate management, automated stage gating, role-based governance, and AI-assisted candidate evaluations.
+> **Client-Based Software Engineering Project**  
+> Developed for **Altrium** | Recruitment Operations & Candidate Pipeline Platform
 
 ---
 
-## Key Features
+## 📌 Executive Summary & Client Context
 
-- **Role-Based Governance (RBAC)**: Enforces distinct capabilities for **HR Managers** (pipeline control, job creation, assignment), **Interviewers** (assigned candidate access, feedback submission), and **Management** (read-only KPI monitoring, report exports).
-- **Interactive Kanban Pipeline**: Drag-and-drop hiring stages with per-job custom interview rounds and strict stage-gating (prevents advancement without required round feedback).
-- **AI-Powered CV Ingestion**: Automated parsing of uploaded CVs/resumes to extract candidate contact details, experience summaries, and skill tag arrays.
-- **AI Panel Consensus & Conflict Engine**: Multi-interviewer score aggregation, weighted round scoring, and automated detection of interviewer score variance.
-- **Feedback Standardization**: Interviewer note polishing and automated rejection email generator powered by LLM integration.
-- **SLA & Escalation Monitoring**: Automated flagging of candidates pending feedback or stalled in pipeline rounds for >7 days.
-- **Modern UI & Dual-Theme System**: Dense, glassmorphism visual language built with OKLCH color system, CSS custom properties, and instant theme toggling (Light/Dark mode).
+**Altrium Hiring Tracker** is a full-stack recruitment operations and applicant tracking platform engineered to solve real-world hiring bottlenecks for **Altrium**.
 
----
+### The Client Problem
+Prior to this solution, recruitment workflows relied on fragmented tools:
+- **CV Overload**: 1,000+ candidate CVs accumulated unstructured in Google Drive folders per role.
+- **Lost Feedback**: Interview notes were scattered across Slack channels without historical tracking or scoring criteria.
+- **Access & Visibility Deficit**: Lack of role-based access control (RBAC), custom stage gating per role, or real-time KPI metrics (HR manually compiled reports in Excel).
 
-## Tech Stack
-
-- **Backend Framework**: Django 5 (Python 3.12)
-- **Frontend / Dynamic Interactivity**: HTMX, Vanilla JS, Custom Glassmorphism CSS Design System
-- **Database**: SQLite (Local Dev) / PostgreSQL (Production)
-- **Object Storage**: Cloudflare R2 / S3-compatible storage (for CV storage)
-- **AI Integration**: Groq API (`llama-3.3-70b-versatile` / `mixtral-8x7b-32768`)
-- **Deployment**: Docker, Render / Railway ready (`render.yaml`, `Procfile`)
+### The Technical Solution
+A centralized, high-density Django application providing:
+- **Structured Kanban Pipelines**: Custom stage rounds per job posting with stage-gating enforced by interview feedback rules.
+- **Role-Based Access Control (RBAC)**: Fine-grained permissions for HR Admins, Interviewers, and Management Oversight.
+- **AI-Assisted Operations**: Automated CV text extraction, skill tagging, panel score consensus engine, and note polishing.
+- **Real-Time Operational Analytics**: Live KPI metrics, pipeline velocity tracking, and SLA escalation flags (>7 days stalled).
 
 ---
 
-## Getting Started
+## 🚀 Key Features & Capabilities
 
-### Local Setup (Python / Virtualenv)
+- 🔐 **Role-Based Access Control (RBAC)**
+  - **HR Managers**: Job management, CV ingestion, stage movement, interviewer assignment.
+  - **Interviewers**: Scoped view of assigned candidates, structured scorecards, and note polishing.
+  - **Management**: Executive KPI dashboards, escalation metrics, and CSV report export.
 
-1. **Clone Repository**:
+- 📊 **Interactive Stage-Gated Kanban Board**
+  - Per-job custom interview stages (e.g., Screening, Tech Assessment, Panel Interview, Offer).
+  - Drag-and-drop movement with automated validation (prevents moving candidates without round feedback).
+
+- 🧠 **AI Intelligence & Panel Consensus Engine**
+  - **CV Parsing**: Automated text parsing, contact extraction, and skill tags via Groq LLM integration (`llama-3.3-70b-versatile`).
+  - **Panel Consensus Engine**: Weighted multi-interviewer score aggregation, conflict detection, and variance alerts.
+  - **Note Polishing & Rejection Emails**: Converts raw notes into professional summaries and generates personalized candidate emails.
+
+- 🎨 **Modern Design System & Accessibility**
+  - Dense, frosted-glass UI language (OKLCH color space, CSS custom properties).
+  - Built-in Light/Dark mode toggle with persistent preferences.
+
+---
+
+## 🛠️ System Architecture & Tech Stack
+
+| Layer | Technology |
+| :--- | :--- |
+| **Backend Framework** | Django 5 (Python 3.12) |
+| **Frontend / Interactivity** | HTMX, Vanilla JavaScript, CSS Custom Properties (OKLCH tokens) |
+| **Database** | SQLite (Development) / PostgreSQL (Production) |
+| **Object Storage** | Cloudflare R2 / S3-compatible storage (Resume PDF/Word files) |
+| **AI Processing** | Groq API (`llama-3.3-70b-versatile` / `mixtral-8x7b-32768`) |
+| **Deployment / Container** | Docker, Docker Compose, Gunicorn, Render / Railway ready |
+
+---
+
+## 💻 Getting Started
+
+### 1. Local Setup (Virtualenv)
+
+1. **Clone the Repository**:
    ```bash
    git clone https://github.com/Ctum0/Altrium-Hiring-Tracker.git
    cd Altrium-Hiring-Tracker
    ```
 
-2. **Set Up Environment**:
+2. **Initialize Environment & Install Dependencies**:
    ```bash
    python3 -m venv .venv
    source .venv/bin/activate
@@ -48,25 +80,25 @@ An enterprise-grade applicant tracking and recruitment operations platform desig
    ```bash
    cp .env.example .env
    ```
-   *(Edit `.env` to set your `DJANGO_SECRET_KEY` and optional `GROQ_API_KEY`)*
+   *(Configure `DJANGO_SECRET_KEY` and optional `GROQ_API_KEY` in `.env`)*
 
-4. **Run Migrations & Seed Initial Demo Accounts**:
+4. **Apply Migrations & Seed Demo Accounts**:
    ```bash
    python manage.py migrate
    python manage.py seed_users
    ```
 
-5. **Start Development Server**:
+5. **Launch Development Server**:
    ```bash
    python manage.py runserver
    ```
-   Navigate to `http://127.0.0.1:8000` in your browser.
+   Access the web app at `http://127.0.0.1:8000`.
 
 ---
 
-### Docker Compose Setup
+### 2. Docker Setup
 
-Run the full web and PostgreSQL stack locally using Docker:
+To run the complete web application and PostgreSQL database using Docker Compose:
 
 ```bash
 docker compose up --build
@@ -74,21 +106,21 @@ docker compose up --build
 
 ---
 
-## Demo Accounts
+## 🔑 Demo User Accounts
 
-The `seed_users` management command sets up demo accounts for testing all three system roles:
+The `seed_users` command automatically configures standard accounts for evaluation:
 
-| Role | Username | Password | Access Level |
+| Role | Username | Password | Operational Access |
 | :--- | :--- | :--- | :--- |
-| **HR Manager** | `hr_demo` | `testpass123` | Full administrative & pipeline control |
-| **Interviewer** | `iv_demo` | `testpass123` | Assigned candidates & feedback entry |
-| **Management** | `mgmt_demo` | `testpass123` | Executive KPI dashboard & reporting |
+| **HR Manager** | `hr_demo` | `testpass123` | Full pipeline, candidate import, interviewer assignment |
+| **Interviewer** | `iv_demo` | `testpass123` | Assigned candidate scorecards & note polishing |
+| **Management** | `mgmt_demo` | `testpass123` | Executive KPI dashboard, reporting & exports |
 
 ---
 
-## Testing & Quality Assurance
+## 🧪 Testing & Quality Assurance
 
-Run the automated Django test suite:
+Run the comprehensive Django unit and integration test suite:
 
 ```bash
 python manage.py test
@@ -96,6 +128,6 @@ python manage.py test
 
 ---
 
-## License
+## 📄 License & Attribution
 
-Copyright © Altrium. All rights reserved.
+Developed as a client-based project for **Altrium**. All rights reserved.
