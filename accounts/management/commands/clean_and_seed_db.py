@@ -1,6 +1,5 @@
 """Management command to clean duplicate/test jobs & candidates and seed a realistic enterprise recruitment dataset."""
 
-import random
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.db import transaction
@@ -45,119 +44,6 @@ REALISTIC_JOBS = [
     },
 ]
 
-REALISTIC_CANDIDATES = [
-    {
-        'first_name': 'Alexander',
-        'last_name': 'Wright',
-        'email': 'alexander.wright@example.com',
-        'phone': '+1 415 555 0124',
-        'skills': 'Python, Django, PostgreSQL, Docker, Redis, REST API',
-        'score': 92,
-        'job_index': 0,
-        'status': 'interview',
-        'notes': 'Strong technical depth in Django ORM and microservice design. Clear communication during technical architecture review.',
-    },
-    {
-        'first_name': 'Sophia',
-        'last_name': 'Chen',
-        'email': 'sophia.chen@example.com',
-        'phone': '+1 415 555 0188',
-        'skills': 'Python, Django, FastAPI, SQL, Docker',
-        'score': 86,
-        'job_index': 0,
-        'status': 'shortlisted',
-        'notes': 'Solid backend experience. Good understanding of database indexing and async task queues.',
-    },
-    {
-        'first_name': 'Marcus',
-        'last_name': 'Vance',
-        'email': 'marcus.vance@example.com',
-        'phone': '+1 415 555 0199',
-        'skills': 'React, JavaScript, HTMX, CSS, TypeScript, UI/UX',
-        'score': 95,
-        'job_index': 1,
-        'status': 'hired',
-        'notes': 'Exceptional frontend architect. Built custom design systems using OKLCH color spaces and HTMX state swaps.',
-    },
-    {
-        'first_name': 'Elena',
-        'last_name': 'Rostova',
-        'email': 'elena.rostova@example.com',
-        'phone': '+1 415 555 0244',
-        'skills': 'JavaScript, React, CSS, HTML',
-        'score': 78,
-        'job_index': 1,
-        'status': 'screening',
-        'notes': 'Good foundation in React components. Needs further assessment on advanced HTMX and state management.',
-    },
-    {
-        'first_name': 'David',
-        'last_name': 'Miller',
-        'email': 'david.miller@example.com',
-        'phone': '+1 415 555 0311',
-        'skills': 'AWS, Docker, Kubernetes, Terraform, CI/CD, Linux, PostgreSQL',
-        'score': 90,
-        'job_index': 2,
-        'status': 'interview',
-        'notes': 'Proven track record in managing production cloud deployments, multi-region failovers, and Docker pipelines.',
-    },
-    {
-        'first_name': 'Aria',
-        'last_name': 'Montgomery',
-        'email': 'aria.montgomery@example.com',
-        'phone': '+1 415 555 0377',
-        'skills': 'AWS, Docker, Linux, Bash',
-        'score': 74,
-        'job_index': 2,
-        'status': 'new',
-        'notes': 'Promising Junior DevOps candidate with strong Linux administration fundamentals.',
-    },
-    {
-        'first_name': 'Lucas',
-        'last_name': 'Thorne',
-        'email': 'lucas.thorne@example.com',
-        'phone': '+1 415 555 0422',
-        'skills': 'Figma, UI/UX, Design System, Prototyping, Agile',
-        'score': 88,
-        'job_index': 3,
-        'status': 'shortlisted',
-        'notes': 'Creative designer with strong portfolio in SaaS productivity dashboards and accessible dark theme interfaces.',
-    },
-    {
-        'first_name': 'Nadia',
-        'last_name': 'Patel',
-        'email': 'nadia.patel@example.com',
-        'phone': '+1 415 555 0499',
-        'skills': 'Python, Pytest, Selenium, Playwright, Automated Testing, API Testing',
-        'score': 94,
-        'job_index': 4,
-        'status': 'interview',
-        'notes': 'Expert QA Lead with hands-on Playwright automation and regression test suite setup.',
-    },
-    {
-        'first_name': 'Julian',
-        'last_name': 'Hayes',
-        'email': 'julian.hayes@example.com',
-        'phone': '+1 415 555 0533',
-        'skills': 'Python, Django, PostgreSQL, Redis',
-        'score': 82,
-        'job_index': 0,
-        'status': 'screening',
-        'notes': 'Solid Django developer. Showed good grasp of database optimization.',
-    },
-    {
-        'first_name': 'Claire',
-        'last_name': 'Dupont',
-        'email': 'claire.dupont@example.com',
-        'phone': '+1 415 555 0611',
-        'skills': 'React, TypeScript, CSS',
-        'score': 65,
-        'job_index': 1,
-        'status': 'rejected',
-        'notes': 'Lacked required experience with complex frontend design systems and server-driven interactive components.',
-    },
-]
-
 
 class Command(BaseCommand):
     help = 'Clean duplicate/test jobs and seed a clean enterprise hiring scenario.'
@@ -177,30 +63,38 @@ class Command(BaseCommand):
         self.stdout.write(self.style.WARNING('Starting database cleanup and enterprise seeding...'))
 
         with transaction.atomic():
-            # Ensure demo users exist
-            hr_user, _ = User.objects.get_or_create(
-                username='hr_demo',
-                defaults={'role': Role.HR, 'first_name': 'Hana', 'last_name': 'HR Manager'},
-            )
-            if not hr_user.check_password('testpass123'):
-                hr_user.set_password('testpass123')
-                hr_user.save()
+            # 1. Seed Realistic Hiring Team Accounts
+            users_spec = [
+                # HR Team
+                ('hr_demo', Role.HR, 'Hana', 'Miller', 'testpass123'),
+                ('hr_sarah', Role.HR, 'Sarah', 'Jenkins', 'testpass123'),
+                # Interviewer Team
+                ('iv_demo', Role.INTERVIEWER, 'Ivan', 'Vance', 'testpass123'),
+                ('iv_chen', Role.INTERVIEWER, 'Marcus', 'Chen', 'testpass123'),
+                ('iv_rachel', Role.INTERVIEWER, 'Rachel', 'Adams', 'testpass123'),
+                ('iv_patel', Role.INTERVIEWER, 'Vikram', 'Patel', 'testpass123'),
+                # Management Team
+                ('mgmt_demo', Role.MANAGEMENT, 'Mia', 'Thorne', 'testpass123'),
+                ('mgmt_davis', Role.MANAGEMENT, 'David', 'Ross', 'testpass123'),
+            ]
 
-            iv_user, _ = User.objects.get_or_create(
-                username='iv_demo',
-                defaults={'role': Role.INTERVIEWER, 'first_name': 'Ivan', 'last_name': 'Interviewer'},
-            )
-            if not iv_user.check_password('testpass123'):
-                iv_user.set_password('testpass123')
-                iv_user.save()
+            users_by_username = {}
+            for username, role, f_name, l_name, pwd in users_spec:
+                u, _ = User.objects.get_or_create(
+                    username=username,
+                    defaults={'role': role, 'first_name': f_name, 'last_name': l_name},
+                )
+                if not u.check_password(pwd):
+                    u.set_password(pwd)
+                    u.save()
+                users_by_username[username] = u
 
-            mgmt_user, _ = User.objects.get_or_create(
-                username='mgmt_demo',
-                defaults={'role': Role.MANAGEMENT, 'first_name': 'Mia', 'last_name': 'Director'},
-            )
-            if not mgmt_user.check_password('testpass123'):
-                mgmt_user.set_password('testpass123')
-                mgmt_user.save()
+            hr_main = users_by_username['hr_demo']
+            mgmt_main = users_by_username['mgmt_demo']
+            iv_demo = users_by_username['iv_demo']
+            iv_chen = users_by_username['iv_chen']
+            iv_rachel = users_by_username['iv_rachel']
+            iv_patel = users_by_username['iv_patel']
 
             # Clean existing jobs & candidates
             JobApplication.objects.all().delete()
@@ -211,7 +105,7 @@ class Command(BaseCommand):
 
             self.stdout.write(self.style.SUCCESS('Cleared legacy test objects.'))
 
-            # Create 5 core enterprise jobs
+            # 2. Create 5 core enterprise jobs
             created_jobs = []
             for spec in REALISTIC_JOBS:
                 job = Job.objects.create(
@@ -219,17 +113,168 @@ class Command(BaseCommand):
                     department=spec['department'],
                     description=spec['description'],
                     requirements=spec['requirements'],
-                    hiring_manager=mgmt_user,
-                    created_by=hr_user,
+                    hiring_manager=mgmt_main,
+                    created_by=hr_main,
                     is_active=True,
                 )
                 created_jobs.append(job)
 
             self.stdout.write(self.style.SUCCESS(f'Created {len(created_jobs)} core enterprise job postings.'))
 
-            # Create realistic candidates and applications
+            # 3. Seed Realistic Candidates & Multi-Evaluator Applications
+            candidates_data = [
+                {
+                    'first_name': 'Alexander',
+                    'last_name': 'Wright',
+                    'email': 'alexander.wright@example.com',
+                    'phone': '+1 415 555 0124',
+                    'skills': 'Python, Django, PostgreSQL, Docker, Redis, REST API',
+                    'score': 93,
+                    'job_idx': 0, # Senior Backend
+                    'status': 'interview',
+                    'assigned_to': iv_demo,
+                    'evaluations': [
+                        (1, hr_main, 9, 'Great screening interview. Clear communication and strong Django fundamentals.'),
+                        (2, iv_demo, 9, 'Excellent technical architecture review. Demonstrated deep knowledge of PostgreSQL indexing and async tasks.'),
+                        (3, mgmt_main, 10, 'Executive round passed with flying colors. Strong leadership mindset for senior backend role.'),
+                    ]
+                },
+                {
+                    'first_name': 'Elena',
+                    'last_name': 'Rostova',
+                    'email': 'elena.rostova@example.com',
+                    'phone': '+1 415 555 0244',
+                    'skills': 'Python, Django, SQL, REST API',
+                    'score': 72,
+                    'job_idx': 0, # Senior Backend
+                    'status': 'in_progress',
+                    'assigned_to': iv_demo,
+                    'evaluations': [
+                        (1, hr_main, 8, 'Friendly candidate with good communication.'),
+                        (2, iv_demo, 4, 'Struggled with complex query optimization and ORM performance questions. Recommend REJECT for senior level.'),
+                    ]
+                },
+                {
+                    'first_name': 'Marcus',
+                    'last_name': 'Vance',
+                    'email': 'marcus.vance@example.com',
+                    'phone': '+1 415 555 0199',
+                    'skills': 'React, JavaScript, HTMX, CSS, TypeScript, UI/UX',
+                    'score': 95,
+                    'job_idx': 1, # Frontend Engineer
+                    'status': 'hired',
+                    'assigned_to': iv_chen,
+                    'evaluations': [
+                        (1, hr_main, 9, 'Impressive portfolio and past frontend architecture projects.'),
+                        (2, iv_chen, 10, 'Outstanding live coding demo. Mastered HTMX state swaps and component re-usability.'),
+                    ]
+                },
+                {
+                    'first_name': 'Sophia',
+                    'last_name': 'Chen',
+                    'email': 'sophia.chen@example.com',
+                    'phone': '+1 415 555 0188',
+                    'skills': 'React, JavaScript, CSS, HTML',
+                    'score': 84,
+                    'job_idx': 1, # Frontend Engineer
+                    'status': 'interview',
+                    'assigned_to': iv_chen,
+                    'evaluations': [
+                        (2, iv_chen, 8, 'Good understanding of React hooks and DOM rendering. Needs minor review on HTMX integration.'),
+                    ]
+                },
+                {
+                    'first_name': 'David',
+                    'last_name': 'Miller',
+                    'email': 'david.miller@example.com',
+                    'phone': '+1 415 555 0311',
+                    'skills': 'AWS, Docker, Kubernetes, Terraform, CI/CD, Linux, PostgreSQL',
+                    'score': 90,
+                    'job_idx': 2, # DevOps Lead
+                    'status': 'interview',
+                    'assigned_to': iv_rachel,
+                    'evaluations': [
+                        (1, hr_main, 9, 'Proven experience managing multi-region cloud infrastructure.'),
+                        (2, iv_rachel, 9, 'Solid Terraform and Kubernetes cluster setup. Passed technical audit.'),
+                    ]
+                },
+                {
+                    'first_name': 'Aria',
+                    'last_name': 'Montgomery',
+                    'email': 'aria.montgomery@example.com',
+                    'phone': '+1 415 555 0377',
+                    'skills': 'AWS, Docker, Linux, Bash',
+                    'score': 74,
+                    'job_idx': 2, # DevOps Lead
+                    'status': 'new',
+                    'assigned_to': iv_rachel,
+                    'evaluations': [] # 0 evaluations
+                },
+                {
+                    'first_name': 'Lucas',
+                    'last_name': 'Thorne',
+                    'email': 'lucas.thorne@example.com',
+                    'phone': '+1 415 555 0422',
+                    'skills': 'Figma, UI/UX, Design System, Prototyping, Agile',
+                    'score': 88,
+                    'job_idx': 3, # Product Designer
+                    'status': 'shortlisted',
+                    'assigned_to': iv_chen,
+                    'evaluations': [
+                        (1, hr_main, 8, 'Strong design portfolio.'),
+                        (2, iv_chen, 9, 'Great eye for UI hierarchy and glassmorphism design tokens.'),
+                    ]
+                },
+                {
+                    'first_name': 'Nadia',
+                    'last_name': 'Patel',
+                    'email': 'nadia.patel@example.com',
+                    'phone': '+1 415 555 0499',
+                    'skills': 'Python, Pytest, Selenium, Playwright, Automated Testing, API Testing',
+                    'score': 94,
+                    'job_idx': 4, # QA Lead
+                    'status': 'interview',
+                    'assigned_to': iv_patel,
+                    'evaluations': [
+                        (1, hr_main, 9, 'Very articulate QA engineer.'),
+                        (2, iv_patel, 10, 'Built a working Playwright regression suite live. Exceptional candidate.'),
+                    ]
+                },
+                {
+                    'first_name': 'Julian',
+                    'last_name': 'Hayes',
+                    'email': 'julian.hayes@example.com',
+                    'phone': '+1 415 555 0533',
+                    'skills': 'Python, Django, PostgreSQL, Redis',
+                    'score': 68,
+                    'job_idx': 0, # Senior Backend
+                    'status': 'on_hold',
+                    'assigned_to': iv_demo,
+                    'evaluations': [
+                        (1, hr_main, 6, 'Average screening performance.'),
+                        (2, iv_demo, 5, 'Marginal technical score. Put candidate on hold for now.'),
+                    ]
+                },
+                {
+                    'first_name': 'Claire',
+                    'last_name': 'Dupont',
+                    'email': 'claire.dupont@example.com',
+                    'phone': '+1 415 555 0611',
+                    'skills': 'React, TypeScript, CSS',
+                    'score': 55,
+                    'job_idx': 1, # Frontend Engineer
+                    'status': 'rejected',
+                    'assigned_to': iv_chen,
+                    'evaluations': [
+                        (1, hr_main, 4, 'Did not meet core position requirements.'),
+                        (2, iv_chen, 3, 'Lacked experience in responsive UI systems. Recommend REJECT.'),
+                    ]
+                },
+            ]
+
             app_count = 0
-            for spec in REALISTIC_CANDIDATES:
+            fb_count = 0
+            for spec in candidates_data:
                 candidate = Candidate.objects.create(
                     first_name=spec['first_name'],
                     last_name=spec['last_name'],
@@ -241,31 +286,36 @@ class Command(BaseCommand):
                     resume_text=f"{spec['first_name']} {spec['last_name']} CV content. Skills: {spec['skills']}",
                 )
 
-                job = created_jobs[spec['job_index']]
-                current_round = job.rounds.filter(order=2).first() or job.rounds.first()
+                job = created_jobs[spec['job_idx']]
+                rounds = list(job.rounds.all().order_by('order'))
+                current_round = rounds[min(len(spec['evaluations']), len(rounds)-1)] if rounds else None
 
                 app = JobApplication.objects.create(
                     candidate=candidate,
                     job=job,
                     status=spec['status'],
                     current_round=current_round,
-                    assigned_to=iv_user,
-                    feedback_submitted=(spec['status'] in ['interview', 'shortlisted', 'hired']),
+                    assigned_to=spec['assigned_to'],
+                    feedback_submitted=len(spec['evaluations']) > 0,
                 )
-                app.panel_interviewers.add(iv_user)
+                app.panel_interviewers.add(spec['assigned_to'])
                 app_count += 1
 
-                # If status is interview/shortlisted/hired, add structured feedback
-                if spec['status'] in ['interview', 'shortlisted', 'hired']:
+                for r_order, interviewer_user, score, notes in spec['evaluations']:
+                    r_obj = rounds[r_order-1] if (r_order-1) < len(rounds) else rounds[-1]
                     InterviewFeedback.objects.create(
                         application=app,
-                        round=current_round,
-                        interviewer=iv_user,
-                        score=min(10, max(1, spec['score'] // 10)),
-                        notes=spec['notes'],
-                        raw_notes=f"Raw notes: {spec['notes']}",
+                        round=r_obj,
+                        interviewer=interviewer_user,
+                        score=score,
+                        notes=notes,
+                        raw_notes=f"Raw interviewer notes: {notes}",
                     )
+                    fb_count += 1
 
             self.stdout.write(
-                self.style.SUCCESS(f'Successfully seeded {len(REALISTIC_CANDIDATES)} candidates and {app_count} applications across 5 positions.')
+                self.style.SUCCESS(
+                    f'Successfully seeded {len(users_spec)} team accounts, {len(candidates_data)} candidates, '
+                    f'{app_count} applications, and {fb_count} multi-evaluator scorecards across 5 enterprise positions.'
+                )
             )
