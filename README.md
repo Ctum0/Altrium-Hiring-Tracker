@@ -133,6 +133,8 @@ Access the app at `http://127.0.0.1:8000`.
 ---
 
 ## 🧪 Testing
+Railway Deployement: https://altrium-hiring-tracker-production.up.railway.app/ 
+(Use this link to access the WebApplication)
 
 Run the Django automated test suite:
 
