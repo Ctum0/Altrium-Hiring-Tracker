@@ -1,0 +1,8 @@
+# Consolidate any co-authored / bot identities to the repository owner.
+# GitHub's Contributors graph respects .mailmap — any commit authored or
+# co-authored as CommandCodeBot will be counted under Ctum0 instead,
+# so the bot never appears as a second contributor.
+Ctum0 <sithumsryt@gmail.com> CommandCodeBot <noreply@commandcode.ai>
+Sithum Ranasinghe <95634930+Ctum0@users.noreply.github.com> CommandCodeBot <noreply@commandcode.ai>
+Ctum0 <sithumsryt@gmail.com> <noreply@commandcode.ai>
+Sithum Ranasinghe <95634930+Ctum0@users.noreply.github.com> <noreply@commandcode.ai>

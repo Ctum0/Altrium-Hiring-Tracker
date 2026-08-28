@@ -56,3 +56,4 @@ db.sqlite3.pre-migration.bak
 test_db.sqlite3
 scratch/
 login-*.md
+wireframes_figma/
