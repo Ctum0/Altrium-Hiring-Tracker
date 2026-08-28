@@ -67,18 +67,18 @@
   --vui-text-subtle: #6897AE;
   --vui-text-disabled: #476B7D;
   
-  /* Borders & Separators */
-  --vui-border-glass-subtle: rgba(255, 255, 255, 0.16);
-  --vui-border-glass-highlight: linear-gradient(135deg, rgba(255, 255, 255, 0.40) 0%, rgba(255, 255, 255, 0.08) 100%);
+  /* Borders & Separators — dark refined: hairline lifted for 4K */
+  --vui-border-glass-subtle: rgba(255, 255, 255, 0.18);
+  --vui-border-glass-highlight: linear-gradient(135deg, rgba(255, 255, 255, 0.42) 0%, rgba(255, 255, 255, 0.10) 100%);
   --vui-divider-gradient: linear-gradient(90deg, rgba(72, 202, 228, 0) 0%, rgba(72, 202, 228, 0.3) 50%, rgba(72, 202, 228, 0) 100%);
   
-  /* Effects & Blurs (Satin Heavy Blur - Extracted from Reference Image) */
-  --vui-blur-card: blur(50px) saturate(140%) brightness(105%);
-  --vui-blur-nav: blur(40px) saturate(180%);
+  /* Effects & Blurs — dark stays premium, light overrides below */
+  --vui-blur-card: blur(32px) saturate(150%) brightness(103%);
+  --vui-blur-nav: blur(28px) saturate(160%);
   --vui-blur-ambient: blur(120px);
   
-  /* Shadows */
-  --vui-shadow-card: inset 0 1px 0 0 rgba(255, 255, 255, 0.25), 0 24px 60px 0 rgba(0, 0, 0, 0.35);
+  /* Shadows — dark default refined (crisper, less milky) */
+  --vui-shadow-card: inset 0 1px 0 0 rgba(255, 255, 255, 0.28), 0 20px 52px 0 rgba(0, 0, 0, 0.36);
   --vui-shadow-glow-blue: 0 0 20px rgba(34, 211, 238, 0.4);
   --vui-shadow-glow-teal: 0 0 20px rgba(45, 212, 191, 0.4);
   
@@ -349,35 +349,35 @@ body {
 }
 :root[data-theme='light'] .vui-ambient-glow { display: none; }
 
-/* Light: visible frosted glass — milk-white translucency + satin edge, sober */
+/* Light: Level 2 glassier — milk translucency ↑, edge wetter, frost visible */
 :root[data-theme='light'] {
-  --vui-blur-card: blur(20px) saturate(165%);
-  --vui-blur-nav: blur(14px) saturate(165%);
+  --vui-blur-card: blur(24px) saturate(180%);
+  --vui-blur-nav: blur(16px) saturate(170%);
 }
 :root[data-theme='light'] .glass-panel,
 :root[data-theme='light'] .glass-card,
 :root[data-theme='light'] .vui-card,
 :root[data-theme='light'] .ai-insight-card {
-  background: rgba(255, 255, 255, 0.68) !important;
-  backdrop-filter: blur(20px) saturate(165%) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(165%) !important;
-  border-color: rgba(255, 255, 255, 0.62) !important;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.92), 0 10px 36px rgba(16,24,40,0.10), 0 1px 2px rgba(16,24,40,0.06) !important;
+  background: rgba(255, 255, 255, 0.58) !important;
+  backdrop-filter: blur(24px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+  border-color: rgba(255, 255, 255, 0.70) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.94), 0 12px 40px rgba(16,24,40,0.11), 0 1px 3px rgba(16,24,40,0.07) !important;
 }
 :root[data-theme='light'] .glass-panel::before,
 :root[data-theme='light'] .glass-card::before,
 :root[data-theme='light'] .vui-card::before,
 :root[data-theme='light'] .ai-insight-card::before {
-  background: linear-gradient(180deg, rgba(255,255,255,0.88) 0%, rgba(255,255,255,0) 72%) !important;
+  background: linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(255,255,255,0) 72%) !important;
   opacity: 1 !important;
 }
 :root[data-theme='light'] .glass-topbar,
 :root[data-theme='light'] .glass-sidebar {
-  background: rgba(255, 255, 255, 0.78) !important;
-  backdrop-filter: blur(14px) saturate(165%) !important;
-  -webkit-backdrop-filter: blur(14px) saturate(165%) !important;
-  border-color: rgba(255,255,255,0.65) !important;
-  box-shadow: 0 1px 16px rgba(16,24,40,0.08) !important;
+  background: rgba(255, 255, 255, 0.74) !important;
+  backdrop-filter: blur(16px) saturate(170%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(170%) !important;
+  border-color: rgba(255,255,255,0.70) !important;
+  box-shadow: 0 1px 18px rgba(16,24,40,0.09) !important;
 }
 :root[data-theme='light'] .app-shell {
   outline: 1px solid oklch(0.93 0.008 260);
