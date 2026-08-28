@@ -207,7 +207,7 @@
   color-scheme: dark;
 }
 
-/* ===== Light theme (Atmospheric Cyan Mesh + White Frosted Glass) ===== */
+/* ===== Light theme — Pure White SaaS (sober, premium, Stripe/Notion) ===== */
 :root[data-theme='light'] {
   color-scheme: light;
 
@@ -216,20 +216,20 @@
   --vui-primary-blue-gradient: linear-gradient(135deg, #0284C7 0%, #0369A1 100%);
   --vui-primary-blue-glow: 0 4px 14px rgba(2, 132, 199, 0.20);
 
-  /* Ultra-soft, delicate light ice-cyan gradient backdrop */
-  --vui-bg-page-gradient: linear-gradient(135deg, #C2F0F7 0%, #D7F5FA 35%, #E6FBFD 70%, #CCF2F8 100%);
-  --vui-bg-body: #C2F0F7;
-  --vui-bg-surface-dark: rgba(255, 255, 255, 0.50);
-  --vui-bg-surface-darker: rgba(255, 255, 255, 0.65);
+  /* Sober frost: slate mist canvas (Linear/Gray) — not blue, white perceives but blur has depth */
+  --vui-bg-page-gradient: radial-gradient(ellipse at 60% 0%, oklch(0.98 0.008 260) 0%, oklch(0.985 0.005 260) 42%, oklch(1.000 0.000 0) 100%);
+  --vui-bg-body: oklch(0.985 0.005 260);
+  --vui-bg-surface-dark: oklch(0.985 0.005 260);
+  --vui-bg-surface-darker: oklch(0.978 0.007 260);
 
-  /* Translucent Frosted Glass Card Backgrounds on ultra-light cyan */
-  --vui-glass-card-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.62) 0%, rgba(255, 255, 255, 0.42) 100%);
-  --vui-glass-card-bg-alt: linear-gradient(135deg, rgba(255, 255, 255, 0.70) 0%, rgba(255, 255, 255, 0.48) 100%);
-  --vui-glass-panel-light: linear-gradient(135deg, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0.52) 100%);
-  --vui-glass-hover-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.78) 0%, rgba(255, 255, 255, 0.55) 100%);
+  /* Sober milk-glass on slate mist — translucent milk + blur, edge reads */
+  --vui-glass-card-bg: rgba(255, 255, 255, 0.68);
+  --vui-glass-card-bg-alt: rgba(255, 255, 255, 0.74);
+  --vui-glass-panel-light: rgba(255, 255, 255, 0.72);
+  --vui-glass-hover-bg: rgba(255, 255, 255, 0.82);
 
   /* Active / Highlight Surface */
-  --vui-active-item-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0.52) 100%);
+  --vui-active-item-bg: rgba(2, 132, 199, 0.10);
 
 
   --brand: #0284C7;
@@ -252,15 +252,15 @@
   --accent-amber: #D97706;
   --accent-amber-soft: rgba(217, 119, 6, 0.14);
 
-  --bg: var(--vui-bg-body);
-  --bg-1: #ffffff;
-  --bg-2: #EAF1F8;
-  --bg-gradient: var(--vui-bg-page-gradient);
-  --surface: var(--vui-glass-card-bg);
-  --surface-2: rgba(255, 255, 255, 0.65);
-  --surface-hover: linear-gradient(135deg, rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0.65) 100%);
-  --border: rgba(10, 33, 56, 0.14);
-  --border-strong: rgba(10, 33, 56, 0.28);
+  --bg: oklch(0.985 0.005 260);
+  --bg-1: oklch(1.000 0.000 0);
+  --bg-2: oklch(0.980 0.007 260);
+  --bg-gradient: radial-gradient(ellipse at 60% 0%, oklch(0.98 0.008 260) 0%, oklch(0.985 0.005 260) 42%, oklch(1.000 0.000 0) 100%);
+  --surface: rgba(255, 255, 255, 0.82);
+  --surface-2: oklch(0.985 0.005 260);
+  --surface-hover: rgba(255, 255, 255, 0.96);
+  --border: oklch(0.92 0.010 260);
+  --border-strong: oklch(0.88 0.012 260);
 
   /* Crisp Slate Ink typography */
   --ink: #081A2C;
@@ -271,8 +271,8 @@
   --vui-text-white: #081A2C;
   --vui-text-muted: #132E48;
   --vui-text-subtle: #334D66;
-  --vui-border-glass-subtle: rgba(10, 33, 56, 0.14);
-  --vui-border-glass-highlight: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(10, 33, 56, 0.08) 100%);
+  --vui-border-glass-subtle: oklch(0.92 0.010 260);
+  --vui-border-glass-highlight: linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0) 100%);
 
   --status-new: #0284C7;
   --status-new-bg: rgba(2, 132, 199, 0.14);
@@ -293,16 +293,16 @@
   --danger-hover: #B91C1C;
   --danger-soft: rgba(220, 38, 38, 0.14);
 
-  --shadow-sm: 0 4px 12px rgba(10, 33, 56, 0.08);
-  --shadow-md: 0 8px 24px rgba(10, 33, 56, 0.10);
-  --shadow-lg: 0 16px 36px rgba(10, 33, 56, 0.12);
-  --shadow-xl: 0 24px 48px rgba(10, 33, 56, 0.15);
-  --shadow-dashboard: 0 12px 32px rgba(10, 33, 56, 0.10);
+  --shadow-sm: 0 1px 2px rgba(16,24,40,0.06), 0 4px 12px rgba(16,24,40,0.06);
+  --shadow-md: 0 1px 3px rgba(16,24,40,0.08), 0 8px 24px rgba(16,24,40,0.08);
+  --shadow-lg: 0 4px 16px rgba(16,24,40,0.10), 0 16px 40px rgba(16,24,40,0.10);
+  --shadow-xl: 0 8px 32px rgba(16,24,40,0.12), 0 24px 48px rgba(16,24,40,0.12);
+  --shadow-dashboard: 0 1px 3px rgba(16,24,40,0.06), 0 12px 32px rgba(16,24,40,0.08);
 
-  --glass-bg: var(--vui-glass-card-bg);
-  --glass-border: rgba(10, 33, 56, 0.14);
-  --glass-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.90), 0 10px 28px rgba(10, 33, 56, 0.08);
-  --glass-highlight: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(10, 33, 56, 0.08) 100%);
+  --glass-bg: rgba(255, 255, 255, 0.68);
+  --glass-border: oklch(0.92 0.010 260);
+  --glass-shadow: 0 1px 2px rgba(16,24,40,0.06), 0 8px 24px rgba(16,24,40,0.08);
+  --glass-highlight: linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0) 100%);
 
   --fg: var(--ink);
   --border-subtle: rgba(10, 33, 56, 0.10);
@@ -324,15 +324,18 @@ body {
   font-size: var(--text-base);
   line-height: 1.5;
   color: var(--ink);
-  background: var(--bg-gradient);
+  background: var(--bg);
   background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
   position: relative;
   overflow-x: hidden;
 }
+/* In dark, keep the navy gradient canvas; in light, flat paper */
+:root[data-theme='dark'] body { background: var(--bg-gradient); }
+:root[data-theme='light'] body { background: var(--bg); }
 
-/* Ambient glow orbs */
+/* Ambient glow orbs — visible only in dark; hidden in light (sober canvas) */
 .vui-ambient-glow {
   position: fixed;
   width: 600px;
@@ -343,6 +346,42 @@ body {
   filter: blur(120px);
   opacity: 0.65;
   transition: opacity 300ms ease;
+}
+:root[data-theme='light'] .vui-ambient-glow { display: none; }
+
+/* Light: visible frosted glass — milk-white translucency + satin edge, sober */
+:root[data-theme='light'] {
+  --vui-blur-card: blur(20px) saturate(165%);
+  --vui-blur-nav: blur(14px) saturate(165%);
+}
+:root[data-theme='light'] .glass-panel,
+:root[data-theme='light'] .glass-card,
+:root[data-theme='light'] .vui-card,
+:root[data-theme='light'] .ai-insight-card {
+  background: rgba(255, 255, 255, 0.68) !important;
+  backdrop-filter: blur(20px) saturate(165%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(165%) !important;
+  border-color: rgba(255, 255, 255, 0.62) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.92), 0 10px 36px rgba(16,24,40,0.10), 0 1px 2px rgba(16,24,40,0.06) !important;
+}
+:root[data-theme='light'] .glass-panel::before,
+:root[data-theme='light'] .glass-card::before,
+:root[data-theme='light'] .vui-card::before,
+:root[data-theme='light'] .ai-insight-card::before {
+  background: linear-gradient(180deg, rgba(255,255,255,0.88) 0%, rgba(255,255,255,0) 72%) !important;
+  opacity: 1 !important;
+}
+:root[data-theme='light'] .glass-topbar,
+:root[data-theme='light'] .glass-sidebar {
+  background: rgba(255, 255, 255, 0.78) !important;
+  backdrop-filter: blur(14px) saturate(165%) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(165%) !important;
+  border-color: rgba(255,255,255,0.65) !important;
+  box-shadow: 0 1px 16px rgba(16,24,40,0.08) !important;
+}
+:root[data-theme='light'] .app-shell {
+  outline: 1px solid oklch(0.93 0.008 260);
+  outline-offset: -1px;
 }
 
 .vui-glow-blue {
