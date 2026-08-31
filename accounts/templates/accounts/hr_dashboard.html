@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% block title %}HR Dashboard | Altrium Tracker{% endblock %}
+{% block title %}{% if user.is_management %}Management Dashboard{% else %}HR Dashboard{% endif %} | Altrium Tracker{% endblock %}
 {% block page_title %}Dashboard{% endblock %}
 {% block content_class %}dashboard-single-screen{% endblock %}
 {% block content %}
@@ -11,11 +11,13 @@
     <p class="page-sub">Recruitment intelligence and candidate workflow control.</p>
   </div>
   <div class="page-actions">
+    {% if user.is_hr %}
     <a href="{% url 'jobs:create' %}" class="btn btn-primary btn-sm">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       Create job
     </a>
     <a href="{% url 'candidates:upload' %}" class="btn btn-secondary btn-sm">Upload CVs</a>
+    {% endif %}
   </div>
 </div>
 

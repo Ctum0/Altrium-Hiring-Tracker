@@ -16,11 +16,11 @@ class LoginView(auth_views.LoginView):
 
     def get_success_url(self):
         user = self.request.user
-        if user.is_hr():
+        if user.is_hr() or user.is_management():
             return reverse_lazy('accounts:hr_dashboard')
         elif user.is_interviewer():
             return reverse_lazy('accounts:interviewer_dashboard')
-        return reverse_lazy('accounts:management_dashboard')
+        return reverse_lazy('accounts:hr_dashboard')
 
 
 class LogoutView(auth_views.LogoutView):
@@ -35,15 +35,15 @@ class HomeView(TemplateView):
     def dispatch(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
             return redirect(reverse_lazy('accounts:login'))
-        if request.user.is_hr():
+        if request.user.is_hr() or request.user.is_management():
             return redirect('accounts:hr_dashboard')
         elif request.user.is_interviewer():
             return redirect('accounts:interviewer_dashboard')
-        return redirect('accounts:management_dashboard')
+        return redirect('accounts:hr_dashboard')
 
 
 class HRDashboardView(LoginRequiredMixin, ListView):
-    """HR dashboard — grid of jobs with pipeline metrics."""
+    """HR and Management dashboard — grid of jobs with pipeline metrics."""
     template_name = 'accounts/hr_dashboard.html'
     context_object_name = 'jobs'
     paginate_by = 20
@@ -51,7 +51,7 @@ class HRDashboardView(LoginRequiredMixin, ListView):
     def dispatch(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
             return self.handle_no_permission()
-        if not request.user.is_hr():
+        if not (request.user.is_hr() or request.user.is_management()):
             return redirect('accounts:home')
         return super().dispatch(request, *args, **kwargs)
 
@@ -392,9 +392,9 @@ class InterviewerDashboardView(LoginRequiredMixin, TemplateView):
 
 
 class ManagementDashboardView(LoginRequiredMixin, RedirectView):
-    """Management lands on the read-only candidate pipeline on sign-in."""
+    """Management lands on the shared executive dashboard on sign-in."""
 
     permanent = False
 
     def get_redirect_url(self, *args, **kwargs):
-        return reverse('candidates:list')
+        return reverse('accounts:hr_dashboard')

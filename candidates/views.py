@@ -91,7 +91,7 @@ class CandidateListView(LoginRequiredMixin, ListView):
         context['filter_q'] = self.request.GET.get('q', '')
         context['show_all'] = self.request.GET.get('all') == '1'
         context['jobs'] = (
-            JobApplication.objects.values_list('job_id', 'job__title').distinct()
+            Job.objects.filter(is_active=True).values_list('id', 'title').distinct()
         )
         context['stages'] = JobApplication.Status.choices
         context['is_hr'] = self.request.user.is_hr()
