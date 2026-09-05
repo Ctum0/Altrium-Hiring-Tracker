@@ -1,8 +1,11 @@
+from django.http import HttpResponse
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.utils import timezone
 from django.db.models import Q
-from django.http import HttpResponse
+from django.conf import settings
+from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.text import get_valid_filename
@@ -13,6 +16,7 @@ from ai.cv_parser import extract_text
 from ai.matching import auto_apply, job_fit
 from ai.panel import synthesize_panel_consensus
 from ai.services import fit_summary, parse_cv
+from accounts.models import InterviewerAvailability
 from jobs.models import Job
 from notifications.models import Notification
 
@@ -124,9 +128,6 @@ class CandidateDetailView(LoginRequiredMixin, DetailView):
         context['applications'] = applications
         context['is_hr'] = self.request.user.is_hr()
         context['is_management'] = self.request.user.is_management()
-        context['interviewers'] = User.objects.filter(role='IV').order_by(
-            'first_name', 'last_name'
-        )
 
         # Compute AI Panel Consensus & Conflict Resolution for each application.
         context['panel_consensus'] = {
@@ -195,6 +196,7 @@ class CandidateUploadView(LoginRequiredMixin, View):
         created = 0
         linked = 0
         duplicates = 0
+        auto_rejected = 0
         unparsed = []
 
         try:
@@ -231,23 +233,43 @@ class CandidateUploadView(LoginRequiredMixin, View):
                         source='upload',
                     )
                     unparsed.append(f.name)
-
                 app, app_created = JobApplication.objects.get_or_create(
                     candidate=candidate,
                     job=job,
                     defaults={'status': JobApplication.Status.NEW},
                 )
+
                 if app_created:
                     linked += 1
 
-                # Auto-score based on job requirements.
-                if job.requirements:
-                    auto_apply(candidate, job)
+                # Auto-score against this specific job and auto-reject when
+                # the job defines a baseline and the candidate falls short.
+                # Only applied to newly created applications so re-uploads
+                # never clobber an existing application's state.
+                if app_created:
+                    if job.requirements:
+                        app.shortlist_score = auto_apply(candidate, job)
+
+                    if (
+                        job.auto_reject_score is not None
+                        and app.status == JobApplication.Status.NEW
+                        and app.shortlist_score is not None
+                        and app.shortlist_score < job.auto_reject_score
+                    ):
+                        app.status = JobApplication.Status.REJECTED
+                        auto_rejected += 1
+
+                    app.save(update_fields=['shortlist_score', 'status', 'updated_at'])
         except Exception as exc:
             messages.error(request, f'Upload failed: {exc}')
             return self._render(request, jobs)
 
         summary = f'{created} candidate(s) created, {linked} linked to "{job.title}".'
+        if auto_rejected:
+            summary += (
+                f' {auto_rejected} application(s) auto-rejected: '
+                f'score below the baseline of {job.auto_reject_score}.'
+            )
         if duplicates:
             summary += f' {duplicates} duplicate(s) matched an existing profile.'
         if unparsed:
@@ -318,15 +340,27 @@ class CandidateImportView(LoginRequiredMixin, View):
             )
             was_created = True
 
-        _, app_created = JobApplication.objects.get_or_create(
+        app, app_created = JobApplication.objects.get_or_create(
             candidate=candidate,
             job=job,
             defaults={'status': JobApplication.Status.NEW},
         )
 
-        # Auto-score for imports too.
-        if job.requirements:
-            auto_apply(candidate, job)
+        # Auto-score against this specific job and auto-reject when
+        # the job defines a baseline and the candidate falls short.
+        if app_created:
+            if job.requirements:
+                app.shortlist_score = auto_apply(candidate, job)
+
+            if (
+                job.auto_reject_score is not None
+                and app.status == JobApplication.Status.NEW
+                and app.shortlist_score is not None
+                and app.shortlist_score < job.auto_reject_score
+            ):
+                app.status = JobApplication.Status.REJECTED
+
+            app.save(update_fields=['shortlist_score', 'status', 'updated_at'])
 
         if was_created and app_created:
             messages.success(request, f'Imported {candidate.full_name} for {job.title}.')
@@ -418,9 +452,12 @@ class AssignApplicationView(LoginRequiredMixin, View):
         previous = app.assigned_to
 
         # Unassign: empty interviewer_id when a candidate is already assigned.
+        # The booked slot belonged to that interviewer; clear it so a stale
+        # booking can't block re-scheduling.
         if not interviewer_id and previous:
             app.assigned_to = None
-            app.save(update_fields=['assigned_to', 'updated_at'])
+            app.interview_at = None
+            app.save(update_fields=['assigned_to', 'interview_at', 'updated_at'])
             messages.success(request, f'Unassigned {app.candidate.full_name}.')
             return redirect('candidates:detail', pk=app.candidate_id)
 
@@ -429,6 +466,28 @@ class AssignApplicationView(LoginRequiredMixin, View):
             return redirect('candidates:detail', pk=app.candidate_id)
 
         interviewer = get_object_or_404(User, pk=interviewer_id, role='IV')
+
+        # Role-match: interviewer's specialty must align with the job.
+        if not interviewer.is_eligible_interviewer_for(app.job):
+            messages.error(
+                request,
+                f'{interviewer.get_full_name() or interviewer.username} is not '
+                f'qualified for {app.job.department or app.job.title}. '
+                f'Pick an interviewer whose specialty matches the role.',
+            )
+            return redirect('candidates:detail', pk=app.candidate_id)
+
+        # Availability: an interviewer with no availability on file cannot
+        # take new assignments.
+        if not interviewer.has_availability():
+            messages.error(
+                request,
+                f'{interviewer.get_full_name() or interviewer.username} has no '
+                f'availability on file. Add their weekly availability before '
+                f'assigning.',
+            )
+            return redirect('candidates:detail', pk=app.candidate_id)
+
         previous = app.assigned_to
         app.assigned_to = interviewer
         app.panel_interviewers.add(interviewer)
@@ -468,11 +527,56 @@ class InterviewDetailsView(LoginRequiredMixin, View):
             messages.error(request, 'Only HR can set interview details.')
             return redirect('candidates:detail', pk=app.candidate_id)
 
-        details = request.POST.get('interview_details', '').strip()
-        app.interview_details = details
-        app.save(update_fields=['interview_details', 'updated_at'])
+        from datetime import datetime as dt, timezone as dt_timezone
 
-        if details:
+        details = request.POST.get('interview_details', '').strip()
+        scheduled_raw = request.POST.get('interview_at', '').strip()
+
+        # Parse the optional scheduled datetime; keep old value on bad input.
+        scheduled = None
+        if scheduled_raw:
+            try:
+                scheduled = dt.fromisoformat(scheduled_raw)
+                if settings.USE_TZ and timezone.is_naive(scheduled):
+                    scheduled = timezone.make_aware(scheduled, dt_timezone.utc)
+            except ValueError:
+                messages.error(
+                    request,
+                    'Could not read the interview date/time. Use the picker '
+                    'or the format YYYY-MM-DD HH:MM.',
+                )
+                return redirect('candidates:detail', pk=app.candidate_id)
+
+        app.interview_details = details
+        app.interview_at = scheduled
+
+        if scheduled:
+            # Scheduling must respect interviewer availability and avoid
+            # double-booking. Skip checks when unassigning or clearing.
+            interviewer = app.assigned_to
+            if interviewer:
+                if not interviewer.is_available_at(scheduled):
+                    messages.error(
+                        request,
+                        f'{interviewer.get_full_name() or interviewer.username} '
+                        f'is not available at that time. Check their availability '
+                        f'and pick a slot inside a weekly window.',
+                    )
+                    return redirect('candidates:detail', pk=app.candidate_id)
+
+                clash = JobApplication.objects.filter(
+                    assigned_to=interviewer,
+                    interview_at=scheduled,
+                ).exclude(pk=app.pk).exists()
+                if clash:
+                    messages.error(
+                        request,
+                        f'{interviewer.get_full_name() or interviewer.username} '
+                        f'already has an interview scheduled at that time.',
+                    )
+                    return redirect('candidates:detail', pk=app.candidate_id)
+
+        if details or scheduled:
             messages.success(
                 request,
                 f'Interview details updated for {app.candidate.full_name}.',
@@ -482,6 +586,8 @@ class InterviewDetailsView(LoginRequiredMixin, View):
                 request,
                 f'Interview details cleared for {app.candidate.full_name}.',
             )
+
+        app.save(update_fields=['interview_details', 'interview_at', 'updated_at'])
 
         return redirect('candidates:detail', pk=app.candidate_id)
 

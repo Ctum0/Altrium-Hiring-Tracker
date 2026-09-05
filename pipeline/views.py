@@ -67,7 +67,11 @@ class PipelineMoveView(LoginRequiredMixin, View):
         if app.current_round == from_round and app.status == from_status:
             return HttpResponse(status=204)
 
-        app.save(update_fields=['current_round', 'status', 'updated_at'])
+        if to_round_id and to_round != from_round:
+            # New round means feedback must be collected again.
+            app.feedback_submitted = False
+
+        app.save(update_fields=['current_round', 'status', 'feedback_submitted', 'updated_at'])
 
         PipelineMove.objects.create(
             application=app,
@@ -88,7 +92,8 @@ class PipelineMoveView(LoginRequiredMixin, View):
         return render(request, template, {
             'app': app,
             'is_hr': True,
-            'interviewers': User.objects.filter(role='IV').order_by(
-                'first_name', 'last_name'
-            ),
+            'interviewers': [
+                iv for iv in User.objects.filter(role='IV').order_by('first_name', 'last_name')
+                if iv.is_eligible_interviewer_for(app.job)
+            ],
         })

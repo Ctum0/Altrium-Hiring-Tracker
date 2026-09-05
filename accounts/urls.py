@@ -14,5 +14,10 @@ urlpatterns = [
         views.InterviewerDashboardView.as_view(),
         name='interviewer_dashboard',
     ),
+    path(
+        'interviewer-roster/',
+        views.InterviewerRosterView.as_view(),
+        name='interviewer_roster',
+    ),
     path('dashboard/', views.ManagementDashboardView.as_view(), name='management_dashboard'),
 ]

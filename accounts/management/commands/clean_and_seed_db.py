@@ -1,10 +1,12 @@
-"""Management command to clean duplicate/test jobs & candidates and seed a realistic enterprise recruitment dataset."""
+"""Management command to clean duplicate/test jobs and seed a clean enterprise hiring scenario."""
+
+from datetime import time
 
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
-from accounts.models import Role
+from accounts.models import InterviewerAvailability, Role
 from jobs.models import InterviewRound, Job
 from candidates.models import Candidate, JobApplication
 from feedback.models import InterviewFeedback
@@ -59,24 +61,43 @@ class Command(BaseCommand):
 
         # Always ensure team user accounts exist
         users_spec = [
-            ('hr_demo', Role.HR, 'Hana', 'Miller', 'testpass123'),
-            ('hr_sarah', Role.HR, 'Sarah', 'Jenkins', 'testpass123'),
-            ('iv_demo', Role.INTERVIEWER, 'Ivan', 'Vance', 'testpass123'),
-            ('iv_chen', Role.INTERVIEWER, 'Marcus', 'Chen', 'testpass123'),
-            ('iv_rachel', Role.INTERVIEWER, 'Rachel', 'Adams', 'testpass123'),
-            ('iv_patel', Role.INTERVIEWER, 'Vikram', 'Patel', 'testpass123'),
-            ('mgmt_demo', Role.MANAGEMENT, 'Mia', 'Thorne', 'testpass123'),
-            ('mgmt_davis', Role.MANAGEMENT, 'David', 'Ross', 'testpass123'),
+            # (username, role, first, last, password, specialty)
+            ('hr_demo', Role.HR, 'Hana', 'Miller', 'testpass123', ''),
+            ('hr_sarah', Role.HR, 'Sarah', 'Jenkins', 'testpass123', ''),
+            ('iv_demo', Role.INTERVIEWER, 'Ivan', 'Vance', 'testpass123', 'Engineering'),
+            ('iv_chen', Role.INTERVIEWER, 'Marcus', 'Chen', 'testpass123', 'Engineering'),
+            ('iv_rachel', Role.INTERVIEWER, 'Rachel', 'Adams', 'testpass123', 'Infrastructure'),
+            ('iv_patel', Role.INTERVIEWER, 'Vikram', 'Patel', 'testpass123', 'Quality Assurance'),
+            ('mgmt_demo', Role.MANAGEMENT, 'Mia', 'Thorne', 'testpass123', ''),
+            ('mgmt_davis', Role.MANAGEMENT, 'David', 'Ross', 'testpass123', ''),
         ]
         users_by_username = {}
-        for username, role, f_name, l_name, pwd in users_spec:
+        for username, role, f_name, l_name, pwd, specialty in users_spec:
             u, _ = User.objects.get_or_create(username=username)
             u.role = role
             u.first_name = f_name
             u.last_name = l_name
+            u.specialty = specialty
             u.set_password(pwd)
             u.save()
             users_by_username[username] = u
+
+        # Recurring weekly availability windows for each interviewer.
+        availability_spec = [
+            ('iv_demo', [(0, '09:00', '12:00'), (2, '13:00', '17:00')]),   # Mon, Wed
+            ('iv_chen', [(1, '09:00', '12:00'), (3, '09:00', '17:00')]),   # Tue, Thu
+            ('iv_rachel', [(0, '13:00', '17:00'), (4, '09:00', '12:00')]), # Mon, Fri
+            ('iv_patel', [(2, '09:00', '12:00'), (4, '13:00', '17:00')]),  # Wed, Fri
+        ]
+        InterviewerAvailability.objects.all().delete()
+        for username, windows in availability_spec:
+            for weekday, start, end in windows:
+                InterviewerAvailability.objects.create(
+                    interviewer=users_by_username[username],
+                    weekday=weekday,
+                    start_time=time.fromisoformat(start),
+                    end_time=time.fromisoformat(end),
+                )
 
         if not force and existing_jobs == 5 and existing_candidates >= 10 and team_user_count == 8:
             self.stdout.write(self.style.SUCCESS('Database is already clean and seeded with enterprise dataset (5 jobs, 10+ candidates, 8 team accounts). Skipping wipe.'))

@@ -65,7 +65,11 @@ All primary functional requirements solving Altrium's core recruitment operation
 - **Candidate Pipeline & Kanban Board**: Interactive board tracking applications across stages, supporting stage moves, candidate un-rejection, and candidate removal.
 - **Position Closure & Management Dashboard**: Executive analytics dashboard with active metrics and job closure controls.
 
----
+- **Auto-Reject Baseline Score**: Jobs can define a minimum AI match score; CVs scoring below the baseline are auto-rejected at upload/import time (never auto-resurrected on re-upload).
+- **Intelligent Interviewer Selection**: Assignment enforces role-matching (interviewer specialty vs. job department; blank = generalist) and declared availability windows, in both the dropdown filter and server-side validation.
+- **Availability-Aware Scheduling**: Interview slots must fall inside the assigned interviewer's weekly windows; double-booking the same interviewer at the same time is blocked.
+- **Interviewer Roster Dashboard**: HR view of every interviewer's specialty, weekly availability, live workload, and pending feedback.
+- **Escalation Drill-Down**: Dashboard lists candidates stalled >7 days with job, idle time, and assignee for management follow-up.
 
 ### 🟡 Sprint 2 & Future Roadmap (Planned Enhancements)
 
@@ -108,6 +112,9 @@ pip install -r requirements.txt
 # Run migrations and seed clean enterprise test data
 python manage.py migrate
 python manage.py clean_and_seed_db --force
+
+# Seed demo availability windows for interviewer accounts
+python manage.py shell -c "from accounts.models import InterviewerAvailability, User; [InterviewerAvailability.objects.get_or_create(interviewer=iv, weekday=wd, start_time='09:00', end_time='12:00') for iv in User.objects.filter(role='IV') for wd in (0, 2)]"
 
 # Start local server
 python manage.py runserver

@@ -8,7 +8,7 @@ class JobForm(forms.ModelForm):
         model = Job
         fields = [
             'title', 'department', 'description', 'requirements',
-            'hiring_manager',
+            'auto_reject_score', 'hiring_manager',
         ]
         widgets = {
             'title': forms.TextInput(attrs={
@@ -27,6 +27,12 @@ class JobForm(forms.ModelForm):
                 'class': 'form-textarea',
                 'rows': 3,
                 'placeholder': 'e.g. Python, Django, PostgreSQL, Docker, AWS',
+            }),
+            'auto_reject_score': forms.NumberInput(attrs={
+                'class': 'form-input',
+                'min': 0,
+                'max': 100,
+                'placeholder': 'e.g. 60 (leave empty to disable auto-reject)',
             }),
             'hiring_manager': forms.Select(attrs={'class': 'form-select'}),
         }

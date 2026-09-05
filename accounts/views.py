@@ -1,13 +1,17 @@
+from django.contrib.auth import get_user_model
+from django.utils import timezone
 from django.contrib.auth import views as auth_views
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Avg, Case, Count, Q, When
 from django.shortcuts import redirect
 from django.urls import reverse, reverse_lazy
 from django.views.generic import ListView, RedirectView, TemplateView
-
+from accounts.models import Role
 from candidates.models import Candidate, JobApplication
 from feedback.models import InterviewFeedback
 from jobs.models import Job
+
+User = get_user_model()
 
 
 class LoginView(auth_views.LoginView):
@@ -326,10 +330,15 @@ class HRDashboardView(LoginRequiredMixin, ListView):
         # --- Card 4: RECRUITMENT RISK MONITOR ---
         from datetime import timedelta
         from django.utils import timezone
+
         week_ago = timezone.now() - timedelta(days=7)
-        stalled_count = JobApplication.objects.filter(
+        stalled_qs = JobApplication.objects.filter(
             updated_at__lt=week_ago
-        ).exclude(status__in=['hired', 'rejected']).count()
+        ).exclude(status__in=['hired', 'rejected']).select_related(
+            'candidate', 'job', 'assigned_to'
+        ).order_by('updated_at')
+        stalled_count = stalled_qs.count()
+        context['stalled_applications'] = stalled_qs[:5]
 
         if stalled_count >= 3:
             risk_level = 'HIGH'
@@ -383,10 +392,26 @@ class InterviewerDashboardView(LoginRequiredMixin, TemplateView):
             'candidate', 'job', 'current_round'
         )
 
-        context['assigned_apps'] = assigned_qs.order_by('-updated_at')[:20]
+        context['assigned_apps'] = assigned_qs.order_by('interview_at', '-updated_at')[:20]
         context['pending_feedback'] = assigned_qs.filter(
             feedback_submitted=False, current_round__isnull=False
         ).count()
+
+        # Upcoming interviews: scheduled, in the future, ordered nearest first.
+        context['upcoming_interviews'] = (
+            assigned_qs.filter(
+                interview_at__isnull=False,
+                interview_at__gte=timezone.now(),
+            ).exclude(status__in=['hired', 'rejected'])
+            .order_by('interview_at')[:5]
+        )
+
+        # The interviewer's own weekly availability, grouped by weekday order.
+        context['availability_windows'] = (
+            user.availability_windows.all()
+        )
+        context['has_availability'] = user.has_availability()
+
         context['active_nav'] = 'dashboard'
         return context
 
@@ -398,3 +423,54 @@ class ManagementDashboardView(LoginRequiredMixin, RedirectView):
 
     def get_redirect_url(self, *args, **kwargs):
         return reverse('accounts:hr_dashboard')
+
+
+class InterviewerRosterView(LoginRequiredMixin, ListView):
+    """HR view of every interviewer: specialty, weekly availability, load.
+
+    Real-time availability comes straight from InterviewerAvailability
+    windows; workload counts in-flight applications per interviewer so HR
+    can balance assignments against the role-match rule.
+    """
+    template_name = 'accounts/interviewer_roster.html'
+    context_object_name = 'interviewers'
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_hr():
+            return redirect('accounts:home')
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_queryset(self):
+        return (
+            User.objects.filter(role=Role.INTERVIEWER)
+            .prefetch_related('availability_windows')
+            .order_by('first_name', 'last_name')
+        )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['active_nav'] = 'roster'
+        load = dict(
+            JobApplication.objects.filter(
+                assigned_to__isnull=False,
+            )
+            .exclude(status__in=['hired', 'rejected'])
+            .values('assigned_to_id')
+            .annotate(count=Count('id'))
+            .values_list('assigned_to_id', 'count')
+        )
+        pending = dict(
+            JobApplication.objects.filter(
+                assigned_to__isnull=False,
+                feedback_submitted=False,
+                current_round__isnull=False,
+            )
+            .exclude(status__in=['hired', 'rejected'])
+            .values('assigned_to_id')
+            .annotate(count=Count('id'))
+            .values_list('assigned_to_id', 'count')
+        )
+        for iv in context['interviewers']:
+            iv.active_load = load.get(iv.pk, 0)
+            iv.pending_count = pending.get(iv.pk, 0)
+        return context

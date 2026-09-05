@@ -1,3 +1,4 @@
+from datetime import datetime, time, timezone as dt_timezone
 from io import BytesIO
 
 from django.contrib.auth import get_user_model
@@ -5,7 +6,8 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
-from accounts.models import Role
+
+from accounts.models import InterviewerAvailability, Role
 from candidates.models import Candidate, JobApplication
 from jobs.models import InterviewRound, Job
 from notifications.models import Notification
@@ -31,6 +33,10 @@ class CandidatesBaseTestCase(TestCase):
         )
         self.management = User.objects.create_user(
             username='mgmt', password='pass12345', role=Role.MANAGEMENT
+        )
+        InterviewerAvailability.objects.create(
+            interviewer=self.interviewer,
+            weekday=0, start_time=time(9, 0), end_time=time(12, 0),
         )
         self.job = Job.objects.create(title='Backend', created_by=self.hr)
         self.round1 = InterviewRound.objects.create(job=self.job, name='Screen', order=1)
@@ -394,3 +400,262 @@ class CandidateRbacSecurityTests(CandidatesBaseTestCase):
         self.assertEqual(response.status_code, 403)
         self.candidate.refresh_from_db()
         self.assertNotEqual(self.candidate.score, 95)
+
+
+class AutoRejectBaselineTests(CandidatesBaseTestCase):
+    """CV ingestion must auto-reject applications below the job's baseline."""
+
+    def setUp(self):
+        super().setUp()
+        self.login('hr')
+
+    def _import(self, email='jane@example.com', skills='Python, Django'):
+        from unittest.mock import patch
+        parsed = {
+            'first_name': 'Jane', 'last_name': 'Smith',
+            'email': email, 'phone': '', 'skills': skills.split(', '),
+        }
+        with patch('candidates.views.parse_cv', return_value=parsed):
+            return self.client.post(reverse('candidates:import'), {
+                'job': self.job.pk,
+                'source': 'LinkedIn',
+                'profile_text': f'Jane Smith\nEmail: {email}',
+            })
+
+    def test_import_auto_rejects_below_baseline(self):
+        self.job.auto_reject_score = 50
+        # Jane's CV lists 2 of 5 required skills -> score 40, below baseline 50.
+        self.job.requirements = 'Python, Django, Kubernetes, Docker, Redis'
+        self.job.save()
+
+        self._import()
+
+        app = JobApplication.objects.get(candidate__email='jane@example.com', job=self.job)
+        self.assertIsNotNone(app.shortlist_score)
+        self.assertLess(app.shortlist_score, 50)
+        self.assertEqual(app.status, JobApplication.Status.REJECTED)
+
+    def test_import_at_or_above_baseline_stays_active(self):
+        self.job.auto_reject_score = 50
+        self.job.requirements = 'Python, Django'
+        self.job.save()
+
+        self._import(skills='Python, Django')
+
+        app = JobApplication.objects.get(candidate__email='jane@example.com', job=self.job)
+        self.assertEqual(app.shortlist_score, 100)
+        self.assertEqual(app.status, JobApplication.Status.NEW)
+
+    def test_import_without_baseline_does_not_reject(self):
+        self.job.requirements = 'Python, Django, Kubernetes'
+        self.job.save()
+        self.assertIsNone(Job.objects.get(pk=self.job.pk).auto_reject_score)
+
+        self._import(skills='Python, Django')
+
+        app = JobApplication.objects.get(candidate__email='jane@example.com', job=self.job)
+        self.assertEqual(app.shortlist_score, 67)  # 2 of 3 skills matched
+        self.assertEqual(app.status, JobApplication.Status.NEW)
+
+    def test_import_without_requirements_does_not_reject(self):
+        Job.objects.filter(pk=self.job.pk).update(auto_reject_score=50)
+
+        self._import()
+
+        app = JobApplication.objects.get(candidate__email='jane@example.com', job=self.job)
+        self.assertIsNone(app.shortlist_score)
+        self.assertEqual(app.status, JobApplication.Status.NEW)
+
+    def test_reupload_below_baseline_does_not_resurrect_rejected_app(self):
+        self.job.auto_reject_score = 50
+        self.job.requirements = 'Python, Django, Kubernetes, Docker, Redis'
+        self.job.save()
+        self._import(skills='Python, Django')
+        app = JobApplication.objects.get(candidate__email='jane@example.com', job=self.job)
+        self.assertEqual(app.status, JobApplication.Status.REJECTED)
+
+        # HR manually shortlists the candidate, then the CV is re-uploaded.
+        app.status = JobApplication.Status.SHORTLISTED
+        app.save(update_fields=['status'])
+        self._import(skills='Python, Django')
+
+        app.refresh_from_db()
+        self.assertEqual(app.status, JobApplication.Status.SHORTLISTED)
+        self.assertEqual(JobApplication.objects.filter(
+            candidate__email='jane@example.com', job=self.job).count(), 1)
+
+
+class InterviewerSelectionTests(CandidatesBaseTestCase):
+    """Role-match and availability enforcement on interviewer assignment."""
+
+    def _create_specialist(self, specialty, **user_kwargs):
+        defaults = {
+            'username': f'iv_{specialty or "generalist"}',
+            'password': 'pass12345',
+            'role': Role.INTERVIEWER,
+            'first_name': 'Spec',
+            'last_name': specialty or 'Generalist',
+            'specialty': specialty,
+        }
+        defaults.update(user_kwargs)
+        return User.objects.create_user(**defaults)
+
+    def _give_window(self, user, weekday=0, start=time(9, 0), end=time(12, 0)):
+        return InterviewerAvailability.objects.create(
+            interviewer=user, weekday=weekday, start_time=start, end_time=end,
+        )
+
+    def _assign(self, interviewer_pk):
+        self.login('hr')
+        return self.client.post(
+            reverse('candidates:assign', args=[self.application.pk]),
+            {'interviewer': interviewer_pk},
+        )
+
+    def test_eligibility_property_filters_by_specialty(self):
+        backend = self._create_specialist('Engineering', username='iv_eng')
+        designer = self._create_specialist('Design', username='iv_des')
+        self.job.department = 'Engineering'
+        self.job.save()
+
+        eligible = [u.username for u in self.application.eligible_interviewers]
+
+        self.assertIn('iv', eligible)          # blank specialty = generalist
+        self.assertIn('iv_eng', eligible)
+        self.assertNotIn('iv_des', eligible)
+
+    def test_assign_rejects_specialty_mismatch(self):
+        designer = self._create_specialist('Design', username='iv_des')
+        self._give_window(designer)
+        self.job.department = 'Engineering'
+        self.job.save()
+
+        response = self._assign(designer.pk)
+
+        self.application.refresh_from_db()
+        self.assertIsNone(self.application.assigned_to)
+        messages_list = [str(m) for m in response.wsgi_request._messages]
+        self.assertTrue(
+            any('not qualified' in m for m in messages_list),
+            f'Expected rejection message, got: {messages_list}',
+        )
+
+    def test_assign_allows_matching_specialty(self):
+        backend = self._create_specialist('Engineering', username='iv_eng')
+        self._give_window(backend)
+        self.job.department = 'Engineering'
+        self.job.save()
+
+        response = self._assign(backend.pk)
+
+        self.application.refresh_from_db()
+        self.assertEqual(self.application.assigned_to, backend)
+
+    def test_assign_rejects_interviewer_without_availability(self):
+        specialist = self._create_specialist('Engineering', username='iv_eng')
+        self.job.department = 'Engineering'
+        self.job.save()
+
+        response = self._assign(specialist.pk)
+
+        self.assertIsNone(self.application.assigned_to)
+
+    def test_scheduling_rejects_slot_outside_window(self):
+        self.application.assigned_to = self.interviewer
+        self.application.save(update_fields=['assigned_to'])
+        # Window is Monday 09:00-12:00; try Wednesday (weekday 2).
+        self.login('hr')
+        self.client.post(
+            reverse('candidates:interview_details', args=[self.application.pk]),
+            {'interview_details': '', 'interview_at': '2030-01-02 10:00'},  # a Wednesday
+        )
+        self.application.refresh_from_db()
+        self.assertIsNone(self.application.interview_at)
+
+    def test_scheduling_accepts_slot_inside_window(self):
+        # 2030-01-07 is a Monday; 10:00 falls inside 09:00-12:00.
+        self.login('hr')
+        self.client.post(
+            reverse('candidates:interview_details', args=[self.application.pk]),
+            {'interview_details': '', 'interview_at': '2030-01-07 10:00'},
+        )
+        self.application.refresh_from_db()
+        self.assertIsNotNone(self.application.interview_at)
+
+    def test_scheduling_rejects_double_booking(self):
+        self.application.assigned_to = self.interviewer
+        self.application.save(update_fields=['assigned_to'])
+        other = JobApplication.objects.create(
+            candidate=Candidate.objects.create(
+                first_name='Grace', last_name='Hopper',
+                email='grace@example.com', skills='Python',
+            ),
+            job=self.job,
+            assigned_to=self.interviewer,
+            interview_at=datetime(2030, 1, 7, 10, 0, tzinfo=dt_timezone.utc),
+        )
+        self.login('hr')
+        self.client.post(
+            reverse('candidates:interview_details', args=[self.application.pk]),
+            {'interview_details': '', 'interview_at': '2030-01-07 10:00'},
+        )
+        self.application.refresh_from_db()
+        self.assertIsNone(self.application.interview_at)
+        # The other booking is untouched.
+        other.refresh_from_db()
+        self.assertIsNotNone(other.interview_at)
+
+
+class DashboardBehaviorTests(CandidatesBaseTestCase):
+    """Unassign clears bookings; round advance re-opens feedback."""
+
+    def test_unassign_clears_booked_interview_time(self):
+        self.application.assigned_to = self.interviewer
+        self.application.interview_at = datetime(2030, 1, 7, 10, 0, tzinfo=dt_timezone.utc)
+        self.application.save(update_fields=['assigned_to', 'interview_at'])
+
+        self.login('hr')
+        self.client.post(
+            reverse('candidates:assign', args=[self.application.pk]),
+            {'interviewer': ''},
+        )
+
+        self.application.refresh_from_db()
+        self.assertIsNone(self.application.assigned_to)
+        self.assertIsNone(self.application.interview_at)
+
+    def test_round_advance_resets_feedback_flag(self):
+        from feedback.models import InterviewFeedback
+        self.application.feedback_submitted = True
+        self.application.save(update_fields=['feedback_submitted'])
+        InterviewFeedback.objects.create(
+            application=self.application,
+            round=self.application.current_round,
+            interviewer=self.interviewer,
+            score=4,
+            notes='Solid screening.',
+        )
+
+        self.login('hr')
+        response = self.client.post(
+            reverse('pipeline:move', args=[self.application.pk]),
+            {'stage': f'round:{self.round2.pk}', 'source': 'detail'},
+        )
+        self.assertEqual(response.status_code, 200)
+
+        self.application.refresh_from_db()
+        self.assertEqual(self.application.current_round, self.round2)
+        self.assertFalse(self.application.feedback_submitted)
+
+    def test_same_round_move_keeps_feedback_flag(self):
+        self.application.feedback_submitted = True
+        self.application.save(update_fields=['feedback_submitted'])
+        current_round_pk = self.application.current_round_id
+
+        self.login('hr')
+        self.client.post(
+            reverse('pipeline:move', args=[self.application.pk]),
+            {'stage': f'round:{current_round_pk}', 'source': 'detail'},
+        )
+
+        self.application.refresh_from_db()

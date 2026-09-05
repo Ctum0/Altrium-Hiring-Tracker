@@ -46,7 +46,7 @@
         {% csrf_token %}
         <select class="form-select" name="interviewer" aria-label="Assigned interviewer for {{ app.candidate.full_name }}" style="padding:var(--sp-1) var(--sp-2);font-size:var(--text-xs)">
           <option value="">{% if app.assigned_to %}Keep current / unassign...{% else %}Assign to...{% endif %}</option>
-          {% for iv in interviewers %}
+          {% for iv in app.eligible_interviewers %}
           <option value="{{ iv.pk }}" {% if app.assigned_to_id == iv.pk %}selected{% endif %}>{{ iv.get_full_name|default:iv.username }}</option>
           {% endfor %}
           {% if app.assigned_to %}

@@ -26,6 +26,14 @@ class Job(models.Model):
         on_delete=models.CASCADE,
         related_name='created_jobs',
     )
+    auto_reject_score = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text=(
+            'Baseline minimum score (0-100). Candidates scoring below this '
+            'are automatically rejected on upload/import. Leave empty to disable.'
+        ),
+    )
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     closed_at = models.DateTimeField(null=True, blank=True)

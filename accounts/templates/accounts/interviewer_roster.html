@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+{% block title %}Interviewer Roster | Altrium Tracker{% endblock %}
+{% block page_title %}Interviewer Roster{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Interviewer Availability</h1>
+    <p class="page-sub">Live weekly windows, role coverage, and current workload for every interviewer.</p>
+  </div>
+</div>
+
+{% if interviewers %}
+<div class="table-wrap">
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Interviewer</th>
+        <th>Specialty</th>
+        <th>Weekly Availability</th>
+        <th>Active Load</th>
+        <th>Pending Feedback</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for iv in interviewers %}
+      <tr class="cand-row">
+        <td>
+          <div class="cand-name-cell">
+            <div class="cand-avatar cand-avatar-blue" aria-hidden="true">
+              {{ iv.first_name|first|upper }}{{ iv.last_name|first|upper }}
+            </div>
+            <div class="cand-name-info">
+              <span class="cand-name-main">{{ iv.get_full_name|default:iv.username }}</span>
+              <span class="cand-name-email">{{ iv.email|default:iv.username }}</span>
+            </div>
+          </div>
+        </td>
+        <td>
+          {% if iv.specialty %}
+          <span class="badge badge-in_progress">{{ iv.specialty }}</span>
+          {% else %}
+          <span class="text-xs text-muted">Generalist</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if iv.availability_windows.all %}
+            {% for w in iv.availability_windows.all %}
+            <div class="text-xs" style="white-space:nowrap">{{ w.get_weekday_display }} {{ w.start_time|time:"H:i" }}&ndash;{{ w.end_time|time:"H:i" }}</div>
+            {% endfor %}
+          {% else %}
+          <span class="badge badge-rejected">No windows declared</span>
+          {% endif %}
+        </td>
+        <td>
+          <span class="score-ring {% if iv.active_load >= 5 %}score-ring-low{% elif iv.active_load >= 2 %}score-ring-mid{% elif iv.active_load > 0 %}score-ring-high{% else %}score-ring-none{% endif %}">
+            {{ iv.active_load }}
+          </span>
+        </td>
+        <td>
+          {% if iv.pending_count > 0 %}
+          <span class="badge badge-feedback">{{ iv.pending_count }} pending</span>
+          {% else %}
+          <span class="text-xs text-muted">All submitted</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty-state">
+  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto 12px;color:var(--muted)" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg>
+  <p class="empty-state-title">No interviewers registered</p>
+  <p class="empty-state-body">Interviewer accounts will appear here with their availability once created.</p>
+</div>
+{% endif %}
+{% endblock %}

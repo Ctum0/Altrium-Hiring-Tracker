@@ -429,6 +429,29 @@
       {% endif %}
     </div>
 
+    <!-- Escalation: Stalled Candidates (>7 days no movement) -->
+    {% if stalled_applications %}
+    <div class="panel panel-pad ref-card">
+      <div class="ref-card-header">
+        <h3 class="ref-card-title">Escalations &mdash; Stalled &gt; 7 Days</h3>
+        <span class="badge badge-feedback">{{ stalled_applications|length }} shown</span>
+      </div>
+      <div class="ref-jobs-list">
+        {% for app in stalled_applications %}
+        <div class="ref-job-item">
+          <div class="ref-job-main">
+            <div class="ref-job-title">
+              <a href="{% url 'candidates:detail' app.candidate_id %}" style="color:inherit;text-decoration:none">{{ app.candidate.full_name }}</a>
+            </div>
+            <div class="ref-job-meta">{{ app.job.title }} &middot; idle {{ app.updated_at|timesince }} &middot; {% if app.assigned_to %}{{ app.assigned_to.get_full_name|default:app.assigned_to.username }}{% else %}unassigned{% endif %}</div>
+          </div>
+          <span class="badge badge-{{ app.status }}">{{ app.get_status_display }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
     <!-- Active Open Roles -->
     <div class="panel panel-pad ref-card">
       <div class="ref-card-header">

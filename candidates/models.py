@@ -148,6 +148,16 @@ class JobApplication(models.Model):
         blank=True,
         help_text='AI-generated candidate-vs-job fit assessment (Strengths / Gaps / Interview focus).',
     )
+    shortlist_score = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text='Score computed against this specific job (0-100), used for auto-reject.',
+    )
+    interview_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='Scheduled interview start time for the assigned interviewer.',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -176,6 +186,23 @@ class JobApplication(models.Model):
         """Synthesizes multi-interviewer feedback and returns progressive weighted consensus."""
         from ai.panel import synthesize_panel_consensus
         return synthesize_panel_consensus(self)
+
+    @property
+    def eligible_interviewers(self):
+        """Interviewers eligible for assignment to this application.
+
+        Applies the role-match rule (specialty vs job department; blank
+        specialty = generalist). Availability is enforced at assignment and
+        scheduling time, not here.
+        """
+        from django.contrib.auth import get_user_model
+
+        User = get_user_model()
+        return [
+            user
+            for user in User.objects.filter(role='IV').order_by('first_name', 'last_name')
+            if user.is_eligible_interviewer_for(self.job)
+        ]
 
     def save(self, *args, **kwargs):
         if self._state.adding and not self.current_round_id and self.job_id:
