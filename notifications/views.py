@@ -19,9 +19,10 @@ class NotificationListView(LoginRequiredMixin, ListView):
 
     def paginate_queryset(self, queryset, page_size):
         """Clamp out-of-range pages instead of 404ing."""
+        from django.core.paginator import EmptyPage, PageNotAnInteger
         try:
             return super().paginate_queryset(queryset, page_size)
-        except Exception:
+        except (PageNotAnInteger, EmptyPage):
             self.kwargs['page'] = 'last'
             return super().paginate_queryset(queryset, page_size)
 
@@ -56,3 +57,13 @@ class MarkReadView(LoginRequiredMixin, View):
                 'n': notification,
             })
         return HttpResponse(status=204)
+
+
+class MarkAllReadView(LoginRequiredMixin, View):
+    """Mark every unread notification for the current user as read."""
+
+    def post(self, request):
+        updated = Notification.objects.filter(
+            recipient=request.user, is_read=False,
+        ).update(is_read=True)
+        return HttpResponse(str(updated))

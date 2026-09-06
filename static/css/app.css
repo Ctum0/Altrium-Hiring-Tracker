@@ -4599,3 +4599,18 @@ body.no-scroll {
     transform: none !important;
   }
 }
+
+/* Interviewer slot preview (assign flow) */
+.slot-preview:empty {
+  display: none;
+}
+.slot-preview-card {
+  border: 1px solid var(--border, rgba(148, 163, 184, 0.25));
+  border-radius: var(--radius, 10px);
+}
+.slot-preview-label {
+  font-weight: 600;
+}
+.slot-pick {
+  white-space: nowrap;
+}

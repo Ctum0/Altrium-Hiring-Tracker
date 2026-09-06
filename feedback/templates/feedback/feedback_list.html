@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load accounts_extras %}
 {% block title %}Feedback | Altrium Tracker{% endblock %}
 {% block page_title %}Feedback{% endblock %}
 {% block content %}
@@ -44,8 +45,7 @@
         {% for app in pending_applications %}
         <tr class="cand-row">
           <td>
-            <div class="cand-name-cell">
-              <div class="cand-avatar cand-avatar-{{ app.candidate.full_name|first|lower|make_list|first|default:'0'|slugify|last }}" aria-hidden="true">
+              <div class="cand-avatar cand-avatar-{{ app.candidate.full_name|avatar_index }}" aria-hidden="true">
                 {{ app.candidate.full_name|first|upper }}{% if app.candidate.full_name|wordcount > 1 %}{{ app.candidate.full_name|cut:" "|last|upper }}{% endif %}
               </div>
               <div class="cand-name-info">
@@ -105,7 +105,7 @@
         <tr class="cand-row">
           <td>
             <div class="cand-name-cell">
-              <div class="cand-avatar cand-avatar-{{ fb.application.candidate.full_name|first|lower|make_list|first|default:'0'|slugify|last }}" aria-hidden="true">
+              <div class="cand-avatar cand-avatar-{{ fb.application.candidate.full_name|avatar_index }}" aria-hidden="true">
                 {{ fb.application.candidate.full_name|first|upper }}{% if fb.application.candidate.full_name|wordcount > 1 %}{{ fb.application.candidate.full_name|cut:" "|last|upper }}{% endif %}
               </div>
               <div class="cand-name-info">

@@ -73,12 +73,15 @@ class Command(BaseCommand):
         ]
         users_by_username = {}
         for username, role, f_name, l_name, pwd, specialty in users_spec:
-            u, _ = User.objects.get_or_create(username=username)
+            u, created = User.objects.get_or_create(username=username)
             u.role = role
             u.first_name = f_name
             u.last_name = l_name
             u.specialty = specialty
-            u.set_password(pwd)
+            if created:
+                # Only stamp the demo password on brand-new accounts; never
+                # revert a password someone may have changed.
+                u.set_password(pwd)
             u.save()
             users_by_username[username] = u
 

@@ -11,6 +11,10 @@
   <div class="page-actions">
     <a href="{% url 'notifications:list' %}" class="btn btn-sm {% if not request.GET.unread %}btn-primary{% else %}btn-secondary{% endif %}">All notifications</a>
     <a href="?unread=1" class="btn btn-sm {% if request.GET.unread == '1' %}btn-primary{% else %}btn-secondary{% endif %}">Unread only</a>
+    <form method="post" action="{% url 'notifications:mark_all_read' %}" style="display:inline">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-sm btn-secondary">Mark all read</button>
+    </form>
   </div>
 </div>
 

@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.urls import reverse
 
@@ -29,6 +30,7 @@ class Job(models.Model):
     auto_reject_score = models.PositiveIntegerField(
         null=True,
         blank=True,
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
         help_text=(
             'Baseline minimum score (0-100). Candidates scoring below this '
             'are automatically rejected on upload/import. Leave empty to disable.'

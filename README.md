@@ -65,11 +65,13 @@ All primary functional requirements solving Altrium's core recruitment operation
 - **Candidate Pipeline & Kanban Board**: Interactive board tracking applications across stages, supporting stage moves, candidate un-rejection, and candidate removal.
 - **Position Closure & Management Dashboard**: Executive analytics dashboard with active metrics and job closure controls.
 
-- **Auto-Reject Baseline Score**: Jobs can define a minimum AI match score; CVs scoring below the baseline are auto-rejected at upload/import time (never auto-resurrected on re-upload).
-- **Intelligent Interviewer Selection**: Assignment enforces role-matching (interviewer specialty vs. job department; blank = generalist) and declared availability windows, in both the dropdown filter and server-side validation.
-- **Availability-Aware Scheduling**: Interview slots must fall inside the assigned interviewer's weekly windows; double-booking the same interviewer at the same time is blocked.
-- **Interviewer Roster Dashboard**: HR view of every interviewer's specialty, weekly availability, live workload, and pending feedback.
+- **Auto-Reject Baseline Score**: Jobs can define a minimum AI match score (0-100, validated); CVs scoring below the baseline are auto-rejected at upload/import time (never auto-resurrected on re-upload). A baseline without requirements is rejected at form level, so the baseline can never silently mass-reject.
+- **Intelligent Interviewer Selection**: Assignment enforces role-matching (interviewer specialty vs. job department; blank = generalist) and declared availability windows, in both the dropdown filter and server-side validation. Assign/unassign run through a confirmation dialog; unassign clears the booked interview slot and notifies the former assignee.
+- **Availability-Aware Scheduling**: HR picks a slot from a live availability preview (weekly windows + computed next free 1-hour slots) rendered inline when an interviewer is selected. Slots must fall inside the interviewer's windows; double-booking the same interviewer at the same time is blocked.
+- **Interviewer Roster Dashboard**: HR/Management view of every interviewer's specialty, weekly availability, live workload (assignee + panel), and pending feedback.
 - **Escalation Drill-Down**: Dashboard lists candidates stalled >7 days with job, idle time, and assignee for management follow-up.
+- **Honest Analytics**: Pipeline velocity shows measured average days-in-stage (no synthetic formulas); insight cards show real candidate counts and skill frequencies; action links deep-link to filtered candidate lists.
+- **Security Hardening**: docker boot no longer wipes/reseeds production data or resets passwords; SECRET_KEY/DEBUG fail closed in production; login rate-limiting via django-axes; signed S3 media URLs; session + upload size caps; tunnel hosts trusted in DEBUG only.
 
 ### 🟡 Sprint 2 & Future Roadmap (Planned Enhancements)
 
@@ -109,10 +111,12 @@ source .venv/bin/activate
 # Install dependencies
 pip install -r requirements.txt
 
-# Run migrations and seed clean enterprise test data
+# Run migrations
 python manage.py migrate
-python manage.py clean_and_seed_db --force
 
+# DEV ONLY — wipes all data and reseeds demo content. Never run against a
+# production database; the Docker/Render boot command does NOT run this.
+python manage.py clean_and_seed_db --force
 # Seed demo availability windows for interviewer accounts
 python manage.py shell -c "from accounts.models import InterviewerAvailability, User; [InterviewerAvailability.objects.get_or_create(interviewer=iv, weekday=wd, start_time='09:00', end_time='12:00') for iv in User.objects.filter(role='IV') for wd in (0, 2)]"
 

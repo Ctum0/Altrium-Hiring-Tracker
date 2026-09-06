@@ -1,4 +1,5 @@
 from django import forms
+from django.core.validators import MinValueValidator, MaxValueValidator
 
 from .models import InterviewRound, Job
 
@@ -36,6 +37,35 @@ class JobForm(forms.ModelForm):
             }),
             'hiring_manager': forms.Select(attrs={'class': 'form-select'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['auto_reject_score'].validators += [
+            MinValueValidator(0), MaxValueValidator(100),
+        ]
+        self.fields['auto_reject_score'].help_text = (
+            'Auto-reject CVs scoring below this baseline (0-100). '
+            'Requires at least one requirement; leave empty to disable.'
+        )
+        self.fields['department'].help_text = (
+            'Used to match interviewer specialties (e.g. an Engineering job '
+            'is interviewed by Engineering-specialty interviewers).'
+        )
+
+    def clean(self):
+        cleaned = super().clean()
+        requirements = (cleaned.get('requirements') or '').strip()
+        baseline = cleaned.get('auto_reject_score')
+        # A separators-only requirements string (" , ") would score every
+        # candidate 0 and mass-reject; require a real token when a baseline
+        # is set, and warn-free pass when it is not.
+        tokens = [t for t in requirements.replace(',', ' ').split() if t.strip()]
+        if baseline is not None and not tokens:
+            raise forms.ValidationError(
+                'Auto-reject baseline requires at least one requirement '
+                'skill, otherwise every candidate would score 0 and be rejected.'
+            )
+        return cleaned
 
 
 class RoundForm(forms.ModelForm):

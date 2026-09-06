@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 {% block title %}{% if user.is_management %}Management Dashboard{% else %}HR Dashboard{% endif %} | Altrium Tracker{% endblock %}
 {% block page_title %}Dashboard{% endblock %}
+{% block head %}<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js" defer></script>{% endblock %}
 {% block content_class %}dashboard-single-screen{% endblock %}
 {% block content %}
 
@@ -40,7 +41,7 @@
   <a href="{% url 'jobs:list' %}" class="ref-kpi-card glass-panel vui-card vui-card-hover kpi-card-link">
     <div class="ref-kpi-meta">
       <span class="ref-kpi-label">Open Positions</span>
-      <span class="ref-kpi-value">{{ jobs|length }}</span>
+      <span class="ref-kpi-value">{{ active_job_count }}</span>
       <span class="kpi-trend kpi-trend-neutral">Active roles</span>
     </div>
     <div class="ref-kpi-icon-box ref-kpi-icon-teal" aria-hidden="true">
@@ -50,8 +51,8 @@
 
   <a href="{% url 'candidates:list' %}?sort=score" class="ref-kpi-card glass-panel vui-card vui-card-hover kpi-card-link">
     <div class="ref-kpi-meta">
-      <span class="ref-kpi-label">Avg. AI Score</span>
-      <span class="ref-kpi-value">{% if avg_score %}{{ avg_score }}{% else %}—{% endif %}</span>
+      <span class="ref-kpi-label">Avg. Shortlist Score</span>
+      <span class="ref-kpi-value">{% if avg_score is not None %}{{ avg_score }}{% else %}—{% endif %}</span>
       <span class="kpi-trend {% if avg_score and avg_score >= 60 %}kpi-trend-up{% else %}kpi-trend-neutral{% endif %}">
         {{ scored_count }} scored candidates
       </span>
@@ -127,36 +128,31 @@
       <div class="panel panel-pad ref-card">
         <div class="ref-card-header">
           <h3 class="ref-card-title">Pipeline Velocity</h3>
-          <span class="text-xs text-muted">7-day monitor</span>
+          <span class="text-xs text-muted">avg days in current stage</span>
         </div>
         <div class="ref-velocity-list">
+          {% if has_velocity_data %}
           <div class="ref-velocity-item">
             <div class="velocity-meta">
-              <span class="velocity-label">Screening Avg Time</span>
-              <span class="velocity-val mono">{{ velocity_screening }} days</span>
-            </div>
-            <div class="velocity-bar-track">
-              <div class="velocity-bar-fill fill-blue" style="width: 45%;"></div>
+              <span class="velocity-label">Shortlisted</span>
+              <span class="velocity-val mono">{% if velocity_screening %}{{ velocity_screening }} days{% else %}—{% endif %}</span>
             </div>
           </div>
           <div class="ref-velocity-item">
             <div class="velocity-meta">
-              <span class="velocity-label">Interview Stage Avg</span>
-              <span class="velocity-val mono">{{ velocity_interview }} days</span>
-            </div>
-            <div class="velocity-bar-track">
-              <div class="velocity-bar-fill fill-amber" style="width: 72%;"></div>
+              <span class="velocity-label">Interview stage</span>
+              <span class="velocity-val mono">{% if velocity_interview %}{{ velocity_interview }} days{% else %}—{% endif %}</span>
             </div>
           </div>
           <div class="ref-velocity-item">
             <div class="velocity-meta">
-              <span class="velocity-label">Offer SLA Pace</span>
-              <span class="velocity-val mono text-success">{{ velocity_offer }} days</span>
-            </div>
-            <div class="velocity-bar-track">
-              <div class="velocity-bar-fill fill-green" style="width: 30%;"></div>
+              <span class="velocity-label">Hired</span>
+              <span class="velocity-val mono">{% if velocity_offer %}{{ velocity_offer }} days{% else %}—{% endif %}</span>
             </div>
           </div>
+          {% else %}
+          <p class="text-xs text-muted">No applications in any stage yet.</p>
+          {% endif %}
           <div class="ref-velocity-flag">
             <span class="flag-dot {% if stalled_count > 0 %}dot-amber{% else %}dot-green{% endif %}"></span>
             <span class="flag-text">{{ stalled_count }} candidate{{ stalled_count|pluralize }} stalled over 7 days</span>
@@ -218,7 +214,7 @@
           <!-- Section 2: Main Finding -->
           <div class="ai-card-sec-finding">
             <h4 class="ai-main-title" title="{{ insight.finding }}">{{ insight.finding }}</h4>
-            <div class="ai-sub-score"><span class="ai-score-label">Demand Score:</span> <span class="ai-score-val ai-text-blue">{{ insight.demand_score }}%</span></div>
+            <div class="ai-sub-score"><span class="ai-score-label">Candidates:</span> <span class="ai-score-val ai-text-blue">{{ insight.distribution.0.count }}</span></div>
           </div>
 
           <!-- Section 3: Supporting Intelligence -->
@@ -250,7 +246,7 @@
             </div>
           </div>          <!-- Action Line -->
           <div class="ai-card-action ai-action-blue">
-            <span class="ai-action-lbl">Action:</span> <a href="{% url 'candidates:list' %}?job_role=Senior+Backend+Engineer" class="ai-action-link">{{ insight.recommendation }} &rarr;</a>
+            <span class="ai-action-lbl">Action:</span> <a href="{% url 'candidates:list' %}?job={{ insight.job_pks }}" class="ai-action-link">{{ insight.recommendation }} &rarr;</a>
           </div>
 
           {% elif insight.id == 'best_fit' %}
@@ -265,40 +261,30 @@
           <!-- Section 2: Main Finding -->
           <div class="ai-card-sec-finding">
             <h4 class="ai-main-title" title="{{ insight.finding }}">{{ insight.finding }}</h4>
-            <div class="ai-sub-score"><span class="ai-score-val ai-text-violet">{{ insight.compatibility }}%</span> <span class="ai-score-label">compatibility</span></div>
           </div>
 
           <!-- Section 3: Supporting Intelligence -->
           <div class="ai-card-sec-intel">
-            <div class="ai-intel-text"><span class="ai-intel-dot ai-dot-violet"></span>Reason: "{{ insight.reason }}"</div>
-            <div class="ai-factors-list">
-              <span class="ai-factors-label">AI Match Factors:</span>
+            {% if insight.skill_factors %}
+            <div class="ai-skills-detected">
+              <span class="ai-factors-label">Most common skills:</span>
               <div class="ai-factors-grid">
                 {% for f in insight.skill_factors %}
                 <div class="ai-factor-item">
                   <span class="ai-factor-name">{{ f.skill }}</span>
-                  <div class="ai-factor-track"><div class="ai-factor-fill ai-fill-violet" style="width: {{ f.pct }}%;"></div></div>
+                  <span class="ai-factor-count text-muted">{{ f.count }} candidate{{ f.count|pluralize }}</span>
                 </div>
                 {% endfor %}
               </div>
             </div>
-          </div>
-
-          <!-- Section 4: Visualization (Circular Match Meter) -->
-          <div class="ai-card-sec-vis ai-vis-radial-wrap">
-            <div class="ai-radial-gauge">
-              <svg viewBox="0 0 36 36" class="ai-radial-svg">
-                <path class="ai-radial-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                <path class="ai-radial-stroke ai-stroke-violet" stroke-dasharray="{{ insight.compatibility }}, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-              </svg>
-              <div class="ai-radial-text">{{ insight.compatibility }}%</div>
-            </div>
-            <div class="ai-radial-label">Match Meter</div>
+            {% else %}
+            <div class="ai-intel-text"><span class="ai-intel-dot ai-dot-violet"></span>No candidate skill data yet for this role.</div>
+            {% endif %}
           </div>
 
           <!-- Action Line -->
           <div class="ai-card-action ai-action-violet">
-            <span class="ai-action-lbl">Action:</span> <a href="{% url 'candidates:list' %}?role=Lead+Cloud+Architect" class="ai-action-link">{{ insight.recommendation }} &rarr;</a>
+            <span class="ai-action-lbl">Action:</span> <a href="{% url 'candidates:list' %}?job={{ insight.job_pks }}" class="ai-action-link">{{ insight.recommendation }} &rarr;</a>
           </div>
 
           {% elif insight.id == 'health' %}
@@ -340,7 +326,7 @@
 
           <!-- Action Line -->
           <div class="ai-card-action ai-action-amber">
-            <span class="ai-action-lbl">Action:</span> <a href="{% url 'candidates:list' %}?stage=Rejected" class="ai-action-link">{{ insight.recommendation }} &rarr;</a>
+            <span class="ai-action-lbl">Action:</span> <a href="{% url 'candidates:list' %}?stage=rejected" class="ai-action-link">{{ insight.recommendation }} &rarr;</a>
           </div>
 
           {% elif insight.id == 'risk' %}

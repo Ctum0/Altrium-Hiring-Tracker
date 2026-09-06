@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+
 from django.http import HttpResponse
 from django.contrib import messages
 from django.contrib.auth import get_user_model
@@ -5,7 +7,6 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.utils import timezone
 from django.db.models import Q
 from django.conf import settings
-from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.text import get_valid_filename
@@ -14,7 +15,6 @@ from django.views.generic import DetailView, ListView
 
 from ai.cv_parser import extract_text
 from ai.matching import auto_apply, job_fit
-from ai.panel import synthesize_panel_consensus
 from ai.services import fit_summary, parse_cv
 from accounts.models import InterviewerAvailability
 from jobs.models import Job
@@ -93,6 +93,10 @@ class CandidateListView(LoginRequiredMixin, ListView):
         context['filter_stage'] = self.request.GET.get('stage', '')
         context['filter_min_score'] = self.request.GET.get('min_score', '')
         context['filter_q'] = self.request.GET.get('q', '')
+        # Pagination links re-attach every current filter param.
+        get_params = self.request.GET.copy()
+        get_params.pop('page', None)
+        context['qs_base'] = get_params.urlencode()
         context['show_all'] = self.request.GET.get('all') == '1'
         context['jobs'] = (
             Job.objects.filter(is_active=True).values_list('id', 'title').distinct()
@@ -129,11 +133,8 @@ class CandidateDetailView(LoginRequiredMixin, DetailView):
         context['is_hr'] = self.request.user.is_hr()
         context['is_management'] = self.request.user.is_management()
 
-        # Compute AI Panel Consensus & Conflict Resolution for each application.
-        context['panel_consensus'] = {
-            app.pk: synthesize_panel_consensus(app)
-            for app in applications
-        }
+        # Panel consensus is rendered via the app.panel_consensus property
+        # inside the row partial; no precompute here.
 
         # Per-application skill overlap breakdown for the fit panel.
         context['fit'] = [
@@ -197,72 +198,81 @@ class CandidateUploadView(LoginRequiredMixin, View):
         linked = 0
         duplicates = 0
         auto_rejected = 0
+        refreshed = 0
         unparsed = []
+        failed = []  # (filename, reason)
 
-        try:
-            for f in files:
-                # Sanitize filename before saving.
-                f.name = get_valid_filename(f.name)
+        for f in files:
+            # Sanitize filename before saving.
+            f.name = get_valid_filename(f.name)
+            try:
                 text = extract_text(f)
                 parsed = parse_cv(text)
-                email = (parsed.get('email') or '').strip().lower()
+            except Exception:
+                failed.append((f.name, 'could not read the file'))
+                continue
+            email = (parsed.get('email') or '').strip().lower()
 
-                if email:
-                    candidate, was_created = Candidate.objects.get_or_create(
-                        email=email,
-                        defaults={
-                            'first_name': parsed.get('first_name', ''),
-                            'last_name': parsed.get('last_name', ''),
-                            'phone': parsed.get('phone', ''),
-                            'skills': ', '.join(parsed.get('skills', [])),
-                            'resume_file': f,
-                            'resume_text': text[:50000],
-                            'source': 'upload',
-                        },
-                    )
-                    if was_created:
-                        created += 1
-                    else:
-                        duplicates += 1
-                else:
-                    # No email extracted: still store the CV so it is not lost.
-                    candidate = Candidate.objects.create(
-                        email=None,
-                        resume_file=f,
-                        resume_text=text[:50000],
-                        source='upload',
-                    )
-                    unparsed.append(f.name)
-                app, app_created = JobApplication.objects.get_or_create(
-                    candidate=candidate,
-                    job=job,
-                    defaults={'status': JobApplication.Status.NEW},
+            if email:
+                candidate, was_created = Candidate.objects.get_or_create(
+                    email=email,
+                    defaults={
+                        'first_name': parsed.get('first_name', ''),
+                        'last_name': parsed.get('last_name', ''),
+                        'phone': parsed.get('phone', ''),
+                        'skills': ', '.join(parsed.get('skills', [])),
+                        'resume_file': f,
+                        'resume_text': text[:50000],
+                        'source': 'upload',
+                    },
                 )
+                if was_created:
+                    created += 1
+                else:
+                    duplicates += 1
+                    # Refresh the stored CV and skills with the newer upload.
+                    candidate.resume_file = f
+                    candidate.resume_text = text[:50000]
+                    if parsed.get('skills'):
+                        candidate.skills = ', '.join(parsed.get('skills', []))
+                    candidate.save(update_fields=['resume_file', 'resume_text', 'skills', 'updated_at'])
+                    refreshed += 1
+            else:
+                # No email extracted: still store the CV so it is not lost.
+                candidate = Candidate.objects.create(
+                    email=None,
+                    resume_file=f,
+                    resume_text=text[:50000],
+                    source='upload',
+                )
+                unparsed.append(f.name)
+            app, app_created = JobApplication.objects.get_or_create(
+                candidate=candidate,
+                job=job,
+                defaults={'status': JobApplication.Status.NEW},
+            )
 
-                if app_created:
-                    linked += 1
+            if app_created:
+                linked += 1
 
-                # Auto-score against this specific job and auto-reject when
-                # the job defines a baseline and the candidate falls short.
-                # Only applied to newly created applications so re-uploads
-                # never clobber an existing application's state.
-                if app_created:
-                    if job.requirements:
-                        app.shortlist_score = auto_apply(candidate, job)
+            # Auto-score against this specific job and auto-reject when the
+            # job defines a baseline and the candidate falls short. Only
+            # applied to newly created applications so re-uploads never
+            # clobber an existing application's state.
+            if app_created:
+                if job.requirements.strip() and candidate.skills.strip():
+                    app.shortlist_score = auto_apply(candidate, job)
 
-                    if (
-                        job.auto_reject_score is not None
-                        and app.status == JobApplication.Status.NEW
-                        and app.shortlist_score is not None
-                        and app.shortlist_score < job.auto_reject_score
-                    ):
-                        app.status = JobApplication.Status.REJECTED
-                        auto_rejected += 1
+                if (
+                    job.auto_reject_score is not None
+                    and app.status == JobApplication.Status.NEW
+                    and app.shortlist_score is not None
+                    and app.shortlist_score < job.auto_reject_score
+                ):
+                    app.status = JobApplication.Status.REJECTED
+                    auto_rejected += 1
 
-                    app.save(update_fields=['shortlist_score', 'status', 'updated_at'])
-        except Exception as exc:
-            messages.error(request, f'Upload failed: {exc}')
-            return self._render(request, jobs)
+                app.save(update_fields=['shortlist_score', 'status', 'updated_at'])
 
         summary = f'{created} candidate(s) created, {linked} linked to "{job.title}".'
         if auto_rejected:
@@ -272,8 +282,17 @@ class CandidateUploadView(LoginRequiredMixin, View):
             )
         if duplicates:
             summary += f' {duplicates} duplicate(s) matched an existing profile.'
+            if refreshed:
+                summary += f' {refreshed} updated with the newer CV.'
         if unparsed:
             summary += f' {len(unparsed)} file(s) could not be parsed: {", ".join(unparsed[:3])}.'
+        if failed:
+            failed_names = ', '.join(name for name, _ in failed[:3])
+            messages.error(
+                request,
+                f'{len(failed)} file(s) failed: {failed_names} — '
+                'unreadable or corrupted; the rest were processed.',
+            )
         messages.success(request, summary)
         return redirect('candidates:list')
 
@@ -281,6 +300,7 @@ class CandidateUploadView(LoginRequiredMixin, View):
         return render(request, 'candidates/candidate_upload.html', {
             'active_nav': 'candidates',
             'jobs': jobs,
+            'selected_job': request.POST.get('job', ''),
         })
 
 
@@ -349,7 +369,7 @@ class CandidateImportView(LoginRequiredMixin, View):
         # Auto-score against this specific job and auto-reject when
         # the job defines a baseline and the candidate falls short.
         if app_created:
-            if job.requirements:
+            if job.requirements.strip() and candidate.skills.strip():
                 app.shortlist_score = auto_apply(candidate, job)
 
             if (
@@ -448,13 +468,24 @@ class AssignApplicationView(LoginRequiredMixin, View):
             messages.error(request, 'Only HR can assign candidates.')
             return redirect('candidates:detail', pk=app.candidate_id)
 
-        interviewer_id = request.POST.get('interviewer')
+        interviewer_id = request.POST.get('interviewer', '')
         previous = app.assigned_to
 
-        # Unassign: empty interviewer_id when a candidate is already assigned.
+        # Unassign: explicit sentinel (from the dropdown) — or an empty value
+        # from a stale/legacy client — when someone is already assigned.
         # The booked slot belonged to that interviewer; clear it so a stale
         # booking can't block re-scheduling.
-        if not interviewer_id and previous:
+        if interviewer_id == '__unassign__' or (not interviewer_id and previous):
+            if previous:
+                app.panel_interviewers.remove(previous)
+                Notification.objects.create(
+                    recipient=previous,
+                    message=(
+                        f'You were unassigned from {app.candidate.full_name} '
+                        f'({app.job.title}).'
+                    ),
+                    link=reverse('candidates:detail', kwargs={'pk': app.candidate_id}),
+                )
             app.assigned_to = None
             app.interview_at = None
             app.save(update_fields=['assigned_to', 'interview_at', 'updated_at'])
@@ -491,9 +522,22 @@ class AssignApplicationView(LoginRequiredMixin, View):
         previous = app.assigned_to
         app.assigned_to = interviewer
         app.panel_interviewers.add(interviewer)
+        if previous and previous != interviewer:
+            # Reassignment: the former assignee leaves the panel — their
+            # feedback duty transfers to the new interviewer.
+            app.panel_interviewers.remove(previous)
         app.save(update_fields=['assigned_to', 'updated_at'])
 
         if previous != interviewer:
+            if previous:
+                Notification.objects.create(
+                    recipient=previous,
+                    message=(
+                        f'You were unassigned from {app.candidate.full_name} '
+                        f'({app.job.title}).'
+                    ),
+                    link=reverse('candidates:detail', kwargs={'pk': app.candidate_id}),
+                )
             Notification.objects.create(
                 recipient=interviewer,
                 message=(
@@ -587,9 +631,91 @@ class InterviewDetailsView(LoginRequiredMixin, View):
                 f'Interview details cleared for {app.candidate.full_name}.',
             )
 
+        scheduled_changed = app.interview_at != (
+            JobApplication.objects.filter(pk=app.pk).values_list('interview_at', flat=True).first()
+        )
         app.save(update_fields=['interview_details', 'interview_at', 'updated_at'])
 
+        # Notify the assigned interviewer about schedule changes affecting them.
+        if scheduled_changed and app.assigned_to:
+            Notification.objects.create(
+                recipient=app.assigned_to,
+                message=(
+                    f'Interview {"scheduled" if scheduled else "cleared"} for '
+                    f'{app.candidate.full_name} ({app.job.title})'
+                    + (f' at {scheduled:%Y-%m-%d %H:%M}.' if scheduled else '.')
+                ),
+                link=reverse('candidates:detail', kwargs={'pk': app.candidate_id}),
+            )
+
         return redirect('candidates:detail', pk=app.candidate_id)
+
+
+
+class InterviewerSlotsView(LoginRequiredMixin, View):
+    """HR-only HTMX partial: fit + availability preview for one interviewer.
+
+    Rendered when HR picks a name in the assign dropdown so the role match,
+    weekly windows, existing bookings, and computed free slots are visible
+    BEFORE the assignment is committed.
+    """
+
+    SLOT_MINUTES = 60
+    HORIZON_DAYS = 14
+
+    def get(self, request, pk):
+        app = get_object_or_404(JobApplication, pk=pk)
+        if not request.user.is_hr():
+            return HttpResponse('Only HR can preview interviewer availability.', status=403)
+
+        interviewer_id = request.GET.get('interviewer', '')
+        if not interviewer_id or interviewer_id == '__unassign__':
+            return render(request, 'candidates/_slot_preview.html', {'preview': None})
+
+        interviewer = get_object_or_404(User, pk=interviewer_id, role='IV')
+
+        role_fit = interviewer.is_eligible_interviewer_for(app.job)
+        windows = list(interviewer.availability_windows.all())
+
+        # Pre-computed free slots: walk each weekly window over the next
+        # HORIZON_DAYS days, hourly steps, skipping booked times and the past.
+        now = timezone.now()
+        booked = set(
+            JobApplication.objects.filter(
+                assigned_to=interviewer, interview_at__isnull=False,
+            ).exclude(pk=app.pk).values_list('interview_at', flat=True)
+        )
+        step = timedelta(minutes=self.SLOT_MINUTES)
+        free_slots = []
+        if windows and role_fit:
+            for day in range(self.HORIZON_DAYS):
+                day_date = (now + timedelta(days=day)).date()
+                weekday = day_date.weekday()
+                for window in windows:
+                    if window.weekday != weekday:
+                        continue
+                    slot = timezone.make_aware(datetime.combine(day_date, window.start_time))
+                    end = timezone.make_aware(datetime.combine(day_date, window.end_time))
+                    while slot + step <= end:
+                        if slot >= now and slot not in booked:
+                            free_slots.append(slot)
+                        slot += step
+                if len(free_slots) >= 6:
+                    break
+        free_slots = free_slots[:6]
+
+        preview = {
+            'interviewer': interviewer,
+            'role_fit': role_fit,
+            'has_windows': bool(windows),
+            'windows': windows,
+            'booked_count': len(booked),
+            'free_slots': free_slots,
+        }
+        return render(request, 'candidates/_slot_preview.html', {
+            'preview': preview,
+            'app': app,
+        })
 
 
 class CandidateDeleteView(LoginRequiredMixin, View):

@@ -1,14 +1,16 @@
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db import models
+from django.db import IntegrityError, models
 from django.http import HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views import View
 from django.views.generic import DetailView, ListView
 
 from ai.services import polish_notes
 from candidates.models import JobApplication
 from jobs.models import InterviewRound
+from notifications.models import Notification
 
 from .forms import FeedbackForm
 from .models import FeedbackEditHistory, InterviewFeedback
@@ -52,22 +54,30 @@ class FeedbackListView(LoginRequiredMixin, ListView):
         else:
             context['filter_candidate'] = None
 
-        # Calculate pending vs submitted feedback counts
-        from candidates.models import JobApplication
+        # Pending rows: in a round, flag not yet set, not terminal, and with
+        # at least one evaluator attached (unassigned apps are nobody's work).
         pending_qs = JobApplication.objects.filter(
             current_round__isnull=False,
             feedback_submitted=False,
-        ).exclude(status__in=['hired', 'rejected']).select_related(
+        ).exclude(
+            status__in=['hired', 'rejected'],
+        ).exclude(
+            assigned_to__isnull=True, panel_interviewers__isnull=True,
+        ).select_related(
             'candidate', 'job', 'current_round', 'assigned_to'
         ).prefetch_related('panel_interviewers')
 
+        # Interviewers see only their own actionable work.
         if user.is_interviewer():
             pending_qs = pending_qs.filter(
                 models.Q(assigned_to=user) | models.Q(panel_interviewers=user)
             ).distinct()
 
         context['pending_count'] = pending_qs.count()
-        context['submitted_count'] = context['paginator'].count if context.get('paginator') else self.get_queryset().count()
+        context['submitted_count'] = (
+            context['paginator'].count if context.get('paginator')
+            else self.get_queryset().count()
+        )
 
         if status == 'pending':
             context['pending_applications'] = pending_qs.order_by('-updated_at')
@@ -89,9 +99,24 @@ class FeedbackFormView(LoginRequiredMixin, View):
         if not request.user.is_interviewer():
             messages.error(request, 'Only interviewers can submit feedback.')
             return redirect('candidates:list')
-        if self.application.assigned_to != request.user:
+        # Assigned interviewer OR a panel member may submit. Panel members
+        # are added by HR at assignment time and share the feedback duty.
+        is_panel = self.application.panel_interviewers.filter(pk=request.user.pk).exists()
+        if self.application.assigned_to != request.user and not is_panel:
             return HttpResponseForbidden(
                 'You can only provide feedback for candidates assigned to you.'
+            )
+        # The round must belong to the application's job and be the round the
+        # application is currently in (or a round the app already passed).
+        if self.round_obj.job_id != self.application.job_id:
+            return HttpResponseForbidden(
+                'That interview round does not belong to this job.'
+            )
+        if self.application.status in (
+            JobApplication.Status.HIRED, JobApplication.Status.REJECTED,
+        ):
+            return HttpResponseForbidden(
+                'Feedback cannot be changed after a final decision.'
             )
         return None
 
@@ -141,6 +166,7 @@ class FeedbackFormView(LoginRequiredMixin, View):
                 feedback=existing,
                 old_score=existing.score,
                 old_notes=existing.notes,
+                old_raw_notes=existing.raw_notes or '',
                 edited_by=request.user,
             )
             feedback.id = existing.id
@@ -149,10 +175,37 @@ class FeedbackFormView(LoginRequiredMixin, View):
             feedback.round = self.round_obj
             feedback.interviewer = request.user
 
-        feedback.save()
-        JobApplication.objects.filter(pk=self.application.pk).update(
-            feedback_submitted=True,
-        )
+        try:
+            feedback.save()
+        except IntegrityError:
+            # Concurrent duplicate submit (double-click / two tabs): treat
+            # as an edit of the existing row instead of a 500.
+            existing = InterviewFeedback.objects.get(
+                application=self.application,
+                round=self.round_obj,
+                interviewer=request.user,
+            )
+            feedback.pk = existing.pk
+            feedback.save()
+        # Only mark the round satisfied when the feedback targets the round
+        # the application is currently in — feedback for any other round
+        # must not unlock the pipeline gate.
+        if self.round_obj_id == self.application.current_round_id:
+            self.application.feedback_submitted = True
+            self.application.save(update_fields=['feedback_submitted', 'updated_at'])
+
+        # Notify HR (job creator) so they know an evaluation landed.
+        if self.application.job.created_by and self.application.job.created_by != request.user:
+            Notification.objects.create(
+                recipient=self.application.job.created_by,
+                message=(
+                    f'{request.user.get_full_name() or request.user.username} '
+                    f'submitted feedback for {self.application.candidate.full_name} '
+                    f'({self.round_obj.name}).'
+                ),
+                link=reverse('candidates:detail', kwargs={'pk': self.application.candidate_id}),
+            )
+
         action = 'updated' if existing else 'submitted'
         messages.success(
             request,

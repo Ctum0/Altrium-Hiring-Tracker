@@ -10,33 +10,95 @@
 </div>
 
 <div class="panel panel-pad glass-panel" style="max-width:640px;box-shadow:var(--shadow-md)">
-  <form method="post" enctype="multipart/form-data" novalidate>
+  <form method="post" enctype="multipart/form-data" novalidate id="upload-form">
     {% csrf_token %}
     <div class="form-field">
       <label class="form-label" for="job">Position</label>
       <select class="form-select" id="job" name="job" required style="font-size:var(--text-sm)">
         <option value="">Select a position...</option>
         {% for job in jobs %}
-        <option value="{{ job.pk }}">{{ job.title }}</option>
+        <option value="{{ job.pk }}" {% if selected_job == job.pk|stringformat:"s" %}selected{% endif %}>{{ job.title }}</option>
         {% endfor %}
       </select>
       <p class="form-help">CVs will be attached to this role's recruitment pipeline.</p>
     </div>
 
     <div class="form-field" style="margin-top:var(--sp-5)">
-      <label class="form-label">CV Files (PDF / DOCX)</label>
+      <label class="form-label" for="files">CV Files (PDF / DOCX)</label>
       <div style="border:2px dashed var(--glass-border);border-radius:var(--radius-lg);padding:var(--sp-6);text-align:center;background:rgba(255,255,255,0.02);transition:border-color 200ms ease" id="dropzone">
         <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto 8px;color:var(--brand)" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-        <p style="font-size:var(--text-sm);font-weight:600;color:var(--ink);margin:0 0 4px">Choose files or drag & drop</p>
-        <p class="text-xs text-muted" style="margin-bottom:12px">Supports multiple .pdf, .doc, or .docx files</p>
-        <input class="form-input" type="file" id="files" name="files" accept=".pdf,.doc,.docx" multiple required style="max-width:280px;margin:0 auto">
+        <p style="font-size:var(--text-sm);font-weight:600;color:var(--ink);margin:0 0 4px">Choose files or drag &amp; drop</p>
+        <p class="text-xs text-muted" style="margin-bottom:12px">Supports multiple .pdf or .docx files</p>
+        <input class="form-input" type="file" id="files" name="files" accept=".pdf,.docx" multiple required style="max-width:280px;margin:0 auto">
+        <p class="text-xs text-muted" id="file-count" style="margin-top:8px" aria-live="polite"></p>
       </div>
     </div>
 
     <div class="form-actions" style="margin-top:var(--sp-6)">
-      <button type="submit" class="btn btn-primary">Upload and parse CVs</button>
+      <button type="submit" class="btn btn-primary" id="upload-btn">Upload and parse CVs</button>
       <a href="{% url 'candidates:list' %}" class="btn btn-secondary">Cancel</a>
     </div>
   </form>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+  var dropzone = document.getElementById('dropzone');
+  var input = document.getElementById('files');
+  var countLabel = document.getElementById('file-count');
+  var form = document.getElementById('upload-form');
+  var btn = document.getElementById('upload-btn');
+  if (!dropzone || !input) return;
+
+  function updateCount() {
+    var n = input.files.length;
+    countLabel.textContent = n === 0 ? '' :
+      n + ' file' + (n > 1 ? 's' : '') + ' selected: ' +
+      Array.from(input.files).map(function(f) { return f.name; }).join(', ');
+  }
+  input.addEventListener('change', updateCount);
+
+  // Wire the drag & drop zone: highlight + set input.files on drop.
+  ['dragenter', 'dragover'].forEach(function(ev) {
+    dropzone.addEventListener(ev, function(e) {
+      e.preventDefault();
+      dropzone.style.borderColor = 'var(--brand)';
+    });
+  });
+  ['dragleave', 'drop'].forEach(function(ev) {
+    dropzone.addEventListener(ev, function(e) {
+      e.preventDefault();
+      dropzone.style.borderColor = 'var(--glass-border)';
+    });
+  });
+  dropzone.addEventListener('drop', function(e) {
+    if (e.dataTransfer && e.dataTransfer.files.length) {
+      input.files = e.dataTransfer.files;
+      updateCount();
+    }
+  });
+  // Clicking the zone opens the file picker (input itself still works).
+  dropzone.addEventListener('click', function(e) {
+    if (e.target !== input) input.click();
+  });
+
+  // Client-side extension pre-check mirrors the server rule (.pdf/.docx).
+  form.addEventListener('submit', function(e) {
+    var bad = Array.from(input.files).filter(function(f) {
+      return !/\.(pdf|docx)$/i.test(f.name);
+    });
+    if (bad.length) {
+      e.preventDefault();
+      alert('Unsupported file type: ' + bad.map(function(f) { return f.name; }).join(', ') + '. Allowed: PDF, DOCX.');
+      return;
+    }
+    if (input.files.length) {
+      btn.disabled = true;
+      btn.textContent = 'Uploading…';
+    }
+  });
+})();
+</script>
 {% endblock %}

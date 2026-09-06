@@ -31,8 +31,6 @@
   </script>
   <link rel="stylesheet" href="{% static 'css/app.css' %}">
   <script src="{% static 'vendor/htmx.min.js' %}"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-<meta name="csrf-token" content="{{ csrf_token }}">
   {% block head %}{% endblock %}
 </head>
 <body>
@@ -100,10 +98,11 @@
         <p class="topbar-title">{% block page_title %}{% endblock %}</p>
       </div>
       <div class="topbar-center">
-        <label class="topbar-search" for="topbar-search-input">
+        <form class="topbar-search" action="{% url 'candidates:list' %}" method="get" role="search">
+          <label for="topbar-search-input" class="sr-only">Search candidates</label>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input type="search" id="topbar-search-input" placeholder="Search candidates, jobs..." aria-label="Search" autocomplete="off">
-        </label>
+          <input type="search" id="topbar-search-input" name="q" placeholder="Search candidates..." aria-label="Search candidates" autocomplete="off">
+        </form>
       </div>
       <div class="topbar-actions">
         {% include 'includes/theme_toggle.html' %}
@@ -266,6 +265,8 @@
     var msg = xhr && xhr.responseText;
     if (msg && msg.indexOf('<') !== 0) {
       showToast(msg);
+    } else {
+      showToast('Request failed (' + (xhr ? xhr.status : 'error') + ').');
     }
     // Revert only the stage dropdown that fired the failed request so the
     // UI matches state, leaving unrelated rows untouched.
@@ -274,6 +275,23 @@
     if (!sel) sel = src && src.classList && src.classList.contains('stage-select') ? src : null;
     if (sel && sel.dataset.prev) {
       sel.value = sel.dataset.prev;
+    }
+  });
+
+  // Network failures / timeouts surface nothing by default — add a toast.
+  document.addEventListener('htmx:sendError', function() {
+    showToast('Network error — check your connection and retry.');
+  });
+  document.addEventListener('htmx:timeout', function() {
+    showToast('Request timed out. Please retry.');
+  });
+
+  // 204 no-op responses (e.g. a stage move that changes nothing) are silent
+  // by design in HTMX; give the user minimal feedback via the toast.
+  document.addEventListener('htmx:afterRequest', function(e) {
+    var xhr = e.detail && e.detail.xhr;
+    if (xhr && xhr.status === 204) {
+      showToast('No change to apply.');
     }
   });
 
@@ -382,6 +400,59 @@
         pop.style.display = 'none';
         if (trigger) trigger.setAttribute('aria-expanded', 'false');
       }
+    }
+  });
+
+  // Assign-button confirmation: warn before (un)assigning because it
+  // notifies people and unassign clears a booked interview slot.
+  // Two-click confirmation for destructive buttons: assign/unassign and
+  // score reset. First click opens the dialog; OK submits, cancel resets.
+  document.addEventListener('click', function(e) {
+    var btn = e.target.closest ? e.target.closest('button[data-confirm-action="assign"], button[data-reset-confirm]') : null;
+    if (!btn) return;
+    var form = btn.closest('form');
+    if (!form) return;
+    if (btn.dataset.confirmed === '1') { return; } // second click submits
+    e.preventDefault();
+    var title, bodyText;
+    if (btn.dataset.confirmAction === 'assign') {
+      var sel = form.querySelector('select[name="interviewer"]');
+      if (!sel) return;
+      var value = sel.value;
+      var label = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].textContent.trim() : '';
+      if (value === '') { return; } // placeholder: nothing to do
+      if (value === '__unassign__') {
+        title = 'Unassign interviewer?';
+        bodyText = 'This removes the assignment and clears any booked interview time for this candidate. This cannot be undone from this screen.';
+      } else {
+        title = 'Assign to ' + label + '?';
+        bodyText = 'The interviewer will be notified. Check the availability preview below the dropdown before confirming.';
+      }
+    } else {
+      title = btn.dataset.confirmTitle || 'Are you sure?';
+      bodyText = btn.dataset.confirmBody || 'This action cannot be undone.';
+    }
+    btn.dataset.confirmed = '1';
+    window.confirmAction(form, title, bodyText);
+    var dialogEl = document.getElementById('confirm-modal');
+    if (dialogEl) {
+      var onClose = function() {
+        setTimeout(function() { btn.dataset.confirmed = ''; }, 0);
+        dialogEl.removeEventListener('close', onClose);
+      };
+      dialogEl.addEventListener('close', onClose);
+    }
+  });
+
+  // Slot preview: clicking a free slot fills the interview_at datetime input.
+  document.addEventListener('click', function(e) {
+    var pick = e.target.closest ? e.target.closest('.slot-pick') : null;
+    if (!pick) return;
+    var card = pick.closest('.app-card') || document;
+    var input = card.querySelector('input[name="interview_at"]');
+    if (input) {
+      input.value = pick.dataset.slot;
+      input.focus();
     }
   });
 })();

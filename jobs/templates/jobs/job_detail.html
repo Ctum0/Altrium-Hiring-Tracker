@@ -7,7 +7,7 @@
     <h1 class="page-title">{{ job.title }}</h1>
     <p class="page-sub">
       Created {{ job.created_at|date:'M j, Y' }} by {{ job.created_by.get_full_name|default:job.created_by.username }}
-      {% if job.is_active %}&middot; <span class="badge badge-progress">Active</span>{% else %}&middot; <span class="badge badge-hold">Closed</span>{% endif %}
+      {% if job.is_active %}&middot; <span class="badge badge-progress">Active</span>{% else %}&middot; <span class="badge badge-hold">Closed{% if job.closed_at %} {{ job.closed_at|date:'M j, Y' }}{% endif %}</span>{% endif %}
     </p>
   </div>
   <div class="page-actions">
@@ -17,6 +17,11 @@
     <form method="post" action="{% url 'jobs:close' job.pk %}" style="display:inline" onsubmit="event.preventDefault();confirmAction(this,'Close job','Close this job? It will stop accepting new CV uploads. Existing candidates keep their current stage and status.')">
       {% csrf_token %}
       <button type="submit" class="btn btn-danger">Close job</button>
+    </form>
+    {% elif can_edit and not job.is_active %}
+    <form method="post" action="{% url 'jobs:reopen' job.pk %}" style="display:inline">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-primary">Reopen job</button>
     </form>
     {% endif %}
   </div>
@@ -30,11 +35,10 @@
     {% else %}
     <p class="text-sm text-muted">No description provided.</p>
     {% endif %}
-
-    {% if job.requirements %}
+    {% if requirements_list %}
     <h3 style="font-size:var(--text-base);font-weight:700;margin:var(--sp-4) 0 var(--sp-2)">Required skills</h3>
     <div class="flex gap-2" style="flex-wrap:wrap">
-      {% for skill in job.requirements.split %}
+      {% for skill in requirements_list %}
       <span class="badge badge-role">{{ skill }}</span>
       {% endfor %}
     </div>

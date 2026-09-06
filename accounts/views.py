@@ -1,14 +1,14 @@
 from django.contrib.auth import get_user_model
-from django.utils import timezone
 from django.contrib.auth import views as auth_views
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import Avg, Case, Count, Q, When
+from django.db.models import Avg, Count, Q
 from django.shortcuts import redirect
 from django.urls import reverse, reverse_lazy
+from django.utils import timezone
 from django.views.generic import ListView, RedirectView, TemplateView
+
 from accounts.models import Role
 from candidates.models import Candidate, JobApplication
-from feedback.models import InterviewFeedback
 from jobs.models import Job
 
 User = get_user_model()
@@ -69,6 +69,7 @@ class HRDashboardView(LoginRequiredMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['active_nav'] = 'dashboard'
+        context['active_job_count'] = Job.objects.filter(is_active=True).count()
 
         # Pipeline stage distribution
         stage_counts = dict(
@@ -164,8 +165,6 @@ class HRDashboardView(LoginRequiredMixin, ListView):
         # AI Insights — compact AI analysis panels (not KPI cards).
         sd = {item['value']: item['count'] for item in context['stage_distribution']}
         active = sd.get('new', 0) + sd.get('shortlisted', 0) + sd.get('in_progress', 0)
-        stuck = sd.get('on_hold', 0) + sd.get('rejected', 0)
-        healthy = active > stuck
         total_apps = context['total_applications'] or 1
 
         ai_insights = []
@@ -173,19 +172,14 @@ class HRDashboardView(LoginRequiredMixin, ListView):
         # --- Card 1: TOP ROLE IN DEMAND ---
         if context['apps_per_job']:
             top_role = context['apps_per_job'][0]
-            top_pct = round((top_role['count'] / total_apps) * 100)
             max_role = context['max_apps_per_job'] or 1
-            total_roles = len(context['apps_per_job'])
 
-            top_job = None
-            try:
-                from jobs.models import Job as _Job
-                top_job = _Job.objects.filter(title=top_role['title']).first()
-            except Exception:
-                pass
+            top_job = Job.objects.filter(title=top_role['title']).first()
             skill_tokens = []
             if top_job and top_job.requirements:
-                raw_tokens = [t.strip() for t in top_job.requirements.replace(',', ' ').split() if t.strip()]
+                raw_tokens = [
+                    t.strip() for t in top_job.requirements.replace(',', ' ').split() if t.strip()
+                ]
                 seen, deduped = set(), []
                 for tk in raw_tokens:
                     key = tk.lower()
@@ -193,34 +187,28 @@ class HRDashboardView(LoginRequiredMixin, ListView):
                         seen.add(key)
                         deduped.append(tk)
                 skill_tokens = deduped[:3]
-            if not skill_tokens:
-                skill_tokens = ['Python', 'Django', 'PostgreSQL']
 
-            demand_score = min(99, max(85, 92 if top_pct > 20 else 88))
+            ai_finding_demand = 'Highest candidate availability among active roles'
+            ai_action_demand = 'Prioritize screening'
 
-            if total_roles == 1:
-                ai_finding_demand = 'Highest candidate availability among active roles'
-                ai_action_demand = 'Prioritize screening'
-            elif top_pct >= 25:
-                ai_finding_demand = 'Highest candidate availability among active roles'
-                ai_action_demand = 'Prioritize screening'
-            else:
-                ai_finding_demand = 'Highest candidate availability among active roles'
-                ai_action_demand = 'Prioritize screening'
-
+            # Candidate-list link target: every active job whose title matches
+            top_role_pks = list(
+                Job.objects.filter(is_active=True, title=top_role['title'])
+                .values_list('pk', flat=True)
+            )
             role_distribution = []
-            for idx, job in enumerate(context['apps_per_job'][:2]):
+            for job in context['apps_per_job'][:2]:
                 role_distribution.append({
                     'label': job['title'],
                     'count': job['count'],
-                    'pct': max(15, round(job['count'] * 100 / max_role)),
+                    'pct': round(job['count'] * 100 / max_role),
                 })
             other_count = sum(j['count'] for j in context['apps_per_job'][2:])
             if other_count > 0:
                 role_distribution.append({
                     'label': 'Other roles',
                     'count': other_count,
-                    'pct': max(10, round(other_count * 100 / max_role)),
+                    'pct': round(other_count * 100 / max_role),
                 })
 
             ai_insights.append({
@@ -228,59 +216,57 @@ class HRDashboardView(LoginRequiredMixin, ListView):
                 'category': 'Hiring Demand',
                 'icon': '🔥',
                 'finding': top_role['title'],
-                'demand_score': demand_score,
                 'ai_finding': ai_finding_demand,
                 'skills': skill_tokens,
+                'job_pks': ','.join(str(pk) for pk in top_role_pks),
                 'distribution': role_distribution,
                 'recommendation': ai_action_demand,
                 'action_accent': 'blue',
             })
 
-        # --- Card 2: BEST FIT ROLE ---
+        # --- Card 2: CANDIDATE SKILLS (top role) ---
         if context['top_positions']:
             top_title = context['apps_per_job'][0]['title'] if context['apps_per_job'] else None
             best_role = context['top_positions'][0]
-            for idx, candidate in enumerate(context['top_positions']):
+            for candidate in context['top_positions']:
                 if candidate['title'] != top_title:
                     best_role = candidate
                     break
 
-            match_score = int(round(context['avg_score'])) if context['avg_score'] else 82
-
-            # Dynamically extract top candidate skills for this position
+            # Real skill frequency among candidates of this role. No fake
+            # match percentages: when there is no data, render an honest
+            # empty state in the template.
             from collections import Counter
-            cand_qs = Candidate.objects.filter(applications__job__title=best_role['title'])
-            all_skills = [s.strip() for c in cand_qs for s in (c.skills or '').split(',') if s.strip()]
+            cand_qs = Candidate.objects.filter(
+                applications__job__title=best_role['title'])
+            all_skills = [
+                s.strip() for c in cand_qs
+                for s in (c.skills or '').split(',') if s.strip()
+            ]
             counts = Counter(all_skills)
             skill_factors = []
             if counts:
-                max_c = max(counts.values()) or 1
                 for skill, count in counts.most_common(3):
                     skill_factors.append({
                         'skill': skill,
-                        'pct': min(98, max(65, int(count * 100 / max_c)))
+                        'count': count,
                     })
-            if not skill_factors:
-                skill_factors = [
-                    {'skill': 'Python Architecture', 'pct': 92},
-                    {'skill': 'API Development', 'pct': 84},
-                    {'skill': 'PostgreSQL', 'pct': 78},
-                ]
 
             ai_insights.append({
                 'id': 'best_fit',
                 'category': 'Candidate Matching',
                 'icon': '🎯',
                 'finding': best_role['title'],
-                'compatibility': match_score,
                 'skill_factors': skill_factors,
-                'reason': 'High candidate skill alignment across requirements',
+                'job_pks': ','.join(str(pk) for pk in best_role['pks']),
+                'reason': 'Most common skills among current candidates',
                 'recommendation': 'Prioritize technical interview scheduling',
                 'action_accent': 'violet',
             })
 
         # --- Card 3: PIPELINE HEALTH ---
-        health_score = min(100, max(25, int(round((active / total_apps) * 100))))
+        # 0-100: share of applications still moving (not hired/rejected).
+        health_score = int(round((active / total_apps) * 100))
         if health_score >= 70:
             health_status = 'Optimal flow'
             health_band = 'strong'
@@ -302,14 +288,16 @@ class HRDashboardView(LoginRequiredMixin, ListView):
             {'label': 'Applied', 'count': sd.get('new', 0), 'value': 'new'},
             {'label': 'Screening', 'count': sd.get('shortlisted', 0), 'value': 'shortlisted'},
             {'label': 'Interview', 'count': sd.get('in_progress', 0), 'value': 'in_progress'},
-            {'label': 'Offer', 'count': sd.get('hired', 0), 'value': 'hired'},
+            {'label': 'Hired', 'count': sd.get('hired', 0), 'value': 'hired'},
         ]
-        # Dynamically identify bottleneck stage
-        max_stage_count = -1
+        # Bottleneck = the funnel stage holding the most candidates still
+        # awaiting progression (exclude 'hired' which is a terminal win,
+        # not a wait state).
         bottleneck_name = 'Screening'
-        for st in raw_stages:
-            if st['count'] > max_stage_count:
-                max_stage_count = st['count']
+        max_wait = -1
+        for st in raw_stages[:3]:
+            if st['count'] > max_wait:
+                max_wait = st['count']
                 bottleneck_name = st['label']
 
         ai_insights.append({
@@ -329,6 +317,7 @@ class HRDashboardView(LoginRequiredMixin, ListView):
 
         # --- Card 4: RECRUITMENT RISK MONITOR ---
         from datetime import timedelta
+
         from django.utils import timezone
 
         week_ago = timezone.now() - timedelta(days=7)
@@ -370,11 +359,28 @@ class HRDashboardView(LoginRequiredMixin, ListView):
 
         context['ai_insights'] = ai_insights
 
-        # Dynamic Pipeline Velocity Metrics
-        context['stalled_count'] = stalled_count
-        context['velocity_screening'] = round(2.0 + (sd.get('shortlisted', 0) * 0.4), 1)
-        context['velocity_interview'] = round(3.0 + (sd.get('in_progress', 0) * 0.5), 1)
-        context['velocity_offer'] = round(1.2 + (sd.get('hired', 0) * 0.3), 1)
+        # Pipeline velocity: REAL measured time-in-stage. For every
+        # application currently sitting in a stage, days since its last
+        # state change (updated_at) — actual elapsed time, no formula.
+        now = timezone.now()
+
+        def _avg_days_in_status(status_value):
+            qs = JobApplication.objects.filter(status=status_value)
+            if not qs.exists():
+                return None
+            ages = [
+                (now - moved).total_seconds() / 86400.0
+                for moved in qs.values_list('updated_at', flat=True)
+            ]
+            return round(sum(ages) / len(ages), 1)
+
+        context['velocity_screening'] = _avg_days_in_status('shortlisted')
+        context['velocity_interview'] = _avg_days_in_status('in_progress')
+        context['velocity_offer'] = _avg_days_in_status('hired')
+        context['has_velocity_data'] = any(
+            context[k] is not None
+            for k in ('velocity_screening', 'velocity_interview', 'velocity_offer')
+        )
 
         return context
 
@@ -393,6 +399,7 @@ class InterviewerDashboardView(LoginRequiredMixin, TemplateView):
         )
 
         context['assigned_apps'] = assigned_qs.order_by('interview_at', '-updated_at')[:20]
+        context['assigned_count'] = assigned_qs.count()
         context['pending_feedback'] = assigned_qs.filter(
             feedback_submitted=False, current_round__isnull=False
         ).count()
@@ -436,7 +443,8 @@ class InterviewerRosterView(LoginRequiredMixin, ListView):
     context_object_name = 'interviewers'
 
     def dispatch(self, request, *args, **kwargs):
-        if not request.user.is_hr():
+        # Read-only oversight for management; full view for HR.
+        if not (request.user.is_hr() or request.user.is_management()):
             return redirect('accounts:home')
         return super().dispatch(request, *args, **kwargs)
 
@@ -450,15 +458,33 @@ class InterviewerRosterView(LoginRequiredMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['active_nav'] = 'roster'
-        load = dict(
-            JobApplication.objects.filter(
-                assigned_to__isnull=False,
-            )
-            .exclude(status__in=['hired', 'rejected'])
-            .values('assigned_to_id')
+
+        # "Active Load" = applications where the interviewer is the assignee
+        # OR a panel member, in a status that still needs work (new,
+        # shortlisted, in_progress). on_hold / terminal are excluded.
+        work_qs = (
+            JobApplication.objects
+            .filter(Q(assigned_to__isnull=False) | Q(panel_interviewers__isnull=False))
+            .exclude(status__in=['hired', 'rejected', 'on_hold'])
+        )
+        load = {}
+        for row in (
+            work_qs.values('assigned_to_id')
             .annotate(count=Count('id'))
             .values_list('assigned_to_id', 'count')
+        ):
+            if row[0]:
+                load[row[0]] = load.get(row[0], 0) + row[1]
+        panel_counts = dict(
+            JobApplication.objects.exclude(status__in=['hired', 'rejected', 'on_hold'])
+            .values('panel_interviewers')
+            .annotate(count=Count('id'))
+            .values_list('panel_interviewers', 'count')
         )
+        for pk, count in panel_counts.items():
+            if pk:
+                load[pk] = load.get(pk, 0) + count
+
         pending = dict(
             JobApplication.objects.filter(
                 assigned_to__isnull=False,

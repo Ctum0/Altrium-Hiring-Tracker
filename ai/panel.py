@@ -29,8 +29,10 @@ def synthesize_panel_consensus(application):
 
     for fb in feedbacks:
         raw_score = float(fb.score or 0)
-        # Normalize score to 10-point scale if entered out of 100
+        # Normalize to the 10-point consensus scale. FeedbackForm accepts
+        # 0-100; anything above 10 is treated as a 100-point entry.
         score_10 = raw_score / 10.0 if raw_score > 10 else raw_score
+        score_10 = min(score_10, 10.0)
         scores_list.append(score_10)
 
         # Progressive round weight: Round 1 (1.0), Round 2 (1.5), Round 3+ (2.0)
@@ -88,14 +90,26 @@ def synthesize_panel_consensus(application):
         status_label = 'Panel Conflict / Divergent'
         status_badge_class = 'badge-danger'
         status_tone = 'red'
-    elif hire_votes > 0 and reject_votes == 0:
+    elif hire_votes > 0 and hold_votes == 0 and reject_votes == 0:
         status_code = 'consensus_hire'
-        status_label = 'Panel Consensus: Recommend Hire'
+        status_label = 'Unanimous: Recommend Hire'
         status_badge_class = 'badge-success'
         status_tone = 'green'
-    elif reject_votes > 0 and hire_votes == 0:
+    elif reject_votes > 0 and hire_votes == 0 and hold_votes == 0:
         status_code = 'consensus_reject'
-        status_label = 'Panel Consensus: Recommend Reject'
+        status_label = 'Unanimous: Recommend Reject'
+        status_badge_class = 'badge-danger'
+        status_tone = 'red'
+    elif hire_votes > reject_votes:
+        status_code = 'consensus_hire'
+        vote_note = f' ({hold_votes} hold vote{"s" if hold_votes != 1 else ""})' if hold_votes else ''
+        status_label = f'Majority: Recommend Hire{vote_note}'
+        status_badge_class = 'badge-success'
+        status_tone = 'green'
+    elif reject_votes > hire_votes:
+        status_code = 'consensus_reject'
+        vote_note = f' ({hold_votes} hold vote{"s" if hold_votes != 1 else ""})' if hold_votes else ''
+        status_label = f'Majority: Recommend Reject{vote_note}'
         status_badge_class = 'badge-danger'
         status_tone = 'red'
     else:
@@ -155,13 +169,13 @@ def synthesize_panel_consensus(application):
         )
     elif status_code == 'consensus_hire':
         recommendation = (
-            f"Unanimous panel alignment across {len(feedbacks)} round(s). "
+            f"Unanimous panel alignment across {len(feedbacks)} evaluation(s). "
             f"Weighted panel average: {weighted_avg_10}/10 ({weighted_avg_100}%). "
             f"HR Recommendation: Proceed to Offer preparation."
         )
     elif status_code == 'consensus_reject':
         recommendation = (
-            f"Unanimous panel rejection across {len(feedbacks)} round(s). "
+            f"Unanimous panel rejection across {len(feedbacks)} evaluation(s). "
             f"Weighted panel average: {weighted_avg_10}/10. "
             f"HR Recommendation: Send respectful rejection communication."
         )

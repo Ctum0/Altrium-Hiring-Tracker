@@ -19,9 +19,10 @@ class JobListView(LoginRequiredMixin, ListView):
 
     def paginate_queryset(self, queryset, page_size):
         """Clamp out-of-range pages instead of 404ing."""
+        from django.core.paginator import EmptyPage, PageNotAnInteger
         try:
             return super().paginate_queryset(queryset, page_size)
-        except Exception:
+        except (PageNotAnInteger, EmptyPage):
             self.kwargs['page'] = 'last'
             return super().paginate_queryset(queryset, page_size)
 
@@ -38,6 +39,7 @@ class JobListView(LoginRequiredMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['active_nav'] = 'jobs'
+        context['show_inactive'] = self.request.GET.get('inactive') == '1'
         return context
 
 
@@ -87,17 +89,40 @@ class JobCloseView(LoginRequiredMixin, View):
     def post(self, request, pk):
         job = get_object_or_404(Job, pk=pk)
         if not request.user.is_hr():
+            messages.error(request, 'Only HR can close jobs.')
             return redirect('jobs:list')
 
-        job.is_active = False
-        job.closed_at = timezone.now()
-        job.save()
-
-        messages.success(
-            request,
-            f'Job "{job.title}" closed. Existing candidates are unchanged.',
-        )
+        if job.is_active:
+            job.is_active = False
+            job.closed_at = timezone.now()
+            job.save()
+            messages.success(
+                request,
+                f'Job "{job.title}" closed. Existing candidates are unchanged.',
+            )
+        else:
+            messages.info(request, f'Job "{job.title}" is already closed.')
         return redirect('jobs:detail', pk=job.pk)
+
+
+class JobReopenView(LoginRequiredMixin, View):
+    """Reopen a closed job: accepts CVs again and clears the closure stamp."""
+
+    def post(self, request, pk):
+        job = get_object_or_404(Job, pk=pk)
+        if not request.user.is_hr():
+            messages.error(request, 'Only HR can reopen jobs.')
+            return redirect('jobs:list')
+
+        if not job.is_active:
+            job.is_active = True
+            job.closed_at = None
+            job.save()
+            messages.success(request, f'Job "{job.title}" reopened and accepting CVs.')
+        else:
+            messages.info(request, f'Job "{job.title}" is already active.')
+        return redirect('jobs:detail', pk=job.pk)
+
 
 
 class JobDetailView(LoginRequiredMixin, DetailView):
@@ -111,6 +136,9 @@ class JobDetailView(LoginRequiredMixin, DetailView):
         context['rounds'] = self.object.rounds.all()
         context['round_form'] = RoundForm()
         context['can_edit'] = self.request.user.is_hr()
+        context['requirements_list'] = [
+            s.strip() for s in self.object.requirements.split(',') if s.strip()
+        ]
         return context
 
 
@@ -125,6 +153,10 @@ class RoundCreateView(LoginRequiredMixin, CreateView):
             return self.handle_no_permission()
         if not request.user.is_hr():
             return redirect('jobs:list')
+        job = get_object_or_404(Job, pk=self.kwargs['job_pk'])
+        if not job.is_active:
+            messages.error(request, 'This job is closed; its rounds cannot be changed.')
+            return redirect('jobs:detail', pk=job.pk)
         return super().dispatch(request, *args, **kwargs)
 
     def form_valid(self, form):
@@ -134,7 +166,7 @@ class RoundCreateView(LoginRequiredMixin, CreateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['job'] = Job.objects.get(pk=self.kwargs['job_pk'])
+        context['job'] = get_object_or_404(Job, pk=self.kwargs['job_pk'])
         return context
 
     def get_success_url(self):

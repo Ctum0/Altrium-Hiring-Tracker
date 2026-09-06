@@ -16,7 +16,7 @@
     </div>
     <div class="page-actions flex gap-2">
       {% if is_hr %}
-      <form method="post" action="{% url 'candidates:delete' candidate.pk %}" onsubmit="return confirm('Are you sure you want to permanently remove this candidate profile and all associated applications?');">
+      <form method="post" action="{% url 'candidates:delete' candidate.pk %}" onsubmit="event.preventDefault();confirmAction(this,'Remove candidate','Permanently remove {{ candidate.full_name }} and all associated applications? This cannot be undone.');">
         {% csrf_token %}
         <button type="submit" class="btn btn-danger btn-sm" style="padding:4px 10px;font-size:var(--text-xs)">Remove Candidate</button>
       </form>
@@ -53,13 +53,17 @@
 
         {% if is_hr %}
         <div style="background:var(--surface-2);padding:10px 12px;border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow-sm)">
-          <span class="section-label">Shortlist Score Override</span>
+          <span class="section-label" title="This global score is shown across the candidate's list and profile. Per-job auto-match scores appear on each application card below.">Shortlist Score</span>
           <form method="post" action="{% url 'candidates:score' candidate.pk %}" class="flex gap-2" style="align-items:center">
             {% csrf_token %}
             <input class="form-input mono" type="number" id="score" name="score" min="0" max="100" value="{% if candidate.score is not None %}{{ candidate.score }}{% endif %}" placeholder="Auto" style="width:80px;padding:2px 6px;font-size:var(--text-xs)">
             <button type="submit" class="btn btn-primary btn-sm" style="padding:3px 10px;font-size:var(--text-xs)">Save score</button>
             {% if candidate.score is not None %}
-            <button type="submit" class="btn btn-ghost btn-sm" name="score" value="" style="padding:3px 8px;font-size:var(--text-xs)">Reset</button>
+            <button type="submit" class="btn btn-ghost btn-sm" name="score" value=""
+                    data-reset-confirm="1"
+                    data-confirm-title="Reset score?"
+                    data-confirm-body="Clear the shortlist score for {{ candidate.full_name }}? The candidate will fall back to their auto-score."
+                    style="padding:3px 8px;font-size:var(--text-xs)">Reset</button>
             {% endif %}
           </form>
         </div>
@@ -169,7 +173,7 @@
     <div class="flex items-center justify-between" style="margin-bottom:8px">
       <h3 style="font-size:1.05rem;font-weight:800;color:var(--ink)">Applications ({{ applications|length }})</h3>
       {% if is_hr %}
-      <a href="{% url 'candidates:import' %}" class="btn btn-secondary btn-sm">Link to another job</a>
+      <a href="{% url 'candidates:import' %}" class="btn btn-secondary btn-sm" title="Opens the paste-profile import form; the candidate is matched by the email in the pasted text.">Import to another job</a>
       {% endif %}
     </div>
 

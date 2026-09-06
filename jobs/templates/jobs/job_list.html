@@ -6,7 +6,10 @@
 <div class="page-header">
   <div>
     <h1 class="page-title">Job Postings</h1>
-    <p class="page-sub">Active roles and their pipelines.</p>
+    <p class="page-sub">
+      {% if show_inactive %}All roles including closed jobs.{% else %}Active roles and their pipelines.{% endif %}
+      <a href="?{% if show_inactive %}{% else %}inactive=1{% endif %}" class="ref-card-link" style="margin-left:var(--sp-2)">{{ show_inactive|yesno:'Hide closed,Show closed' }}</a>
+    </p>
   </div>
   <div class="page-actions">
     {% if user.is_hr %}

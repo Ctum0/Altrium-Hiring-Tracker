@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load accounts_extras %}
 {% block title %}Candidates | Altrium Tracker{% endblock %}
 {% block page_title %}Candidates{% endblock %}
 {% block content_class %}scrollable{% endblock %}
@@ -15,12 +16,11 @@
     {% endif %}
   </div>
 </div>
-
 <!-- Quick-filter tabs (preserve search/filters when switching) -->
 {% with tab_extra='q='|add:filter_q|add:'&job='|add:filter_job|add:'&min_score='|add:filter_min_score %}
 <div class="flex gap-2" style="margin-bottom:var(--sp-4)">
   <a href="{% url 'candidates:list' %}?{{ tab_extra }}"
-     class="btn btn-sm {% if not show_all and filter_stage != 'hired' and filter_stage != 'rejected' %}btn-primary{% else %}btn-secondary{% endif %}">Active</a>
+     class="btn btn-sm {% if not show_all and not filter_stage %}btn-primary{% else %}btn-secondary{% endif %}">Active</a>
   <a href="?all=1&{{ tab_extra }}"
      class="btn btn-sm {% if show_all %}btn-primary{% else %}btn-secondary{% endif %}">All candidates</a>
   <a href="?stage=hired&{{ tab_extra }}"
@@ -93,7 +93,7 @@
       <tr id="app-row-{{ app.pk }}" class="cand-row">
         <td>
           <div class="cand-name-cell">
-            <div class="cand-avatar cand-avatar-{{ app.candidate.full_name|first|lower|make_list|first|default:'0'|slugify|last }}" aria-hidden="true">
+            <div class="cand-avatar cand-avatar-{{ app.candidate.full_name|avatar_index }}" aria-hidden="true">
               {{ app.candidate.full_name|first|upper }}{% if app.candidate.full_name|wordcount > 1 %}{{ app.candidate.full_name|cut:" "|last|upper }}{% endif %}
             </div>
             <div class="cand-name-info">
@@ -159,22 +159,20 @@
 {% if is_paginated and page_obj.paginator.num_pages > 1 %}
 <nav class="pagination" aria-label="Pagination">
   {% if page_obj.has_previous %}
-  <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if filter_q %}&q={{ filter_q }}{% endif %}{% if filter_job %}&job={{ filter_job }}{% endif %}{% if filter_stage %}&stage={{ filter_stage }}{% endif %}{% if filter_min_score %}&min_score={{ filter_min_score }}{% endif %}">Previous</a>
+  <a class="page-link" href="?{{ qs_base }}&page={{ page_obj.previous_page_number }}">Previous</a>
   {% endif %}
   {% for num in page_obj.paginator.page_range %}
     {% if num == page_obj.number %}
     <span class="page-link current">{{ num }}</span>
     {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
-    <a class="page-link" href="?page={{ num }}{% if filter_q %}&q={{ filter_q }}{% endif %}{% if filter_job %}&job={{ filter_job }}{% endif %}{% if filter_stage %}&stage={{ filter_stage }}{% endif %}{% if filter_min_score %}&min_score={{ filter_min_score }}{% endif %}">{{ num }}</a>
+    <a class="page-link" href="?{{ qs_base }}&page={{ num }}">{{ num }}</a>
     {% endif %}
   {% endfor %}
   {% if page_obj.has_next %}
-  <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if filter_q %}&q={{ filter_q }}{% endif %}{% if filter_job %}&job={{ filter_job }}{% endif %}{% if filter_stage %}&stage={{ filter_stage }}{% endif %}{% if filter_min_score %}&min_score={{ filter_min_score }}{% endif %}">Next</a>
+  <a class="page-link" href="?{{ qs_base }}&page={{ page_obj.next_page_number }}">Next</a>
   {% endif %}
 </nav>
 {% endif %}
-
-{% elif filter_q or filter_job or filter_stage or filter_min_score %}
 <div class="empty-state">
   <p class="empty-state-title">No candidates match your filters</p>
   <p class="empty-state-body">Try widening the search, removing the score threshold, or clearing filters.</p>

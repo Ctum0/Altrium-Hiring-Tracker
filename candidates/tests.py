@@ -659,3 +659,95 @@ class DashboardBehaviorTests(CandidatesBaseTestCase):
         )
 
         self.application.refresh_from_db()
+
+
+class SlotPreviewTests(CandidatesBaseTestCase):
+    """HR slot preview: fit status, windows, and computed free slots."""
+
+    def test_slot_preview_requires_hr(self):
+        self.login('iv')
+        response = self.client.get(
+            reverse('candidates:interviewer_slots', args=[self.application.pk]),
+            {'interviewer': self.interviewer.pk},
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_slot_preview_reports_mismatch(self):
+        self.interviewer.specialty = 'Design'
+        self.interviewer.save()
+        self.job.department = 'Engineering'
+        self.job.save()
+        self.login('hr')
+        response = self.client.get(
+            reverse('candidates:interviewer_slots', args=[self.application.pk]),
+            {'interviewer': self.interviewer.pk},
+        )
+        self.assertContains(response, 'Specialty mismatch')
+
+    def test_slot_preview_shows_free_slots_for_fit(self):
+        # Interviewer has Monday 09:00-12:00; Monday slots must be offered.
+        self.login('hr')
+        response = self.client.get(
+            reverse('candidates:interviewer_slots', args=[self.application.pk]),
+            {'interviewer': self.interviewer.pk},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'mismatch')
+        self.assertNotContains(response, 'No availability')
+
+
+class UnassignSemanticsTests(CandidatesBaseTestCase):
+    """__unassign__ sentinel and legacy empty value both unassign."""
+
+    def _assign(self):
+        self.application.assigned_to = self.interviewer
+        self.application.interview_at = datetime(2030, 1, 7, 10, 0, tzinfo=dt_timezone.utc)
+        self.application.save(update_fields=['assigned_to', 'interview_at'])
+
+    def test_sentinel_unassigns_and_clears_slot(self):
+        self._assign()
+        self.login('hr')
+        self.client.post(
+            reverse('candidates:assign', args=[self.application.pk]),
+            {'interviewer': '__unassign__'},
+        )
+        self.application.refresh_from_db()
+        self.assertIsNone(self.application.assigned_to)
+        self.assertIsNone(self.application.interview_at)
+
+    def test_unassign_notifies_former_assignee(self):
+        self._assign()
+        self.login('hr')
+        self.client.post(
+            reverse('candidates:assign', args=[self.application.pk]),
+            {'interviewer': '__unassign__'},
+        )
+        self.assertTrue(Notification.objects.filter(
+            recipient=self.interviewer, message__contains='unassigned',
+        ).exists())
+
+
+class MatcherSemanticsTests(TestCase):
+    """Whole-word skill matching: no substring false positives."""
+
+    def test_short_requirement_does_not_match_longer_skill(self):
+        from unittest.mock import patch
+        from ai.matching import compute_score
+        job = Job(title='Go Dev', requirements='go')
+        cand = Candidate(skills='django, mongodb')
+        # "go" must NOT match "django"/"mongodb".
+        with patch.object(Job, 'save', lambda *a, **k: None):
+            self.assertEqual(compute_score(cand, job), 0)
+
+    def test_exact_skill_matches(self):
+        from ai.matching import compute_score
+        job = Job(title='Backend', requirements='Python, Django')
+        cand = Candidate(skills='Python, Django, Redis')
+        self.assertEqual(compute_score(cand, job), 100)
+
+    def test_multi_word_requirement_counts_once(self):
+        from ai.matching import compute_score
+        job = Job(title='API', requirements='REST API, Python')
+        cand = Candidate(skills='REST API')
+        # REST API matched (1/2 = 50), not double-counted as two tokens.
+        self.assertEqual(compute_score(cand, job), 50)

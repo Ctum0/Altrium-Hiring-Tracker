@@ -12,7 +12,8 @@ class FeedbackForm(forms.ModelForm):
                 'class': 'form-input mono',
                 'min': 0,
                 'max': 100,
-                'placeholder': 'e.g. 8/10',
+                'placeholder': 'e.g. 75 (0-100 scale)',
+                'title': 'Enter a score from 0 to 100',
             }),
             'notes': forms.Textarea(attrs={
                 'class': 'form-textarea',
@@ -26,6 +27,7 @@ class FeedbackForm(forms.ModelForm):
             }),
         }
         labels = {
+            'score': 'Score (0-100)',
             'notes': 'Feedback',
             'raw_notes': 'Raw notes (optional)',
         }

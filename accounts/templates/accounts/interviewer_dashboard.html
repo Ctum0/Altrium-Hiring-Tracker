@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load accounts_extras %}
 {% block title %}My Candidates | Altrium Tracker{% endblock %}
 {% block page_title %}My Candidates{% endblock %}
 {% block content %}
@@ -33,7 +34,7 @@
   <div class="ref-kpi-card glass-panel vui-card vui-card-hover">
     <div class="ref-kpi-meta">
       <span class="ref-kpi-label">Assigned Candidates</span>
-      <span class="ref-kpi-value">{{ assigned_apps|length }}</span>
+      <span class="ref-kpi-value">{{ assigned_count }}</span>
       <span class="kpi-trend kpi-trend-neutral">Your queue</span>
     </div>
     <div class="ref-kpi-icon-box ref-kpi-icon-blue" aria-hidden="true">
@@ -75,7 +76,7 @@
       <tr class="cand-row">
         <td>
           <div class="cand-name-cell">
-            <div class="cand-avatar cand-avatar-{{ app.candidate.full_name|first|lower|make_list|first|default:'0'|slugify|last }}" aria-hidden="true">
+            <div class="cand-avatar cand-avatar-{{ app.candidate.full_name|avatar_index }}" aria-hidden="true">
               {{ app.candidate.full_name|first|upper }}{% if app.candidate.full_name|wordcount > 1 %}{{ app.candidate.full_name|cut:" "|last|upper }}{% endif %}
             </div>
             <div class="cand-name-info">
@@ -85,6 +86,11 @@
           </div>
         </td>
         <td >{{ app.job.title }}</td>
+        <td>
+          {% if app.current_round %}
+          <span class="badge badge-in_progress">{{ app.current_round.name }}</span>
+          {% else %}-{% endif %}
+        </td>
         <td>
           {% if app.interview_at %}
           <span class="text-xs" style="white-space:nowrap;font-weight:600">{{ app.interview_at|date:'M j, H:i' }}</span>

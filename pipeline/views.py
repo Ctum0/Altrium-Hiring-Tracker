@@ -20,55 +20,56 @@ class PipelineMoveView(LoginRequiredMixin, View):
         if not request.user.is_hr():
             return HttpResponse('Only HR can move candidates.', status=403)
 
-        # Single POST format: 'stage' like 'round:1' or 'status:hired'.
-        stage_value = request.POST.get('stage')
-        if stage_value:
-            if stage_value.startswith('round:'):
-                to_round_id = stage_value.split(':', 1)[1]
-                to_status = None
-            elif stage_value.startswith('status:'):
-                to_round_id = None
-                to_status = stage_value.split(':', 1)[1]
-            else:
-                to_round_id = None
-                to_status = None
-        else:
-            to_round_id = None
-            to_status = None
+        # Single POST format: 'stage' like 'round:3' or 'status:hired'.
+        stage_value = request.POST.get('stage') or ''
+        to_round_id = None
+        to_status = None
+        if stage_value.startswith('round:'):
+            raw_id = stage_value.split(':', 1)[1]
+            try:
+                to_round_id = int(raw_id)
+            except ValueError:
+                return HttpResponse('Malformed round value.', status=400)
+        elif stage_value.startswith('status:'):
+            to_status = stage_value.split(':', 1)[1]
+            if to_status not in [s for s, _ in JobApplication.Status.choices]:
+                return HttpResponse('Invalid status.', status=400)
+        elif stage_value:
+            return HttpResponse('Malformed stage value.', status=400)
 
         from_round = app.current_round
         from_status = app.status
 
-        if to_round_id:
+        if to_round_id is not None:
             to_round = get_object_or_404(InterviewRound, pk=to_round_id, job=app.job)
 
-            # Feedback validation: if moving TO a NEW round, the CURRENT round
-            # (from_round) must have submitted feedback.
+            # Feedback gate on ANY round change (forward, backward, or
+            # re-entry after a terminal status): the round being left must
+            # have feedback before the candidate can move anywhere else.
             if from_round and from_round != to_round:
                 has_feedback = app.feedbacks.filter(round=from_round).exists()
                 if not has_feedback:
                     return HttpResponse(
-                        'Feedback required to advance candidate.',
+                        'Feedback required to move candidate to a different round.',
                         status=409,
                     )
 
             app.current_round = to_round
             app.status = JobApplication.Status.IN_PROGRESS
-        else:
-            to_round = None
-            if to_status:
-                if to_status not in [s for s, _ in JobApplication.Status.choices]:
-                    return HttpResponse('Invalid status.', status=400)
-                app.status = to_status
-                app.current_round = None
+        elif to_status:
+            app.status = to_status
+            app.current_round = None
 
         # No-op guard: same round or same final status -> no state change,
         # no audit noise.
         if app.current_round == from_round and app.status == from_status:
             return HttpResponse(status=204)
-
-        if to_round_id and to_round != from_round:
-            # New round means feedback must be collected again.
+        # The flag must reflect whether the *target* round already has
+        # feedback: a forward move to a fresh round re-opens it, a backward
+        # move to an already-evaluated round keeps it satisfied.
+        if to_round_id is not None:
+            app.feedback_submitted = app.feedbacks.filter(round=to_round).exists()
+        elif to_status:
             app.feedback_submitted = False
 
         app.save(update_fields=['current_round', 'status', 'feedback_submitted', 'updated_at'])
@@ -76,7 +77,7 @@ class PipelineMoveView(LoginRequiredMixin, View):
         PipelineMove.objects.create(
             application=app,
             from_round=from_round,
-            to_round=to_round,
+            to_round=to_round if to_round_id is not None else None,
             moved_by=request.user,
         )
 
@@ -85,15 +86,5 @@ class PipelineMoveView(LoginRequiredMixin, View):
         User = get_user_model()
         app.refresh_from_db()
         source = request.POST.get('source', 'detail')
-        if source == 'list':
-            template = 'pipeline/_list_app_row.html'
-        else:
-            template = 'pipeline/_app_row.html'
-        return render(request, template, {
-            'app': app,
-            'is_hr': True,
-            'interviewers': [
-                iv for iv in User.objects.filter(role='IV').order_by('first_name', 'last_name')
-                if iv.is_eligible_interviewer_for(app.job)
-            ],
-        })
+        template = 'pipeline/_list_app_row.html' if source == 'list' else 'pipeline/_app_row.html'
+        return render(request, template, {'app': app, 'is_hr': True})

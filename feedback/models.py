@@ -48,8 +48,9 @@ class FeedbackEditHistory(models.Model):
         on_delete=models.CASCADE,
         related_name='edit_history',
     )
-    old_score = models.PositiveIntegerField()
+    old_score = models.PositiveIntegerField(null=True, blank=True)
     old_notes = models.TextField()
+    old_raw_notes = models.TextField(blank=True, default='')
     edited_at = models.DateTimeField(auto_now_add=True)
     edited_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,

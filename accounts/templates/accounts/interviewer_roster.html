@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load accounts_extras %}
 {% block title %}Interviewer Roster | Altrium Tracker{% endblock %}
 {% block page_title %}Interviewer Roster{% endblock %}
 {% block content %}
@@ -27,7 +28,7 @@
       <tr class="cand-row">
         <td>
           <div class="cand-name-cell">
-            <div class="cand-avatar cand-avatar-blue" aria-hidden="true">
+            <div class="cand-avatar cand-avatar-{{ iv.get_full_name|default:iv.username|avatar_index }}" aria-hidden="true">
               {{ iv.first_name|first|upper }}{{ iv.last_name|first|upper }}
             </div>
             <div class="cand-name-info">

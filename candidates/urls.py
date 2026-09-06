@@ -14,4 +14,5 @@ urlpatterns = [
     path('applications/<int:pk>/ai-fit/', views.AiFitSummaryView.as_view(), name='ai_fit'),
     path('applications/<int:pk>/assign/', views.AssignApplicationView.as_view(), name='assign'),
     path('applications/<int:pk>/interview-details/', views.InterviewDetailsView.as_view(), name='interview_details'),
+    path('applications/<int:pk>/interviewer-slots/', views.InterviewerSlotsView.as_view(), name='interviewer_slots'),
 ]
