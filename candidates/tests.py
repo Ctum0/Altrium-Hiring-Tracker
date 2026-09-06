@@ -833,3 +833,27 @@ class FeedbackHistorySnapshotTests(CandidatesBaseTestCase):
         self.assertEqual(history.count(), 1)
         self.assertEqual(history.first().old_score, 60)
         self.assertEqual(history.first().old_notes, 'first')
+
+
+class PendingFeedbackTabTests(CandidatesBaseTestCase):
+    """The Pending tab must render for an assigned interviewer (prod 500 fix)."""
+
+    def test_pending_tab_renders_for_assigned_interviewer(self):
+        self.application.assigned_to = self.interviewer
+        self.application.feedback_submitted = False
+        self.application.save(update_fields=['assigned_to', 'feedback_submitted'])
+
+        self.client.login(username='iv', password='pass12345')
+        response = self.client.get(reverse('feedback:list') + '?status=pending')
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Submit Feedback')
+
+    def test_pending_tab_renders_for_hr(self):
+        self.application.assigned_to = self.interviewer
+        self.application.feedback_submitted = False
+        self.application.save(update_fields=['assigned_to', 'feedback_submitted'])
+
+        self.login('hr')
+        response = self.client.get(reverse('feedback:list') + '?status=pending')
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'View Candidate')
