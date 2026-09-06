@@ -751,3 +751,85 @@ class MatcherSemanticsTests(TestCase):
         cand = Candidate(skills='REST API')
         # REST API matched (1/2 = 50), not double-counted as two tokens.
         self.assertEqual(compute_score(cand, job), 50)
+
+
+class ScoreResetTests(CandidatesBaseTestCase):
+    """Reset button clears the score via the reset_score payload flag."""
+
+    def test_reset_flag_clears_score(self):
+        self.candidate.score = 85
+        self.candidate.save(update_fields=['score', 'updated_at'])
+        self.login('hr')
+        self.client.post(
+            reverse('candidates:score', args=[self.candidate.pk]),
+            {'score': '85', 'reset_score': '1'},
+        )
+        self.candidate.refresh_from_db()
+        self.assertIsNone(self.candidate.score)
+
+    def test_normal_save_ignores_stale_reset_flag(self):
+        self.candidate.score = 85
+        self.candidate.save(update_fields=['score', 'updated_at'])
+        self.login('hr')
+        self.client.post(
+            reverse('candidates:score', args=[self.candidate.pk]),
+            {'score': '60'},
+        )
+        self.candidate.refresh_from_db()
+        self.assertEqual(self.candidate.score, 60)
+
+
+class SortByScoreTests(CandidatesBaseTestCase):
+    """?sort=score orders by candidate score desc, unscored last."""
+
+    def test_sort_order_desc_with_none_last(self):
+        self.candidate.score = 50
+        self.candidate.save(update_fields=['score', 'updated_at'])
+        other = Candidate.objects.create(
+            first_name='Zed', last_name='High', email='zed@example.com', score=95,
+        )
+        JobApplication.objects.create(candidate=other, job=self.job)
+        noscore = Candidate.objects.create(
+            first_name='Ann', last_name='None', email='ann@example.com',
+        )
+        JobApplication.objects.create(candidate=noscore, job=self.job)
+
+        self.login('hr')
+        response = self.client.get(reverse('candidates:list') + '?sort=score&all=1')
+        self.assertEqual(response.status_code, 200)
+        scores = [app.candidate.score for app in response.context['page_obj']]
+        scored = [s for s in scores if s is not None]
+        self.assertEqual(scored, sorted(scored, reverse=True))
+        if None in scores:
+            self.assertEqual(scores[-1], None)
+
+
+class FeedbackHistorySnapshotTests(CandidatesBaseTestCase):
+    """Edit history must record the PRE-edit values, not the new ones."""
+
+    def test_history_records_old_score(self):
+        from feedback.models import InterviewFeedback
+        self.login('hr')
+        # HR cannot submit; use the interviewer
+        self.client.logout()
+        self.client.login(username='iv', password='pass12345')
+        self.application.assigned_to = self.interviewer
+        self.application.save(update_fields=['assigned_to'])
+
+        self.client.post(
+            reverse('feedback:form', args=[self.application.pk, self.round1.pk]),
+            {'score': '60', 'notes': 'first'},
+        )
+        self.client.post(
+            reverse('feedback:form', args=[self.application.pk, self.round1.pk]),
+            {'score': '90', 'notes': 'second'},
+        )
+        fb = InterviewFeedback.objects.get(
+            application=self.application, round=self.round1,
+            interviewer=self.interviewer,
+        )
+        self.assertEqual(fb.score, 90)
+        history = fb.edit_history.order_by('edited_at')
+        self.assertEqual(history.count(), 1)
+        self.assertEqual(history.first().old_score, 60)
+        self.assertEqual(history.first().old_notes, 'first')

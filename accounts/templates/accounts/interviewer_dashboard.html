@@ -13,7 +13,7 @@
     <a href="{% url 'candidates:detail' app.candidate.pk %}" class="ref-kpi-card glass-panel vui-card vui-card-hover kpi-card-link" style="min-width:220px;text-decoration:none">
       <div class="ref-kpi-meta">
         <span class="ref-kpi-label">{{ app.candidate.full_name }}</span>
-        <span class="ref-kpi-value" style="font-size:var(--text-base)">{{ app.interview_at|date:'M j, H:i' }}</span>
+        <span class="ref-kpi-value" style="font-size:var(--text-base)">{{ app.interview_at|date:'M j, H:i' }} <small style="font-size:0.7em;color:var(--muted)">UTC</small></span>
         <span class="kpi-trend kpi-trend-neutral">{{ app.job.title }}{% if app.current_round %} &middot; {{ app.current_round.name }}{% endif %}</span>
       </div>
     </a>
@@ -93,7 +93,7 @@
         </td>
         <td>
           {% if app.interview_at %}
-          <span class="text-xs" style="white-space:nowrap;font-weight:600">{{ app.interview_at|date:'M j, H:i' }}</span>
+          <span class="text-xs" style="white-space:nowrap;font-weight:600">{{ app.interview_at|date:'M j, H:i' }} UTC</span>
           {% else %}
           <span class="text-xs text-muted">Not scheduled</span>
           {% endif %}

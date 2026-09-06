@@ -459,32 +459,19 @@ class InterviewerRosterView(LoginRequiredMixin, ListView):
         context = super().get_context_data(**kwargs)
         context['active_nav'] = 'roster'
 
-        # "Active Load" = applications where the interviewer is the assignee
-        # OR a panel member, in a status that still needs work (new,
-        # shortlisted, in_progress). on_hold / terminal are excluded.
+        # "Active Load" = DISTINCT applications where the interviewer is the
+        # assignee OR a panel member, in a status that still needs work.
+        # The two sets overlap heavily (assignees are auto-added to the
+        # panel), so count the union per interviewer — never the sum.
         work_qs = (
             JobApplication.objects
-            .filter(Q(assigned_to__isnull=False) | Q(panel_interviewers__isnull=False))
             .exclude(status__in=['hired', 'rejected', 'on_hold'])
         )
         load = {}
-        for row in (
-            work_qs.values('assigned_to_id')
-            .annotate(count=Count('id'))
-            .values_list('assigned_to_id', 'count')
-        ):
-            if row[0]:
-                load[row[0]] = load.get(row[0], 0) + row[1]
-        panel_counts = dict(
-            JobApplication.objects.exclude(status__in=['hired', 'rejected', 'on_hold'])
-            .values('panel_interviewers')
-            .annotate(count=Count('id'))
-            .values_list('panel_interviewers', 'count')
-        )
-        for pk, count in panel_counts.items():
-            if pk:
-                load[pk] = load.get(pk, 0) + count
-
+        for iv in context['interviewers']:
+            load[iv.pk] = work_qs.filter(
+                Q(assigned_to=iv) | Q(panel_interviewers=iv)
+            ).distinct().count()
         pending = dict(
             JobApplication.objects.filter(
                 assigned_to__isnull=False,

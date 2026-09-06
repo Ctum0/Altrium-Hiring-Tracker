@@ -33,15 +33,13 @@
         <p class="text-xs text-muted" id="file-count" style="margin-top:8px" aria-live="polite"></p>
       </div>
     </div>
+    <div class="alert alert-error" id="upload-error" role="alert" style="display:none;margin-bottom:var(--sp-3)"></div>
 
     <div class="form-actions" style="margin-top:var(--sp-6)">
       <button type="submit" class="btn btn-primary" id="upload-btn">Upload and parse CVs</button>
       <a href="{% url 'candidates:list' %}" class="btn btn-secondary">Cancel</a>
-    </div>
   </form>
-</div>
 {% endblock %}
-
 {% block scripts %}
 <script>
 (function() {
@@ -89,11 +87,16 @@
     var bad = Array.from(input.files).filter(function(f) {
       return !/\.(pdf|docx)$/i.test(f.name);
     });
+    var err = document.getElementById('upload-error');
     if (bad.length) {
       e.preventDefault();
-      alert('Unsupported file type: ' + bad.map(function(f) { return f.name; }).join(', ') + '. Allowed: PDF, DOCX.');
+      if (err) {
+        err.textContent = 'Unsupported file type: ' + bad.map(function(f) { return f.name; }).join(', ') + '. Allowed: PDF, DOCX.';
+        err.style.display = 'block';
+      }
       return;
     }
+    if (err) err.style.display = 'none';
     if (input.files.length) {
       btn.disabled = true;
       btn.textContent = 'Uploading…';

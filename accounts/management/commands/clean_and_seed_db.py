@@ -151,7 +151,7 @@ class Command(BaseCommand):
                     'skills': 'Python, Django, PostgreSQL, Docker, Redis, REST API',
                     'score': 93,
                     'job_idx': 0, # Senior Backend
-                    'status': 'interview',
+                    'status': 'in_progress',
                     'assigned_to': iv_demo,
                     'evaluations': [
                         (1, hr_main, 9, 'Great screening interview. Clear communication and strong Django fundamentals.'),
@@ -197,7 +197,7 @@ class Command(BaseCommand):
                     'skills': 'React, JavaScript, CSS, HTML',
                     'score': 84,
                     'job_idx': 1, # Frontend Engineer
-                    'status': 'interview',
+                    'status': 'in_progress',
                     'assigned_to': iv_chen,
                     'evaluations': [
                         (2, iv_chen, 8, 'Good understanding of React hooks and DOM rendering. Needs minor review on HTMX integration.'),
@@ -211,7 +211,7 @@ class Command(BaseCommand):
                     'skills': 'AWS, Docker, Kubernetes, Terraform, CI/CD, Linux, PostgreSQL',
                     'score': 90,
                     'job_idx': 2, # DevOps Lead
-                    'status': 'interview',
+                    'status': 'in_progress',
                     'assigned_to': iv_rachel,
                     'evaluations': [
                         (1, hr_main, 9, 'Proven experience managing multi-region cloud infrastructure.'),
@@ -253,7 +253,7 @@ class Command(BaseCommand):
                     'skills': 'Python, Pytest, Selenium, Playwright, Automated Testing, API Testing',
                     'score': 94,
                     'job_idx': 4, # QA Lead
-                    'status': 'interview',
+                    'status': 'in_progress',
                     'assigned_to': iv_patel,
                     'evaluations': [
                         (1, hr_main, 9, 'Very articulate QA engineer.'),

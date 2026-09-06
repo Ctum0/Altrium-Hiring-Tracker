@@ -3,7 +3,8 @@
   {% if notifications %}
     {% for n in notifications|slice:":5" %}
     {% if n.link|safe_link %}
-    <a href="{{ n.link|safe_link }}" class="popover-item {% if not n.is_read %}unread{% endif %}">
+    <a href="{{ n.link|safe_link }}" class="popover-item {% if not n.is_read %}unread{% endif %}"
+       {% if not n.is_read %}hx-post="{% url 'notifications:mark_read' n.pk %}" hx-trigger="click" hx-swap="none"{% endif %}>
     {% else %}
     <div class="popover-item {% if not n.is_read %}unread{% endif %}">
     {% endif %}

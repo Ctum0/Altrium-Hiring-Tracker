@@ -1,6 +1,6 @@
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import HttpResponse
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 from django.views import View
 from django.views.generic import ListView
 
@@ -63,7 +63,7 @@ class MarkAllReadView(LoginRequiredMixin, View):
     """Mark every unread notification for the current user as read."""
 
     def post(self, request):
-        updated = Notification.objects.filter(
+        Notification.objects.filter(
             recipient=request.user, is_read=False,
         ).update(is_read=True)
-        return HttpResponse(str(updated))
+        return redirect('notifications:list')

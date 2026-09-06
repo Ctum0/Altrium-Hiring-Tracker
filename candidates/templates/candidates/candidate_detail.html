@@ -59,12 +59,13 @@
             <input class="form-input mono" type="number" id="score" name="score" min="0" max="100" value="{% if candidate.score is not None %}{{ candidate.score }}{% endif %}" placeholder="Auto" style="width:80px;padding:2px 6px;font-size:var(--text-xs)">
             <button type="submit" class="btn btn-primary btn-sm" style="padding:3px 10px;font-size:var(--text-xs)">Save score</button>
             {% if candidate.score is not None %}
-            <button type="submit" class="btn btn-ghost btn-sm" name="score" value=""
+            <button type="button" class="btn btn-ghost btn-sm"
                     data-reset-confirm="1"
                     data-confirm-title="Reset score?"
                     data-confirm-body="Clear the shortlist score for {{ candidate.full_name }}? The candidate will fall back to their auto-score."
                     style="padding:3px 8px;font-size:var(--text-xs)">Reset</button>
             {% endif %}
+            <input type="hidden" name="reset_score" value="" data-reset-payload>
           </form>
         </div>
         {% endif %}

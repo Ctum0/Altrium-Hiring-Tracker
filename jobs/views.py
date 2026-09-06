@@ -184,5 +184,11 @@ class RoundDeleteView(LoginRequiredMixin, DeleteView):
             return redirect('jobs:list')
         return super().dispatch(request, *args, **kwargs)
 
+    def form_valid(self, form):
+        name = self.object.name
+        response = super().form_valid(form)
+        messages.success(self.request, f'Round "{name}" removed.')
+        return response
+
     def get_success_url(self):
         return reverse('jobs:detail', kwargs={'pk': self.object.job_id})

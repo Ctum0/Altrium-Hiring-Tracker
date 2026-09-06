@@ -173,12 +173,13 @@
   {% endif %}
 </nav>
 {% endif %}
+{% else %}
+{% if has_filters %}
 <div class="empty-state">
   <p class="empty-state-title">No candidates match your filters</p>
   <p class="empty-state-body">Try widening the search, removing the score threshold, or clearing filters.</p>
   <a href="{% url 'candidates:list' %}" class="btn btn-secondary">Clear filters</a>
 </div>
-
 {% else %}
 <div class="empty-state">
   <p class="empty-state-title">No candidates yet</p>
@@ -192,6 +193,7 @@
   <p class="empty-state-body">Candidates assigned to you will appear here once HR assigns them.</p>
   {% endif %}
 </div>
+{% endif %}
 {% endif %}
 
 <script>

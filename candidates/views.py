@@ -1,14 +1,14 @@
 from datetime import datetime, timedelta
 
-from django.http import HttpResponse
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.utils import timezone
-from django.db.models import Q
-from django.conf import settings
+from django.db.models import F, Q
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.text import get_valid_filename
 from django.views import View
 from django.views.generic import DetailView, ListView
@@ -16,7 +16,6 @@ from django.views.generic import DetailView, ListView
 from ai.cv_parser import extract_text
 from ai.matching import auto_apply, job_fit
 from ai.services import fit_summary, parse_cv
-from accounts.models import InterviewerAvailability
 from jobs.models import Job
 from notifications.models import Notification
 
@@ -75,6 +74,12 @@ class CandidateListView(LoginRequiredMixin, ListView):
                 | Q(candidate__skills__icontains=q)
                 | Q(job__title__icontains=q)
             )
+        # Dashboard "Avg. Shortlist Score" deep-links with ?sort=score:
+        # highest-scoring candidates first, unscored last.
+        if self.request.GET.get('sort') == 'score':
+            qs = qs.order_by(F('candidate__score').desc(nulls_last=True), '-updated_at')
+        else:
+            qs = qs.order_by('-updated_at')
         return qs
 
     def paginate_queryset(self, queryset, page_size):
@@ -98,6 +103,11 @@ class CandidateListView(LoginRequiredMixin, ListView):
         get_params.pop('page', None)
         context['qs_base'] = get_params.urlencode()
         context['show_all'] = self.request.GET.get('all') == '1'
+        context['has_filters'] = bool(
+            context['filter_q'] or context['filter_job']
+            or context['filter_stage'] or context['filter_min_score']
+            or context['show_all']
+        )
         context['jobs'] = (
             Job.objects.filter(is_active=True).values_list('id', 'title').distinct()
         )
@@ -438,7 +448,8 @@ class ScoreUpdateView(LoginRequiredMixin, View):
             messages.error(request, 'Only HR can score candidates.')
             return redirect('candidates:detail', pk=pk)
         raw = request.POST.get('score', '').strip()
-        if raw == '':
+        is_reset = request.POST.get('reset_score', '').strip() == '1'
+        if raw == '' or is_reset:
             candidate.score = None
             message = 'Score cleared.'
         else:
@@ -571,7 +582,8 @@ class InterviewDetailsView(LoginRequiredMixin, View):
             messages.error(request, 'Only HR can set interview details.')
             return redirect('candidates:detail', pk=app.candidate_id)
 
-        from datetime import datetime as dt, timezone as dt_timezone
+        from datetime import datetime as dt
+        from datetime import timezone as dt_timezone
 
         details = request.POST.get('interview_details', '').strip()
         scheduled_raw = request.POST.get('interview_at', '').strip()
@@ -620,7 +632,13 @@ class InterviewDetailsView(LoginRequiredMixin, View):
                     )
                     return redirect('candidates:detail', pk=app.candidate_id)
 
-        if details or scheduled:
+        if scheduled:
+            messages.success(
+                request,
+                f'Interview details updated for {app.candidate.full_name} — '
+                f'scheduled at {scheduled:%Y-%m-%d %H:%M} UTC.',
+            )
+        elif details:
             messages.success(
                 request,
                 f'Interview details updated for {app.candidate.full_name}.',
@@ -723,6 +741,8 @@ class CandidateDeleteView(LoginRequiredMixin, View):
 
     def post(self, request, pk):
         candidate = get_object_or_404(Candidate, pk=pk)
+        if request.user.is_management():
+            return HttpResponse('Management has read-only access.', status=403)
         if not request.user.is_hr():
             messages.error(request, 'Only HR can remove candidate profiles.')
             return redirect('candidates:detail', pk=pk)

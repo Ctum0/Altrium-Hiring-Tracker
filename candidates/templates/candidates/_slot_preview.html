@@ -11,7 +11,7 @@
       <div style="margin-bottom:var(--sp-2)">
         <span class="badge badge-hired">Role match</span>
         {% for w in preview.windows %}
-          <span class="badge badge-in_progress">{{ w.get_weekday_display }} {{ w.start_time|time:"H:i" }}–{{ w.end_time|time:"H:i" }}</span>
+          <span class="badge badge-in_progress">{{ w.get_weekday_display }} {{ w.start_time|time:"H:i" }}–{{ w.end_time|time:"H:i" }} UTC</span>
         {% endfor %}
       </div>
       {% if preview.free_slots %}
@@ -19,13 +19,17 @@
         <div class="flex gap-2" style="flex-wrap:wrap">
           {% for slot in preview.free_slots %}
             <button type="button" class="btn btn-secondary btn-xs slot-pick"
-                    data-slot="{{ slot|date:'Y-m-d\TH:i' }}">{{ slot|date:'D M j, H:i' }}</button>
+                    data-slot="{{ slot|date:'Y-m-d\TH:i' }}">{{ slot|date:'D M j, H:i' }} UTC</button>
           {% endfor %}
         </div>
-        <div class="text-muted" style="margin-top:var(--sp-1)">Click a slot to fill the schedule field above, then Save.</div>
+        <div class="text-muted" style="margin-top:var(--sp-1)">All times are UTC. Click a slot to fill the schedule field above, then Save.</div>
       {% else %}
         <span class="text-muted">No free slots in the next 14 days ({{ preview.booked_count }} booking{{ preview.booked_count|pluralize }} on file).</span>
       {% endif %}
     {% endif %}
+  </div>
+{% else %}
+  <div class="slot-preview-card glass-panel" style="padding:var(--sp-3);margin-top:var(--sp-2);font-size:var(--text-xs)">
+    <span class="text-muted">Pick an interviewer to preview their role fit, weekly windows, and next free slots.</span>
   </div>
 {% endif %}

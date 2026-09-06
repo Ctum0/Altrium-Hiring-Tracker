@@ -4,6 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf_token }}">
   <title>{% block title %}Altrium Tracker{% endblock %}</title>
   <link rel="icon" type="image/png" href="{% static 'img/logo.png' %}">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -56,7 +57,7 @@
         Jobs
       </a>
       {% endif %}
-      {% if user.is_hr %}
+      {% if user.is_hr or user.is_management %}
       <a href="{% url 'accounts:interviewer_roster' %}" class="nav-link {% if active_nav == 'roster' %}active{% endif %}">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         Interviewers
@@ -269,12 +270,19 @@
       showToast('Request failed (' + (xhr ? xhr.status : 'error') + ').');
     }
     // Revert only the stage dropdown that fired the failed request so the
-    // UI matches state, leaving unrelated rows untouched.
+    // UI matches state, leaving unrelated rows untouched. Prefer the option
+    // the SERVER marked selected (the candidate's actual round); fall back
+    // to the focus-time snapshot.
     var src = e.detail && e.detail.elt;
     var sel = src && src.closest ? src.closest('.stage-select') : null;
     if (!sel) sel = src && src.classList && src.classList.contains('stage-select') ? src : null;
-    if (sel && sel.dataset.prev) {
-      sel.value = sel.dataset.prev;
+    if (sel) {
+      var serverSelected = sel.querySelector('option[selected]');
+      if (serverSelected) {
+        sel.value = serverSelected.value;
+      } else if (sel.dataset.prev) {
+        sel.value = sel.dataset.prev;
+      }
     }
   });
 
@@ -431,6 +439,10 @@
     } else {
       title = btn.dataset.confirmTitle || 'Are you sure?';
       bodyText = btn.dataset.confirmBody || 'This action cannot be undone.';
+      // Reset-style buttons arm a companion payload input the form posts
+      // (form.submit() drops the submitter button's own name/value).
+      var payload = form.querySelector('[data-reset-payload]');
+      if (payload) payload.value = '1';
     }
     btn.dataset.confirmed = '1';
     window.confirmAction(form, title, bodyText);

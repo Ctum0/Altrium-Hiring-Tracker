@@ -48,7 +48,6 @@ class FeedbackListView(LoginRequiredMixin, ListView):
         context['filter_status'] = status
 
         if app_pk:
-            from candidates.models import JobApplication
             app = JobApplication.objects.filter(pk=app_pk).select_related('candidate').first()
             context['filter_candidate'] = app.candidate.full_name if app else None
         else:
@@ -161,12 +160,15 @@ class FeedbackFormView(LoginRequiredMixin, View):
 
         feedback = form.save(commit=False)
         if existing:
-            # Edit path: save history before updating
+            # Edit path: snapshot BEFORE mutating. form.save(commit=False)
+            # mutates `existing` in place (form.instance IS existing), so the
+            # old values must come from a pristine re-fetch.
+            pristine = InterviewFeedback.objects.get(pk=existing.pk)
             FeedbackEditHistory.objects.create(
-                feedback=existing,
-                old_score=existing.score,
-                old_notes=existing.notes,
-                old_raw_notes=existing.raw_notes or '',
+                feedback=pristine,
+                old_score=pristine.score,
+                old_notes=pristine.notes,
+                old_raw_notes=pristine.raw_notes or '',
                 edited_by=request.user,
             )
             feedback.id = existing.id
@@ -190,7 +192,7 @@ class FeedbackFormView(LoginRequiredMixin, View):
         # Only mark the round satisfied when the feedback targets the round
         # the application is currently in — feedback for any other round
         # must not unlock the pipeline gate.
-        if self.round_obj_id == self.application.current_round_id:
+        if self.round_obj.pk == self.application.current_round_id:
             self.application.feedback_submitted = True
             self.application.save(update_fields=['feedback_submitted', 'updated_at'])
 
