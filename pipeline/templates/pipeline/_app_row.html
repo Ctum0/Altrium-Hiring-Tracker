@@ -74,8 +74,13 @@
         <button type="submit" class="btn btn-primary btn-sm"
                 data-confirm-action="assign" data-app-pk="{{ app.pk }}">Assign</button>
       </form>
-      <!-- Slot preview: fetched via HTMX when an interviewer is selected -->
-      <div id="slot-preview-{{ app.pk }}" class="slot-preview" aria-live="polite"></div>
+      <!-- Slot preview: server-rendered for the current assignee, refreshed
+           via HTMX whenever HR picks another interviewer -->
+      <div id="slot-preview-{{ app.pk }}" class="slot-preview" aria-live="polite">
+        {% if app.assigned_to %}
+          {% include 'candidates/_slot_preview.html' with preview=app.slot_preview_context app=app %}
+        {% endif %}
+      </div>
       {% else %}
       <span class="text-xs text-muted">
         {% if app.assigned_to %}{{ app.assigned_to.get_full_name|default:app.assigned_to.username }}{% else %}Unassigned{% endif %}

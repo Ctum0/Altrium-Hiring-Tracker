@@ -204,6 +204,47 @@ class JobApplication(models.Model):
             if user.is_eligible_interviewer_for(self.job)
         ]
 
+    @property
+    def slot_preview_context(self):
+        """Availability-preview payload for the CURRENTLY assigned
+        interviewer, mirroring InterviewerSlotsView so HR sees the assigned
+        interviewer's fit and free slots without re-selecting them."""
+        iv = self.assigned_to
+        if not iv:
+            return None
+        from django.utils import timezone
+        from datetime import datetime, timedelta
+        windows = list(iv.availability_windows.all())
+        booked = set(
+            JobApplication.objects.filter(
+                assigned_to=iv, interview_at__isnull=False,
+            ).exclude(pk=self.pk).values_list('interview_at', flat=True)
+        )
+        now = timezone.now()
+        step = timedelta(minutes=60)
+        free_slots = []
+        for day in range(14):
+            day_date = (now + timedelta(days=day)).date()
+            for window in windows:
+                if window.weekday != day_date.weekday():
+                    continue
+                slot = timezone.make_aware(datetime.combine(day_date, window.start_time))
+                end = timezone.make_aware(datetime.combine(day_date, window.end_time))
+                while slot + step <= end:
+                    if slot >= now and slot not in booked:
+                        free_slots.append(slot)
+                    slot += step
+            if len(free_slots) >= 6:
+                break
+        return {
+            'interviewer': iv,
+            'role_fit': iv.is_eligible_interviewer_for(self.job),
+            'has_windows': bool(windows),
+            'windows': windows,
+            'booked_count': len(booked),
+            'free_slots': free_slots[:6],
+        }
+
     def save(self, *args, **kwargs):
         if self._state.adding and not self.current_round_id and self.job_id:
             first_round = self.job.rounds.first()

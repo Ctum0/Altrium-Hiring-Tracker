@@ -546,21 +546,25 @@ class AssignApplicationView(LoginRequiredMixin, View):
                     message=(
                         f'You were unassigned from {app.candidate.full_name} '
                         f'({app.job.title}).'
+                        + self._slot_note_for_former(app, previous)
                     ),
                     link=reverse('candidates:detail', kwargs={'pk': app.candidate_id}),
                 )
+            self._reconcile_inherited_slot(app, previous, interviewer)
             Notification.objects.create(
                 recipient=interviewer,
                 message=(
                     f'New candidate assigned to you: {app.candidate.full_name} '
                     f'for {app.job.title}.'
+                    + self._slot_note_for_new(app)
                 ),
                 link=reverse('candidates:detail', kwargs={'pk': app.candidate_id}),
             )
             assignee = interviewer.get_full_name() or interviewer.username
             messages.success(
                 request,
-                f'Assigned {app.candidate.full_name} to {assignee}.',
+                f'Assigned {app.candidate.full_name} to {assignee}.'
+                + self._hr_slot_note(app, interviewer),
             )
         else:
             messages.info(
@@ -569,6 +573,71 @@ class AssignApplicationView(LoginRequiredMixin, View):
             )
 
         return redirect('candidates:detail', pk=app.candidate_id)
+
+    @staticmethod
+    def _fmt(dt):
+        return f'{dt:%Y-%m-%d %H:%M} UTC' if dt else ''
+
+    @staticmethod
+    def _slot_note_for_former(app, former):
+        """Tell the outgoing interviewer whether their booked slot survives."""
+        if app.interview_at:
+            return (
+                f' The booked slot on {AssignApplicationView._fmt(app.interview_at)} '
+                f'has been transferred to the new interviewer.'
+            )
+        return ''
+
+    @staticmethod
+    def _slot_note_for_new(app):
+        """Tell the new interviewer whether they inherited a booked slot."""
+        if app.interview_at:
+            return (
+                f' An interview is already booked for '
+                f'{AssignApplicationView._fmt(app.interview_at)} — check it '
+                f'fits your availability.'
+            )
+        return ' No interview is scheduled yet.'
+
+    @staticmethod
+    def _hr_slot_note(app, interviewer):
+        """HR-facing note explaining what happened to the inherited slot."""
+        if not app.interview_at:
+            if getattr(app, '_slot_cleared_on_reassign', False):
+                return (
+                    ' The previously booked slot was cleared: it falls outside '
+                    f'{interviewer.get_full_name() or interviewer.username}\'s '
+                    'availability or clashes with another interview. Please '
+                    'rebook.'
+                )
+            return ''
+        return (
+            f' The booked slot on {AssignApplicationView._fmt(app.interview_at)} '
+            f'was validated against the new interviewer\'s availability and kept.'
+        )
+
+    def _reconcile_inherited_slot(self, app, previous, new_interviewer):
+        """Validate an inherited booking against the NEW interviewer.
+
+        A slot booked for the outgoing interviewer may be outside the new
+        interviewer's weekly windows or clash with their other bookings.
+        Keep it when it fits; clear it (and say so) when it doesn't.
+        """
+        app._slot_cleared_on_reassign = False
+        if not app.interview_at:
+            return
+        fits = new_interviewer.is_available_at(app.interview_at)
+        if fits:
+            clash = JobApplication.objects.filter(
+                assigned_to=new_interviewer,
+                interview_at=app.interview_at,
+            ).exclude(pk=app.pk).exists()
+            fits = not clash
+        if fits:
+            return
+        app.interview_at = None
+        app.save(update_fields=['interview_at', 'updated_at'])
+        app._slot_cleared_on_reassign = True
 
 
 class InterviewDetailsView(LoginRequiredMixin, View):

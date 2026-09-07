@@ -3238,8 +3238,8 @@ dialog.modal-overlay {
   padding: var(--sp-4);
   background: transparent;
   border: 0;
-  max-width: none;
-  width: auto;
+  max-width: 460px;
+  width: calc(100% - 2 * var(--sp-4));
 }
 
 dialog.modal-overlay::backdrop {
@@ -4613,4 +4613,36 @@ body.no-scroll {
 }
 .slot-pick {
   white-space: nowrap;
+}
+
+/* Upcoming interviews (interviewer dashboard) — distinct from KPI cards */
+.upcoming-card {
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--border, rgba(148, 163, 184, 0.25));
+  border-radius: var(--radius, 10px);
+  transition: border-color 150ms ease, transform 150ms ease;
+}
+.upcoming-card:hover {
+  border-color: var(--brand, #0075ff);
+}
+.upcoming-card-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.upcoming-card-name {
+  font-size: var(--text-xs);
+  color: var(--muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.upcoming-card-time {
+  font-size: var(--text-base);
+  font-weight: 800;
+  color: var(--ink);
+}
+.upcoming-card-sub {
+  font-size: var(--text-xs);
+  color: var(--muted);
 }

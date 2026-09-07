@@ -53,6 +53,23 @@ class CandidatesBaseTestCase(TestCase):
     def login(self, username):
         assert self.client.login(username=username, password='pass12345')
 
+    def _create_specialist(self, specialty, **user_kwargs):
+        defaults = {
+            'username': f'iv_{specialty or "generalist"}'.lower(),
+            'password': 'pass12345',
+            'role': Role.INTERVIEWER,
+            'first_name': 'Spec',
+            'last_name': specialty or 'Generalist',
+            'specialty': specialty,
+        }
+        defaults.update(user_kwargs)
+        return User.objects.create_user(**defaults)
+
+    def _give_window(self, user, weekday=0, start=time(9, 0), end=time(12, 0)):
+        return InterviewerAvailability.objects.create(
+            interviewer=user, weekday=weekday, start_time=start, end_time=end,
+        )
+
 
 class CandidateVisibilityTests(CandidatesBaseTestCase):
     def _add_other_candidate(self):
@@ -857,3 +874,86 @@ class PendingFeedbackTabTests(CandidatesBaseTestCase):
         response = self.client.get(reverse('feedback:list') + '?status=pending')
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'View Candidate')
+
+
+class ReassignmentSlotReconciliationTests(CandidatesBaseTestCase):
+    """Reassignment must reconcile the inherited interview slot."""
+
+    def setUp(self):
+        super().setUp()
+        self.new_iv = self._create_specialist('Engineering', username='iv_new')
+        self._give_window(self.new_iv)
+        self.job.department = 'Engineering'
+        self.job.save()
+        self.application.assigned_to = self.interviewer
+        self.application.save(update_fields=['assigned_to'])
+
+    def _reassign(self):
+        self.login('hr')
+        return self.client.post(
+            reverse('candidates:assign', args=[self.application.pk]),
+            {'interviewer': self.new_iv.pk},
+        )
+
+    def test_invalid_inherited_slot_is_cleared(self):
+        # Ivan's window is Monday 09:00-12:00. Book Monday for Ivan, then
+        # reassign to iv_new whose window is Tuesday — Monday doesn't fit.
+        self.application.interview_at = datetime(2030, 1, 7, 9, 0, tzinfo=dt_timezone.utc)  # Mon
+        self.application.save(update_fields=['interview_at'])
+        # iv_new window: give Tuesday instead of default Monday
+        self.new_iv.availability_windows.all().update(weekday=1)
+
+        self._reassign()
+
+        self.application.refresh_from_db()
+        self.assertEqual(self.application.assigned_to, self.new_iv)
+        self.assertIsNone(self.application.interview_at)
+        # HR is told the slot was cleared
+        self.assertTrue(Notification.objects.filter(
+            recipient=self.new_iv,
+            message__contains='No interview is scheduled yet',
+        ).exists())
+
+    def test_valid_inherited_slot_is_kept(self):
+        # Both interviewers have Monday windows; the booking stays valid.
+        self.application.interview_at = datetime(2030, 1, 7, 9, 0, tzinfo=dt_timezone.utc)  # Mon
+        self.application.save(update_fields=['interview_at'])
+
+        self._reassign()
+
+        self.application.refresh_from_db()
+        self.assertEqual(self.application.assigned_to, self.new_iv)
+        self.assertIsNotNone(self.application.interview_at)
+        self.assertTrue(Notification.objects.filter(
+            recipient=self.new_iv,
+            message__contains='An interview is already booked',
+        ).exists())
+
+    def test_former_interviewer_told_slot_transferred(self):
+        self.application.interview_at = datetime(2030, 1, 7, 9, 0, tzinfo=dt_timezone.utc)
+        self.application.save(update_fields=['interview_at'])
+
+        self._reassign()
+
+        self.assertTrue(Notification.objects.filter(
+            recipient=self.interviewer,
+            message__contains='has been transferred to the new interviewer',
+        ).exists())
+
+    def test_clashing_slot_for_new_interviewer_is_cleared(self):
+        # iv_new also has a Monday window, but is already booked at that time.
+        other = JobApplication.objects.create(
+            candidate=Candidate.objects.create(
+                first_name='Clash', last_name='Case', email='clash@example.com',
+            ),
+            job=self.job,
+            assigned_to=self.new_iv,
+            interview_at=datetime(2030, 1, 7, 9, 0, tzinfo=dt_timezone.utc),
+        )
+        self.application.interview_at = datetime(2030, 1, 7, 9, 0, tzinfo=dt_timezone.utc)
+        self.application.save(update_fields=['interview_at'])
+
+        self._reassign()
+
+        self.application.refresh_from_db()
+        self.assertIsNone(self.application.interview_at)
