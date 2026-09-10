@@ -10,14 +10,14 @@ class InterviewFeedback(models.Model):
     )
     round = models.ForeignKey(
         'jobs.InterviewRound',
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
     )
     interviewer = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name='feedback_submissions',
     )
-    score = models.PositiveIntegerField(help_text='Numeric score, e.g. 8/10.')
+    score = models.PositiveIntegerField(help_text='Score from 0 to 100 (e.g. 75).')
     notes = models.TextField(help_text='Polished feedback (or original if not AI-assisted).')
     raw_notes = models.TextField(blank=True, help_text='Original messy notes before AI polishing.')
     submitted_at = models.DateTimeField(auto_now_add=True)
@@ -45,7 +45,7 @@ class FeedbackEditHistory(models.Model):
     """Immutable version log — every edit saved here."""
     feedback = models.ForeignKey(
         InterviewFeedback,
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name='edit_history',
     )
     old_score = models.PositiveIntegerField(null=True, blank=True)

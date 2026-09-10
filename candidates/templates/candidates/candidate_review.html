@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+{% block title %}Review: {{ candidate.full_name }} | Altrium Tracker{% endblock %}
+{% block page_title %}Review Candidate{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">Review Candidate</h1>
+  <p class="page-sub">This candidate's CV parse had low confidence. Review and correct the extracted fields.</p>
+</div>
+
+<div class="panel panel-pad glass-panel" style="max-width:700px;box-shadow:var(--shadow-md)">
+  <div style="margin-bottom:var(--sp-4);padding:var(--sp-3);border-radius:8px;background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.2)">
+    <div style="font-weight:600;color:#f59e0b;margin-bottom:4px">Needs Review</div>
+    {% if latest_job %}
+    <div class="text-xs" style="color:var(--vui-text-muted);margin-bottom:6px">Uploaded for: <strong>{{ latest_job.title }}</strong></div>
+    {% endif %}
+    <div class="text-xs text-muted">
+      {% for reason in reasons_list %}
+        {% if reason == 'no_email' %}No email was extracted from the CV.{% endif %}
+        {% if reason == 'low_text_volume' %}Very little text was extracted — the file may be corrupted or image-based.{% endif %}
+        {% if reason == 'name_is_skill_word' %}The extracted "name" matches a technical skill, not a person's name.{% endif %}
+        {% if reason == 'single_word_name' %}Only one name word was extracted — likely incomplete.{% endif %}
+      {% endfor %}
+    </div>
+  </div>
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+    <div class="form-field">
+      <label class="form-label" for="first_name">First name</label>
+      <input class="form-input" type="text" id="first_name" name="first_name" value="{{ candidate.first_name }}">
+    </div>
+    <div class="form-field">
+      <label class="form-label" for="last_name">Last name</label>
+      <input class="form-input" type="text" id="last_name" name="last_name" value="{{ candidate.last_name }}">
+    </div>
+    <div class="form-field">
+      <label class="form-label" for="email">Email</label>
+      <input class="form-input" type="email" id="email" name="email" value="{{ candidate.email|default:'' }}">
+    </div>
+    <div class="form-field">
+      <label class="form-label" for="phone">Phone</label>
+      <input class="form-input" type="text" id="phone" name="phone" value="{{ candidate.phone }}">
+    </div>
+    <div class="form-field">
+      <label class="form-label" for="skills">Skills</label>
+      <textarea class="form-textarea" id="skills" name="skills" rows="3">{{ candidate.skills }}</textarea>
+      <p class="form-help">Comma-separated skills list.</p>
+    </div>
+
+    {% if candidate.resume_text %}
+    <div style="margin-top:var(--sp-4)">
+      <details>
+        <summary class="text-sm" style="cursor:pointer;font-weight:600">View extracted CV text</summary>
+        <pre style="margin-top:var(--sp-2);padding:var(--sp-3);background:rgba(255,255,255,0.04);border-radius:8px;font-size:var(--text-xs);max-height:300px;overflow:auto;white-space:pre-wrap">{{ candidate.resume_text }}</pre>
+      </details>
+    </div>
+    {% endif %}
+
+    <div class="form-actions" style="margin-top:var(--sp-4)">
+      <button type="submit" class="btn btn-primary">Save &amp; Mark Reviewed</button>
+      <a href="{% url 'candidates:detail' pk=candidate.pk %}" class="btn btn-secondary">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

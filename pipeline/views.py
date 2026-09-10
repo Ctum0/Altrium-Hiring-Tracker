@@ -57,6 +57,14 @@ class PipelineMoveView(LoginRequiredMixin, View):
             app.current_round = to_round
             app.status = JobApplication.Status.IN_PROGRESS
         elif to_status:
+            # Feedback gate: leaving a round for a terminal status requires feedback
+            if from_round:
+                has_feedback = app.feedbacks.filter(round=from_round).exists()
+                if not has_feedback:
+                    return HttpResponse(
+                        'Feedback is required before making a final hiring decision.',
+                        status=409,
+                    )
             app.status = to_status
             app.current_round = None
 
@@ -82,8 +90,6 @@ class PipelineMoveView(LoginRequiredMixin, View):
         )
 
         # Return the updated row so HTMX can swap it in place.
-        from django.contrib.auth import get_user_model
-        User = get_user_model()
         app.refresh_from_db()
         source = request.POST.get('source', 'detail')
         template = 'pipeline/_list_app_row.html' if source == 'list' else 'pipeline/_app_row.html'

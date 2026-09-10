@@ -132,3 +132,54 @@ class PipelineTests(TestCase):
         self.assertEqual(r.status_code, 409)
         self.app.refresh_from_db()
         self.assertEqual(self.app.current_round, self.round1)
+
+    def test_terminal_move_blocked_without_feedback(self):
+        """Terminal move (hired) from a round without feedback returns 409."""
+        assert self.client.login(username='hr', password='pass12345')
+        self.app.current_round = self.round1
+        self.app.save()
+        r = self.client.post(reverse('pipeline:move', args=[self.app.pk]), {
+            'stage': 'status:hired',
+        })
+        self.assertEqual(r.status_code, 409)
+        self.app.refresh_from_db()
+        self.assertEqual(self.app.status, JobApplication.Status.NEW)
+        self.assertEqual(self.app.current_round, self.round1)
+
+    def test_terminal_move_allowed_with_feedback(self):
+        """Terminal move succeeds when feedback exists for the current round."""
+        assert self.client.login(username='hr', password='pass12345')
+        self.app.current_round = self.round1
+        self.app.save()
+        self._add_feedback(self.round1)
+        r = self.client.post(reverse('pipeline:move', args=[self.app.pk]), {
+            'stage': 'status:hired',
+        })
+        self.assertEqual(r.status_code, 200)
+        self.app.refresh_from_db()
+        self.assertEqual(self.app.status, JobApplication.Status.HIRED)
+        self.assertIsNone(self.app.current_round)
+
+    def test_terminal_move_no_current_round_allowed(self):
+        """Terminal move succeeds when there is no current round to gate on."""
+        assert self.client.login(username='hr', password='pass12345')
+        # app.current_round is None from setUp
+        r = self.client.post(reverse('pipeline:move', args=[self.app.pk]), {
+            'stage': 'status:on_hold',
+        })
+        self.assertEqual(r.status_code, 200)
+        self.app.refresh_from_db()
+        self.assertEqual(self.app.status, JobApplication.Status.ON_HOLD)
+
+    def test_terminal_move_gated_from_round(self):
+        """Terminal move from a round without feedback is blocked (409), confirming the gate applies to terminal paths."""
+        assert self.client.login(username='hr', password='pass12345')
+        self.app.current_round = self.round1
+        self.app.save()
+        r = self.client.post(reverse('pipeline:move', args=[self.app.pk]), {
+            'stage': 'status:hired',
+        })
+        self.assertEqual(r.status_code, 409)
+        self.app.refresh_from_db()
+        self.assertEqual(self.app.current_round, self.round1)
+        self.assertEqual(self.app.status, JobApplication.Status.NEW)

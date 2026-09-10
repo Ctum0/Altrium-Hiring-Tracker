@@ -7,7 +7,7 @@ from .models import User
 @admin.register(User)
 class CustomUserAdmin(UserAdmin):
     fieldsets = UserAdmin.fieldsets + (
-        ('Role', {'fields': ('role',)}),
+        ('Role', {'fields': ('role', 'specialty')}),
     )
     list_display = ('username', 'email', 'role', 'is_active')
     list_filter = ('role', 'is_active')

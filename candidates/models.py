@@ -25,6 +25,24 @@ class Candidate(models.Model):
         default='',
         help_text='Where the CV came from (upload, LinkedIn, job board).',
     )
+    needs_review = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text='Set when the CV parse had low confidence and needs HR review.',
+    )
+    needs_review_reasons = models.TextField(
+        blank=True,
+        default='',
+        help_text='Comma-separated reasons for the review flag (e.g. no_email, low_text_volume).',
+    )
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='reviewed_candidates',
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -167,6 +185,8 @@ class JobApplication(models.Model):
             models.Index(fields=['status'], name='ix_app_status'),
             models.Index(fields=['-updated_at'], name='ix_app_updated'),
             models.Index(fields=['current_round'], name='ix_app_round'),
+            models.Index(fields=['assigned_to'], name='ix_app_assigned_to'),
+            models.Index(fields=['interview_at'], name='ix_app_interview_at'),
         ]
         constraints = [
             models.UniqueConstraint(fields=['candidate', 'job'], name='unique_candidate_job'),
@@ -187,6 +207,10 @@ class JobApplication(models.Model):
         from ai.panel import synthesize_panel_consensus
         return synthesize_panel_consensus(self)
 
+    def is_panel_member_of(self, user):
+        """Return True if *user* is on this application's hiring panel."""
+        return self.panel_interviewers.filter(pk=user.pk).exists()
+
     @property
     def eligible_interviewers(self):
         """Interviewers eligible for assignment to this application.
@@ -200,7 +224,7 @@ class JobApplication(models.Model):
         User = get_user_model()
         return [
             user
-            for user in User.objects.filter(role='IV').order_by('first_name', 'last_name')
+            for user in User.objects.filter(role='IV', is_active=True).order_by('first_name', 'last_name')
             if user.is_eligible_interviewer_for(self.job)
         ]
 

@@ -36,6 +36,10 @@ class Job(models.Model):
             'are automatically rejected on upload/import. Leave empty to disable.'
         ),
     )
+    num_openings = models.PositiveIntegerField(
+        default=1,
+        help_text='Number of positions to fill for this job posting.',
+    )
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     closed_at = models.DateTimeField(null=True, blank=True)
@@ -55,6 +59,14 @@ class Job(models.Model):
     @property
     def candidate_count(self):
         return self.applications.count()
+
+    @property
+    def hires_made(self):
+        return self.applications.filter(status='hired').count()
+
+    @property
+    def is_fully_hired(self):
+        return self.hires_made >= self.num_openings
 
 
 class InterviewRound(models.Model):

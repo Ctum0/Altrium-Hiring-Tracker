@@ -12,3 +12,11 @@ def avatar_index(name: str) -> int:
     if not name:
         return 0
     return sum(ord(c) for c in name) % 8
+
+
+@register.filter
+def get_item(dictionary, key):
+    """Get an item from a dictionary by key. Usage: {{ dict|get_item:key }}"""
+    if dictionary is None:
+        return None
+    return dictionary.get(key)

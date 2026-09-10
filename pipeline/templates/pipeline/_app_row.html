@@ -1,4 +1,4 @@
-{% load static %}
+{% load static accounts_extras %}
 <div id="app-row-{{ app.pk }}" class="app-card">
   <!-- Card Header -->
   <div class="app-card-header">
@@ -37,6 +37,7 @@
         <input class="form-input" type="datetime-local" name="interview_at"
                value="{{ app.interview_at|date:'Y-m-d\TH:i' }}"
                aria-label="Scheduled interview time for {{ app.candidate.full_name }}"
+               {% if not app.assigned_to %}disabled title="Assign an interviewer first to enable scheduling"{% endif %}
                style="padding:var(--sp-1) var(--sp-2);font-size:var(--text-xs)">
         <button type="submit" class="btn btn-primary btn-sm">Save</button>
       </form>
@@ -65,7 +66,7 @@
                 hx-include="this">
           <option value="">{% if app.assigned_to %}Keep current{% else %}Assign to...{% endif %}</option>
           {% for iv in app.eligible_interviewers %}
-          <option value="{{ iv.pk }}" {% if app.assigned_to_id == iv.pk %}selected{% endif %}>{{ iv.get_full_name|default:iv.username }}{% if iv.specialty %} &middot; {{ iv.specialty }}{% endif %}</option>
+          <option value="{{ iv.pk }}" {% if app.assigned_to_id == iv.pk %}selected{% endif %}>{{ iv.get_full_name|default:iv.username }}{% if iv.specialty %} &middot; {{ iv.specialty }}{% endif %}{% if workload_counts %}{% with load=workload_counts|get_item:iv.pk|default:"0" %}{% if load and team_avg_workload and load > team_avg_workload|floatformat:0 %} (⚠ {{ load }} active — above avg){% else %} ({{ load }} active){% endif %}{% endwith %}{% endif %}</option>
           {% endfor %}
           {% if app.assigned_to %}
           <option value="__unassign__">Unassign…</option>

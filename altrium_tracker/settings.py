@@ -198,9 +198,7 @@ S3_ENDPOINT = _env('S3_ENDPOINT', default='')
 S3_PUBLIC_DOMAIN = _env('S3_PUBLIC_DOMAIN', default='')
 
 if S3_ACCESS_KEY_ID and S3_BUCKET_NAME:
-    _s3_custom_domain = None
-    if S3_PUBLIC_DOMAIN:
-        _s3_custom_domain = S3_PUBLIC_DOMAIN.split('://', 1)[-1]
+    _s3_custom_domain = None  # Disabled: custom_domain bypasses presigned URLs
     STORAGES['default'] = {
         'BACKEND': 'storages.backends.s3boto3.S3Boto3Storage',
         'OPTIONS': {
@@ -214,19 +212,11 @@ if S3_ACCESS_KEY_ID and S3_BUCKET_NAME:
             # bucket instead of permanently readable public URLs.
             'querystring_auth': True,
             'querystring_expire': 600,
-            'custom_domain': _s3_custom_domain,
+            # custom_domain intentionally omitted: generates unsigned public URLs
+            # instead of the private-bucket presigned URLs we need for CV PII.
             'object_parameters': {'CacheControl': 'max-age=86400'},
         },
     }
-    if S3_PUBLIC_DOMAIN:
-        MEDIA_URL = f'{S3_PUBLIC_DOMAIN}/media/'
-
-
-# Security settings - only enforced in production (DEBUG=False)
-if not DEBUG:
-    SECURE_SSL_REDIRECT = _env('DJANGO_SECURE_SSL_REDIRECT', default=True, cast=bool)
-    SESSION_COOKIE_SECURE = True
-    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # Internal system holding candidate PII: cap sessions at one workday and
 # expire on browser close instead of the 2-week Django default.
@@ -240,11 +230,12 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 2 * 1024 * 1024          # 2 MiB in memory
 DATA_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024          # 5 MiB total body
 
 # Cache (LocMem in dev; set REDIS_URL in prod for shared rate limiting).
-if _env('REDIS_URL', default=''):
+_redis_url = _env('REDIS_URL', default='')
+if _redis_url:
     CACHES = {
         'default': {
             'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-            'LOCATION': _env('REDIS_URL', default=''),
+            'LOCATION': _redis_url,
         }
     }
 else:

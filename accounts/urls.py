@@ -20,4 +20,5 @@ urlpatterns = [
         name='interviewer_roster',
     ),
     path('dashboard/', views.ManagementDashboardView.as_view(), name='management_dashboard'),
+    path('interviewer/<int:pk>/deactivate/', views.DeactivateInterviewerView.as_view(), name='deactivate_interviewer'),
 ]

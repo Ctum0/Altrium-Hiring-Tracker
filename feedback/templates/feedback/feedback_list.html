@@ -66,8 +66,12 @@
           </td>
           <td><span class="badge badge-pending">Feedback Pending</span></td>
           <td>
-            {% if user.is_interviewer and app.assigned_to == user and app.current_round %}
-            <a href="{% url 'feedback:form' app.pk app.current_round.pk %}" class="btn btn-primary btn-xs">Submit Feedback</a>
+            {% if user.is_interviewer and app.current_round %}
+              {% if app.assigned_to == user or app.pk in panel_member_app_ids %}
+              <a href="{% url 'feedback:form' app.pk app.current_round.pk %}" class="btn btn-primary btn-xs">Submit Feedback</a>
+              {% else %}
+              <a href="{% url 'candidates:detail' app.candidate.pk %}" class="btn btn-secondary btn-xs">View Candidate &rarr;</a>
+              {% endif %}
             {% else %}
             <a href="{% url 'candidates:detail' app.candidate.pk %}" class="btn btn-secondary btn-xs">View Candidate &rarr;</a>
             {% endif %}

@@ -29,9 +29,8 @@ def synthesize_panel_consensus(application):
 
     for fb in feedbacks:
         raw_score = float(fb.score or 0)
-        # Normalize to the 10-point consensus scale. FeedbackForm accepts
-        # 0-100; anything above 10 is treated as a 100-point entry.
-        score_10 = raw_score / 10.0 if raw_score > 10 else raw_score
+        # All scores are 0-100, always normalize to /10
+        score_10 = raw_score / 10.0
         score_10 = min(score_10, 10.0)
         scores_list.append(score_10)
 

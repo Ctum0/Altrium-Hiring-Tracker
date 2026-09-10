@@ -126,11 +126,14 @@ def _fallback_parse_cv(text: str) -> dict:
 def parse_cv(text: str) -> dict:
     """Extract candidate details from raw CV text via Groq with local fallback.
 
-    Returns a dict with first_name, last_name, email, phone, skills.
+    Returns a dict with first_name, last_name, email, phone, skills, used_fallback.
     Never returns empty fields if contact info or skills are present in raw text.
     """
     result = {'first_name': '', 'last_name': '', 'email': '', 'phone': '', 'skills': []}
+    used_fallback = True
+
     if not text.strip():
+        result['used_fallback'] = True
         return result
 
     content = _chat(SYSTEM_PARSE, text[:12000])
@@ -154,6 +157,7 @@ def parse_cv(text: str) -> dict:
 
             # Verify that remote parse extracted email/skills; if incomplete, blend with fallback
             if result['email'] or result['first_name'] or result['skills']:
+                result['used_fallback'] = False
                 return result
         except (json.JSONDecodeError, AttributeError):
             logger.error('Could not parse Groq response: %s', content[:200])
@@ -164,6 +168,7 @@ def parse_cv(text: str) -> dict:
         if not result[key]:
             result[key] = fallback[key]
 
+    result['used_fallback'] = used_fallback
     return result
 
 
@@ -179,7 +184,10 @@ def polish_notes(raw_notes: str) -> str:
     lines = [line.strip('-* \t') for line in raw_notes.splitlines() if line.strip()]
     if not lines:
         return raw_notes.strip()
-    return '\n'.join(f'- {line.capitalize()}' if not line.startswith('-') else line for line in lines)
+    return '\n'.join(
+        f'- {line[0].upper()}{line[1:]}' if not line.startswith('-') else f'- {line}'
+        for line in lines if line
+    )
 
 
 def fit_summary(candidate_skills: str, job_title: str, requirements: str) -> str:

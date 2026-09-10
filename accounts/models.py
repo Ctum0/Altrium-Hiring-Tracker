@@ -99,6 +99,10 @@ class InterviewerAvailability(models.Model):
                 condition=models.Q(start_time__lt=models.F('end_time')),
                 name='availability_start_before_end',
             ),
+            models.UniqueConstraint(
+                fields=['interviewer', 'weekday', 'start_time'],
+                name='unique_availability_slot',
+            ),
         ]
 
     def __str__(self):

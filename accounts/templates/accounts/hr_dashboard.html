@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% block title %}{% if user.is_management %}Management Dashboard{% else %}HR Dashboard{% endif %} | Altrium Tracker{% endblock %}
 {% block page_title %}Dashboard{% endblock %}
-{% block head %}<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js" defer></script>{% endblock %}
+{% block head %}<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>{% endblock %}
 {% block content_class %}dashboard-single-screen{% endblock %}
 {% block content %}
 
@@ -51,7 +51,7 @@
 
   <a href="{% url 'candidates:list' %}?sort=score" class="ref-kpi-card glass-panel vui-card vui-card-hover kpi-card-link">
     <div class="ref-kpi-meta">
-      <span class="ref-kpi-label">Avg. Shortlist Score</span>
+      <span class="ref-kpi-label">Avg. Candidate Score</span>
       <span class="ref-kpi-value">{% if avg_score is not None %}{{ avg_score }}{% else %}—{% endif %}</span>
       <span class="kpi-trend {% if avg_score and avg_score >= 60 %}kpi-trend-up{% else %}kpi-trend-neutral{% endif %}">
         {{ scored_count }} scored candidates
@@ -74,6 +74,21 @@
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
     </div>
   </a>
+
+  {% if needs_review_count > 0 %}
+  <a href="{% url 'candidates:list' %}?needs_review=1" class="ref-kpi-card glass-panel vui-card vui-card-hover kpi-card-link" aria-label="Candidates needing review">
+    <div class="ref-kpi-meta">
+      <span class="ref-kpi-label">Needs Review</span>
+      <span class="ref-kpi-value" style="color:#f59e0b">{{ needs_review_count }}</span>
+      <span class="kpi-trend kpi-trend-pending">
+        CV parse flagged
+      </span>
+    </div>
+    <div class="ref-kpi-icon-box" style="background:rgba(251,191,36,0.12);color:#f59e0b" aria-hidden="true">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    </div>
+  </a>
+  {% endif %}
 
 </div>
 
@@ -300,14 +315,14 @@
           <div class="ai-card-sec-finding">
             <h4 class="ai-main-title">Pipeline Health</h4>
             <div class="ai-sub-score">
-              <span class="ai-score-val ai-text-amber">{{ insight.score }}/{{ insight.score_max }}</span>
+              <span class="ai-score-val ai-text-amber">{{ insight.score }}%</span>
               <span class="ai-status-badge ai-badge-amber">Status: {{ insight.status }}</span>
             </div>
           </div>
 
           <!-- Section 3: Supporting Intelligence -->
           <div class="ai-card-sec-intel">
-            <div class="ai-intel-text"><span class="ai-intel-dot ai-dot-amber"></span>AI Detection: "{{ insight.ai_detection }}"</div>
+            <div class="ai-intel-text"><span class="ai-intel-dot ai-dot-amber"></span>Observation: "{{ insight.ai_detection }}"</div>
           </div>
 
           <!-- Section 4: Visualization (Stage Flow Sequence) -->

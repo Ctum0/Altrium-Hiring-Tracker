@@ -49,6 +49,13 @@
     </div>
 
     <div class="form-field">
+      <label class="form-label" for="{{ form.num_openings.id_for_label }}">Number of openings</label>
+      {{ form.num_openings }}
+      {% if form.num_openings.errors %}<p class="form-error">{{ form.num_openings.errors.0 }}</p>{% endif %}
+      <p class="form-help">How many positions to fill for this posting (default: 1).</p>
+    </div>
+
+    <div class="form-field">
       <label class="form-label" for="{{ form.hiring_manager.id_for_label }}">Hiring manager</label>
       {{ form.hiring_manager }}
       {% if form.hiring_manager.errors %}<p class="form-error">{{ form.hiring_manager.errors.0 }}</p>{% endif %}

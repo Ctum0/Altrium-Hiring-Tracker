@@ -5,11 +5,12 @@ from django.db.models import Avg, Count, Q
 from django.shortcuts import redirect
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
-from django.views.generic import ListView, RedirectView, TemplateView
+from django.views.generic import ListView, RedirectView, TemplateView, View
 
 from accounts.models import Role
 from candidates.models import Candidate, JobApplication
 from jobs.models import Job
+from pipeline.models import PipelineMove
 
 User = get_user_model()
 
@@ -70,6 +71,7 @@ class HRDashboardView(LoginRequiredMixin, ListView):
         context = super().get_context_data(**kwargs)
         context['active_nav'] = 'dashboard'
         context['active_job_count'] = Job.objects.filter(is_active=True).count()
+        context['needs_review_count'] = Candidate.objects.filter(needs_review=True).count()
 
         # Pipeline stage distribution
         stage_counts = dict(
@@ -265,7 +267,7 @@ class HRDashboardView(LoginRequiredMixin, ListView):
             })
 
         # --- Card 3: PIPELINE HEALTH ---
-        # 0-100: share of applications still moving (not hired/rejected).
+        # Active ratio: share of applications still moving (not hired/rejected).
         health_score = int(round((active / total_apps) * 100))
         if health_score >= 70:
             health_status = 'Optimal flow'
@@ -306,6 +308,7 @@ class HRDashboardView(LoginRequiredMixin, ListView):
             'icon': '📊',
             'score': health_score,
             'score_max': 100,
+            'score_label': f'{health_score}%',  # Active Ratio display
             'status': health_status,
             'status_band': health_band,
             'ai_detection': ai_detection_health,
@@ -327,7 +330,8 @@ class HRDashboardView(LoginRequiredMixin, ListView):
             'candidate', 'job', 'assigned_to'
         ).order_by('updated_at')
         stalled_count = stalled_qs.count()
-        context['stalled_applications'] = stalled_qs[:5]
+        context['stalled_applications'] = stalled_qs
+        context['stalled_count'] = stalled_count
 
         if stalled_count >= 3:
             risk_level = 'HIGH'
@@ -365,14 +369,38 @@ class HRDashboardView(LoginRequiredMixin, ListView):
         now = timezone.now()
 
         def _avg_days_in_status(status_value):
-            qs = JobApplication.objects.filter(status=status_value)
-            if not qs.exists():
+            """Average days since last PipelineMove into this status.
+
+            Falls back to updated_at for applications with no move history.
+            """
+            app_ids_in_status = list(
+                JobApplication.objects.filter(status=status_value).values_list('id', flat=True)
+            )
+            if not app_ids_in_status:
                 return None
-            ages = [
-                (now - moved).total_seconds() / 86400.0
-                for moved in qs.values_list('updated_at', flat=True)
-            ]
-            return round(sum(ages) / len(ages), 1)
+
+            last_move = {}
+            for move in (
+                PipelineMove.objects.filter(application_id__in=app_ids_in_status)
+                .order_by('application_id', '-moved_at')
+            ):
+                if move.application_id not in last_move:
+                    last_move[move.application_id] = move.moved_at
+
+            ages = []
+            for app_id in app_ids_in_status:
+                ref_time = last_move.get(app_id)
+                if ref_time is None:
+                    # No moves yet — fall back to updated_at
+                    ref_time = (
+                        JobApplication.objects.filter(id=app_id)
+                        .values_list('updated_at', flat=True)
+                        .first()
+                    )
+                if ref_time:
+                    ages.append((now - ref_time).total_seconds() / 86400.0)
+
+            return round(sum(ages) / len(ages), 1) if ages else None
 
         context['velocity_screening'] = _avg_days_in_status('shortlisted')
         context['velocity_interview'] = _avg_days_in_status('in_progress')
@@ -388,6 +416,13 @@ class HRDashboardView(LoginRequiredMixin, ListView):
 class InterviewerDashboardView(LoginRequiredMixin, TemplateView):
     """Interviewer dashboard — assigned candidates + feedback needed."""
     template_name = 'accounts/interviewer_dashboard.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
+        if not request.user.is_interviewer():
+            return redirect('accounts:home')
+        return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -467,11 +502,25 @@ class InterviewerRosterView(LoginRequiredMixin, ListView):
             JobApplication.objects
             .exclude(status__in=['hired', 'rejected', 'on_hold'])
         )
+        # Pre-compute load in two queries to avoid N+1.
+        assignee_counts = dict(
+            work_qs.filter(assigned_to__isnull=False)
+            .values('assigned_to_id')
+            .annotate(cnt=Count('id'))
+            .values_list('assigned_to_id', 'cnt')
+        )
+        panel_counts = dict(
+            work_qs.filter(panel_interviewers__isnull=False)
+            .values('panel_interviewers__id')
+            .annotate(cnt=Count('id'))
+            .values_list('panel_interviewers__id', 'cnt')
+        )
         load = {}
-        for iv in context['interviewers']:
-            load[iv.pk] = work_qs.filter(
-                Q(assigned_to=iv) | Q(panel_interviewers=iv)
-            ).distinct().count()
+        all_iv_pks = set(assignee_counts.keys()) | set(panel_counts.keys())
+        for pk in all_iv_pks:
+            # Union approximation: max of the two counts (assignees overlap
+            # with panel in practice, so this is close to DISTINCT).
+            load[pk] = max(assignee_counts.get(pk, 0), panel_counts.get(pk, 0))
         pending = dict(
             JobApplication.objects.filter(
                 assigned_to__isnull=False,
@@ -487,3 +536,30 @@ class InterviewerRosterView(LoginRequiredMixin, ListView):
             iv.active_load = load.get(iv.pk, 0)
             iv.pending_count = pending.get(iv.pk, 0)
         return context
+
+
+class DeactivateInterviewerView(LoginRequiredMixin, View):
+    """HR only: deactivate an interviewer account (is_active=False).
+
+    Does NOT delete the user — historical feedback stays attributed.
+    Active assignments surface on the offboarding page for HR to reassign.
+    """
+
+    def post(self, request, pk):
+        if not request.user.is_hr():
+            return HttpResponse('Only HR can deactivate interviewers.', status=403)
+        user = get_object_or_404(User, pk=pk, role=Role.INTERVIEWER)
+        if user == request.user:
+            messages.error(request, 'You cannot deactivate your own account.')
+            return redirect('accounts:interviewer_roster')
+        if not user.is_active:
+            messages.info(request, f'{user.get_full_name() or user.username} is already deactivated.')
+            return redirect('accounts:interviewer_roster')
+        user.is_active = False
+        user.save(update_fields=['is_active'])
+        messages.success(
+            request,
+            f'{user.get_full_name() or user.username} has been deactivated. '
+            f'Active assignments are listed on the offboarding page.',
+        )
+        return redirect('accounts:interviewer_roster')

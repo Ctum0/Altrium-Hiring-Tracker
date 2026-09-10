@@ -4,7 +4,8 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import F, Q
+from django.db import transaction
+from django.db.models import Count, F, Q
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -13,6 +14,7 @@ from django.utils.text import get_valid_filename
 from django.views import View
 from django.views.generic import DetailView, ListView
 
+from ai.confidence import assess_confidence
 from ai.cv_parser import extract_text
 from ai.matching import auto_apply, job_fit
 from ai.services import fit_summary, parse_cv
@@ -51,11 +53,15 @@ class CandidateListView(LoginRequiredMixin, ListView):
         min_score = self.request.GET.get('min_score', '').strip()
         show_all = self.request.GET.get('all') == '1'
         q = self.request.GET.get('q', '').strip()
+        needs_review = self.request.GET.get('needs_review') == '1'
 
         # Default: show only active candidates (exclude hired and rejected),
         # unless explicitly showing all or filtering by a final status.
         if not show_all and stage not in ('hired', 'rejected'):
             qs = qs.exclude(status__in=['hired', 'rejected'])
+
+        if needs_review:
+            qs = qs.filter(candidate__needs_review=True)
 
         if job_pk:
             if ',' in job_pk:
@@ -65,6 +71,8 @@ class CandidateListView(LoginRequiredMixin, ListView):
         if stage:
             qs = qs.filter(status=stage)
         if min_score:
+            # candidate__score is the HR qualitative score (0-100), NOT the
+            # auto-match shortlist_score.  See template labels for distinction.
             qs = qs.filter(candidate__score__gte=min_score)
         if q:
             qs = qs.filter(
@@ -113,6 +121,8 @@ class CandidateListView(LoginRequiredMixin, ListView):
         )
         context['stages'] = JobApplication.Status.choices
         context['is_hr'] = self.request.user.is_hr()
+        context['needs_review_count'] = Candidate.objects.filter(needs_review=True).count()
+        context['filter_needs_review'] = self.request.GET.get('needs_review') == '1'
         return context
 
 
@@ -151,6 +161,12 @@ class CandidateDetailView(LoginRequiredMixin, DetailView):
             (app, job_fit(self.object, app.job))
             for app in applications
         ]
+        # Workload counts for eligible interviewers
+        active_apps = JobApplication.objects.exclude(status__in=['hired', 'rejected', 'on_hold'])
+        workload_data = active_apps.values('assigned_to_id').annotate(cnt=Count('id')).values_list('assigned_to_id', 'cnt')
+        workload_counts = dict(workload_data)
+        context['workload_counts'] = workload_counts
+        context['team_avg_workload'] = round(sum(workload_counts.values()) / max(len(workload_counts), 1), 1)
         return context
 
 
@@ -221,6 +237,10 @@ class CandidateUploadView(LoginRequiredMixin, View):
             except Exception:
                 failed.append((f.name, 'could not read the file'))
                 continue
+            needs_review, review_reasons = assess_confidence(parsed, text)
+            if len(text.strip()) < 10:
+                failed.append((f.name, 'file contains no readable text'))
+                continue
             email = (parsed.get('email') or '').strip().lower()
 
             if email:
@@ -236,6 +256,10 @@ class CandidateUploadView(LoginRequiredMixin, View):
                         'source': 'upload',
                     },
                 )
+                if was_created or needs_review:
+                    candidate.needs_review = needs_review
+                    candidate.needs_review_reasons = ', '.join(review_reasons) if review_reasons else ''
+                    candidate.save(update_fields=['needs_review', 'needs_review_reasons', 'updated_at'])
                 if was_created:
                     created += 1
                 else:
@@ -255,6 +279,9 @@ class CandidateUploadView(LoginRequiredMixin, View):
                     resume_text=text[:50000],
                     source='upload',
                 )
+                candidate.needs_review = needs_review
+                candidate.needs_review_reasons = ', '.join(review_reasons) if review_reasons else ''
+                candidate.save(update_fields=['needs_review', 'needs_review_reasons', 'updated_at'])
                 unparsed.append(f.name)
             app, app_created = JobApplication.objects.get_or_create(
                 candidate=candidate,
@@ -344,6 +371,7 @@ class CandidateImportView(LoginRequiredMixin, View):
         text = form.cleaned_data['profile_text']
 
         parsed = parse_cv(text)
+        needs_review, review_reasons = assess_confidence(parsed, text)
         email = (parsed.get('email') or '').strip().lower()
 
         if email:
@@ -358,6 +386,10 @@ class CandidateImportView(LoginRequiredMixin, View):
                     'source': source,
                 },
             )
+            if was_created or needs_review:
+                candidate.needs_review = needs_review
+                candidate.needs_review_reasons = ', '.join(review_reasons) if review_reasons else ''
+                candidate.save(update_fields=['needs_review', 'needs_review_reasons', 'updated_at'])
         else:
             candidate = Candidate.objects.create(
                 email=None,
@@ -368,6 +400,9 @@ class CandidateImportView(LoginRequiredMixin, View):
                 resume_text=text[:50000],
                 source=source,
             )
+            candidate.needs_review = needs_review
+            candidate.needs_review_reasons = ', '.join(review_reasons) if review_reasons else ''
+            candidate.save(update_fields=['needs_review', 'needs_review_reasons', 'updated_at'])
             was_created = True
 
         app, app_created = JobApplication.objects.get_or_create(
@@ -507,7 +542,10 @@ class AssignApplicationView(LoginRequiredMixin, View):
             messages.error(request, 'Choose an interviewer to assign.')
             return redirect('candidates:detail', pk=app.candidate_id)
 
-        interviewer = get_object_or_404(User, pk=interviewer_id, role='IV')
+        try:
+            interviewer = get_object_or_404(User, pk=interviewer_id, role='IV')
+        except (ValueError, TypeError):
+            return HttpResponse('Invalid interviewer.', status=400)
 
         # Role-match: interviewer's specialty must align with the job.
         if not interviewer.is_eligible_interviewer_for(app.job):
@@ -531,46 +569,47 @@ class AssignApplicationView(LoginRequiredMixin, View):
             return redirect('candidates:detail', pk=app.candidate_id)
 
         previous = app.assigned_to
-        app.assigned_to = interviewer
-        app.panel_interviewers.add(interviewer)
-        if previous and previous != interviewer:
-            # Reassignment: the former assignee leaves the panel — their
-            # feedback duty transfers to the new interviewer.
-            app.panel_interviewers.remove(previous)
-        app.save(update_fields=['assigned_to', 'updated_at'])
+        with transaction.atomic():
+            app.assigned_to = interviewer
+            app.panel_interviewers.add(interviewer)
+            if previous and previous != interviewer:
+                # Reassignment: the former assignee leaves the panel — their
+                # feedback duty transfers to the new interviewer.
+                app.panel_interviewers.remove(previous)
+            app.save(update_fields=['assigned_to', 'updated_at'])
 
-        if previous != interviewer:
-            if previous:
+            if previous != interviewer:
+                if previous:
+                    Notification.objects.create(
+                        recipient=previous,
+                        message=(
+                            f'You were unassigned from {app.candidate.full_name} '
+                            f'({app.job.title}).'
+                            + self._slot_note_for_former(app, previous)
+                        ),
+                        link=reverse('candidates:detail', kwargs={'pk': app.candidate_id}),
+                    )
+                self._reconcile_inherited_slot(app, previous, interviewer)
                 Notification.objects.create(
-                    recipient=previous,
+                    recipient=interviewer,
                     message=(
-                        f'You were unassigned from {app.candidate.full_name} '
-                        f'({app.job.title}).'
-                        + self._slot_note_for_former(app, previous)
+                        f'New candidate assigned to you: {app.candidate.full_name} '
+                        f'for {app.job.title}.'
+                        + self._slot_note_for_new(app)
                     ),
                     link=reverse('candidates:detail', kwargs={'pk': app.candidate_id}),
                 )
-            self._reconcile_inherited_slot(app, previous, interviewer)
-            Notification.objects.create(
-                recipient=interviewer,
-                message=(
-                    f'New candidate assigned to you: {app.candidate.full_name} '
-                    f'for {app.job.title}.'
-                    + self._slot_note_for_new(app)
-                ),
-                link=reverse('candidates:detail', kwargs={'pk': app.candidate_id}),
-            )
-            assignee = interviewer.get_full_name() or interviewer.username
-            messages.success(
-                request,
-                f'Assigned {app.candidate.full_name} to {assignee}.'
-                + self._hr_slot_note(app, interviewer),
-            )
-        else:
-            messages.info(
-                request,
-                f'{app.candidate.full_name} is already assigned to that interviewer.',
-            )
+                assignee = interviewer.get_full_name() or interviewer.username
+                messages.success(
+                    request,
+                    f'Assigned {app.candidate.full_name} to {assignee}.'
+                    + self._hr_slot_note(app, interviewer),
+                )
+            else:
+                messages.info(
+                    request,
+                    f'{app.candidate.full_name} is already assigned to that interviewer.',
+                )
 
         return redirect('candidates:detail', pk=app.candidate_id)
 
@@ -672,12 +711,16 @@ class InterviewDetailsView(LoginRequiredMixin, View):
                 )
                 return redirect('candidates:detail', pk=app.candidate_id)
 
+            if scheduled.hour == 0 and scheduled.minute == 0:
+                messages.warning(
+                    request,
+                    'The interview time appears to be midnight. Did you mean to set a specific time?',
+                )
+
         app.interview_details = details
         app.interview_at = scheduled
 
         if scheduled:
-            # Scheduling must respect interviewer availability and avoid
-            # double-booking. Skip checks when unassigning or clearing.
             interviewer = app.assigned_to
             if interviewer:
                 if not interviewer.is_available_at(scheduled):
@@ -689,9 +732,11 @@ class InterviewDetailsView(LoginRequiredMixin, View):
                     )
                     return redirect('candidates:detail', pk=app.candidate_id)
 
+                slot_duration = timedelta(minutes=60)
                 clash = JobApplication.objects.filter(
                     assigned_to=interviewer,
-                    interview_at=scheduled,
+                    interview_at__lt=scheduled + slot_duration,
+                    interview_at__gte=scheduled - slot_duration,
                 ).exclude(pk=app.pk).exists()
                 if clash:
                     messages.error(
@@ -701,39 +746,40 @@ class InterviewDetailsView(LoginRequiredMixin, View):
                     )
                     return redirect('candidates:detail', pk=app.candidate_id)
 
-        if scheduled:
-            messages.success(
-                request,
-                f'Interview details updated for {app.candidate.full_name} — '
-                f'scheduled at {scheduled:%Y-%m-%d %H:%M} UTC.',
-            )
-        elif details:
-            messages.success(
-                request,
-                f'Interview details updated for {app.candidate.full_name}.',
-            )
-        else:
-            messages.success(
-                request,
-                f'Interview details cleared for {app.candidate.full_name}.',
-            )
+        with transaction.atomic():
+            if scheduled:
+                messages.success(
+                    request,
+                    f'Interview details updated for {app.candidate.full_name} — '
+                    f'scheduled at {scheduled:%Y-%m-%d %H:%M} UTC.',
+                )
+            elif details:
+                messages.success(
+                    request,
+                    f'Interview details updated for {app.candidate.full_name}.',
+                )
+            else:
+                messages.success(
+                    request,
+                    f'Interview details cleared for {app.candidate.full_name}.',
+                )
 
-        scheduled_changed = app.interview_at != (
-            JobApplication.objects.filter(pk=app.pk).values_list('interview_at', flat=True).first()
-        )
-        app.save(update_fields=['interview_details', 'interview_at', 'updated_at'])
-
-        # Notify the assigned interviewer about schedule changes affecting them.
-        if scheduled_changed and app.assigned_to:
-            Notification.objects.create(
-                recipient=app.assigned_to,
-                message=(
-                    f'Interview {"scheduled" if scheduled else "cleared"} for '
-                    f'{app.candidate.full_name} ({app.job.title})'
-                    + (f' at {scheduled:%Y-%m-%d %H:%M}.' if scheduled else '.')
-                ),
-                link=reverse('candidates:detail', kwargs={'pk': app.candidate_id}),
+            scheduled_changed = app.interview_at != (
+                JobApplication.objects.filter(pk=app.pk).values_list('interview_at', flat=True).first()
             )
+            app.save(update_fields=['interview_details', 'interview_at', 'updated_at'])
+
+            # Notify the assigned interviewer about schedule changes affecting them.
+            if scheduled_changed and app.assigned_to:
+                Notification.objects.create(
+                    recipient=app.assigned_to,
+                    message=(
+                        f'Interview {"scheduled" if scheduled else "cleared"} for '
+                        f'{app.candidate.full_name} ({app.job.title})'
+                        + (f' at {scheduled:%Y-%m-%d %H:%M}.' if scheduled else '.')
+                    ),
+                    link=reverse('candidates:detail', kwargs={'pk': app.candidate_id}),
+                )
 
         return redirect('candidates:detail', pk=app.candidate_id)
 
@@ -759,7 +805,10 @@ class InterviewerSlotsView(LoginRequiredMixin, View):
         if not interviewer_id or interviewer_id == '__unassign__':
             return render(request, 'candidates/_slot_preview.html', {'preview': None})
 
-        interviewer = get_object_or_404(User, pk=interviewer_id, role='IV')
+        try:
+            interviewer = get_object_or_404(User, pk=interviewer_id, role='IV')
+        except (ValueError, TypeError):
+            return HttpResponse('Invalid interviewer.', status=400)
 
         role_fit = interviewer.is_eligible_interviewer_for(app.job)
         windows = list(interviewer.availability_windows.all())
@@ -805,6 +854,40 @@ class InterviewerSlotsView(LoginRequiredMixin, View):
         })
 
 
+class CandidateEditView(LoginRequiredMixin, View):
+    """HR only: edit candidate contact info and skills."""
+
+    def get(self, request, pk):
+        candidate = get_object_or_404(Candidate, pk=pk)
+        if not request.user.is_hr():
+            messages.error(request, 'Only HR can edit candidate profiles.')
+            return redirect('candidates:detail', pk=pk)
+        from .forms import CandidateEditForm
+        form = CandidateEditForm(instance=candidate)
+        return render(request, 'candidates/candidate_edit.html', {
+            'candidate': candidate,
+            'form': form,
+            'active_nav': 'candidates',
+        })
+
+    def post(self, request, pk):
+        candidate = get_object_or_404(Candidate, pk=pk)
+        if not request.user.is_hr():
+            messages.error(request, 'Only HR can edit candidate profiles.')
+            return redirect('candidates:detail', pk=pk)
+        from .forms import CandidateEditForm
+        form = CandidateEditForm(request.POST, instance=candidate)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f'Candidate profile for {candidate.full_name} updated.')
+            return redirect('candidates:detail', pk=pk)
+        return render(request, 'candidates/candidate_edit.html', {
+            'candidate': candidate,
+            'form': form,
+            'active_nav': 'candidates',
+        })
+
+
 class CandidateDeleteView(LoginRequiredMixin, View):
     """HR only: permanently remove a candidate profile and associated applications."""
 
@@ -819,5 +902,73 @@ class CandidateDeleteView(LoginRequiredMixin, View):
         name = candidate.full_name
         candidate.delete()
         messages.success(request, f'Candidate profile for "{name}" has been permanently removed.')
+        return redirect('candidates:list')
+
+
+class CandidateReviewView(LoginRequiredMixin, View):
+    """HR only: review a flagged candidate's parsed data, correct fields, mark reviewed."""
+
+    def get(self, request, pk):
+        if not request.user.is_hr():
+            return redirect('candidates:list')
+        candidate = get_object_or_404(Candidate, pk=pk, needs_review=True)
+        reasons_list = [r.strip() for r in (candidate.needs_review_reasons or '').split(',') if r.strip()]
+        # Get the most recent application to show which job this was uploaded for
+        latest_app = candidate.applications.select_related('job').order_by('-created_at').first()
+        return render(request, 'candidates/candidate_review.html', {
+            'candidate': candidate,
+            'reasons_list': reasons_list,
+            'latest_job': latest_app.job if latest_app else None,
+            'active_nav': 'candidates',
+        })
+
+    def post(self, request, pk):
+        if not request.user.is_hr():
+            return redirect('candidates:list')
+        candidate = get_object_or_404(Candidate, pk=pk, needs_review=True)
+        candidate.first_name = request.POST.get('first_name', candidate.first_name)
+        candidate.last_name = request.POST.get('last_name', candidate.last_name)
+        candidate.email = request.POST.get('email', candidate.email)
+        candidate.phone = request.POST.get('phone', candidate.phone)
+        candidate.skills = request.POST.get('skills', candidate.skills)
+        candidate.needs_review = False
+        candidate.needs_review_reasons = ''
+        candidate.reviewed_by = request.user
+        candidate.reviewed_at = timezone.now()
+        candidate.save()
+        messages.success(request, f'Reviewed and corrected {candidate.full_name}.')
+        return redirect('candidates:detail', pk=pk)
+
+
+class OffboardingCandidatesView(LoginRequiredMixin, View):
+    """HR only: view candidates assigned to deactivated interviewers who need reassignment."""
+
+    def get(self, request):
+        if not request.user.is_hr():
+            return redirect('candidates:list')
+        apps = JobApplication.objects.filter(
+            assigned_to__is_active=False,
+        ).exclude(
+            status__in=['hired', 'rejected', 'on_hold'],
+        ).select_related('candidate', 'job', 'assigned_to', 'current_round')
+        return render(request, 'candidates/offboarding_list.html', {
+            'applications': apps,
+            'active_nav': 'candidates',
+        })
+
+
+class BulkMarkReviewedView(LoginRequiredMixin, View):
+    """HR only: mark all needs_review candidates as reviewed (bulk triage)."""
+
+    def post(self, request):
+        if not request.user.is_hr():
+            return redirect('candidates:list')
+        count = Candidate.objects.filter(needs_review=True).update(
+            needs_review=False,
+            needs_review_reasons='',
+            reviewed_by=request.user,
+            reviewed_at=timezone.now(),
+        )
+        messages.success(request, f'Marked {count} candidate{"s" if count != 1 else ""} as reviewed.')
         return redirect('candidates:list')
 

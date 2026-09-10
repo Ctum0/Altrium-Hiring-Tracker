@@ -52,6 +52,10 @@
       <dd>{% if job.hiring_manager %}{{ job.hiring_manager.get_full_name|default:job.hiring_manager.username }}{% else %}-{% endif %}</dd>
       <dt class="text-muted">Candidates</dt>
       <dd class="mono">{{ job.candidate_count }}</dd>
+      {% if job.num_openings > 1 %}
+      <dt class="text-muted">Openings</dt>
+      <dd class="mono">{{ job.hires_made }}/{{ job.num_openings }} filled</dd>
+      {% endif %}
       <dt class="text-muted">Rounds</dt>
       <dd class="mono">{{ rounds|length }}</dd>
     </dl>

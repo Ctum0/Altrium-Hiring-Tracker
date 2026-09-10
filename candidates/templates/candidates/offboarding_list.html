@@ -1,0 +1,57 @@
+{% extends 'base.html' %}
+{% block title %}Needs Reassignment | Altrium Tracker{% endblock %}
+{% block page_title %}Needs Reassignment{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">Needs Reassignment</h1>
+  <p class="page-sub">Candidates assigned to deactivated interviewers who need a new interviewer.</p>
+</div>
+
+{% if applications %}
+<div class="panel panel-pad glass-panel" style="box-shadow:var(--shadow-md)">
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Candidate</th>
+          <th>Position</th>
+          <th>Round</th>
+          <th>Former Interviewer</th>
+          <th>Status</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for app in applications %}
+        <tr>
+          <td>
+            <a href="{% url 'candidates:detail' pk=app.candidate.pk %}" style="text-decoration:none;color:inherit">
+              {{ app.candidate.full_name }}
+            </a>
+          </td>
+          <td>{{ app.job.title }}</td>
+          <td>{{ app.current_round.name|default:"—" }}</td>
+          <td>
+            <span class="badge badge-danger">{{ app.assigned_to.get_full_name|default:app.assigned_to.username }}</span>
+            <span class="text-xs text-muted">(deactivated)</span>
+          </td>
+          <td>
+            <span class="badge badge-{{ app.status }}">{{ app.get_status_display }}</span>
+          </td>
+          <td>
+            <a href="{% url 'candidates:detail' pk=app.candidate.pk %}" class="btn btn-primary btn-sm">Reassign</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="panel panel-pad glass-panel empty-state" style="box-shadow:var(--shadow-md)">
+  <p class="empty-state-title">All clear</p>
+  <p class="empty-state-body">No active candidates are assigned to deactivated interviewers.</p>
+</div>
+{% endif %}
+{% endblock %}

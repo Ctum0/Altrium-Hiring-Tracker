@@ -43,6 +43,9 @@
       <span class="job-card-count">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle;margin-right:3px"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
         {{ job.num_applications }} candidate{{ job.num_applications|pluralize }}
+        {% if job.num_openings > 1 %}
+        <span style="font-size:10px;color:var(--vui-text-muted);margin-left:4px">({{ job.hires_made }}/{{ job.num_openings }} hired)</span>
+        {% endif %}
       </span>
       <span style="font-size:11px;color:var(--brand)">View &rarr;</span>
     </div>

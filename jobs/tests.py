@@ -29,6 +29,7 @@ class JobCreateTests(JobsBaseTestCase):
         r = self.client.post(reverse('jobs:create'), {
             'title': 'Backend Engineer',
             'description': 'Build the API.',
+            'num_openings': 1,
             'hiring_manager': '',
         })
         self.assertEqual(r.status_code, 302)
@@ -125,3 +126,69 @@ class JobRoundTests(JobsBaseTestCase):
         self.assertIsNotNone(job.closed_at)
         app.refresh_from_db()
         self.assertEqual(app.status, JobApplication.Status.NEW)
+
+
+class RoundValidationTests(JobsBaseTestCase):
+    """Tests for round-level form validation and view guards."""
+
+    def test_duplicate_round_name_returns_form_error(self):
+        """POST duplicate name returns 200 (re-rendered form) with error, not 500."""
+        self.login('hr')
+        from jobs.models import InterviewRound, Job
+        job = Job.objects.create(title='Dev', created_by=self.hr)
+        InterviewRound.objects.create(job=job, name='Phone Screen', order=1)
+        r = self.client.post(reverse('jobs:round_create', args=[job.pk]), {
+            'name': 'Phone Screen',
+            'order': 2,
+        })
+        self.assertEqual(r.status_code, 200)  # form re-rendered, not 500
+        self.assertContains(r, 'already exists')
+        self.assertEqual(job.rounds.count(), 4)  # 3 defaults + 1 created via ORM, no additional round
+
+    def test_round_create_auto_increments_order(self):
+        """GET create page shows next order number (max + 1)."""
+        self.login('hr')
+        from jobs.models import Job
+        job = Job.objects.create(title='Dev', created_by=self.hr)
+        # Default rounds have orders 1, 2, 3 → next should be 4
+        r = self.client.get(reverse('jobs:round_create', args=[job.pk]))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'value="4"')
+
+    def test_round_delete_closed_job_blocked(self):
+        """Deleting a round on a closed job redirects with error."""
+        self.login('hr')
+        from jobs.models import InterviewRound, Job
+        job = Job.objects.create(title='Dev', created_by=self.hr, is_active=False)
+        round_ = InterviewRound.objects.create(job=job, name='Tech Test', order=99)
+        r = self.client.post(reverse('jobs:round_delete', args=[round_.pk]))
+        self.assertEqual(r.status_code, 302)
+        self.assertTrue(InterviewRound.objects.filter(pk=round_.pk).exists())
+
+    def test_round_delete_requires_active_job(self):
+        """dispatch() check: closed job → redirect to detail, round not deleted."""
+        self.login('hr')
+        from jobs.models import InterviewRound, Job
+        job = Job.objects.create(title='Dev', created_by=self.hr, is_active=False)
+        round_ = InterviewRound.objects.create(job=job, name='Tech Test', order=99)
+        r = self.client.get(reverse('jobs:round_delete', args=[round_.pk]))
+        self.assertEqual(r.status_code, 302)
+        self.assertIn(reverse('jobs:detail', args=[job.pk]), r.url)
+        self.assertTrue(InterviewRound.objects.filter(pk=round_.pk).exists())
+
+
+class OfferRoundIsFinalTest(JobsBaseTestCase):
+    """Verify the Offer default round has is_final=True from the signal."""
+
+    def test_offer_round_is_final(self):
+        self.login('hr')
+        from jobs.models import Job
+        job = Job.objects.create(title='Dev', created_by=self.hr)
+        offer = job.rounds.get(name='Offer')
+        self.assertTrue(offer.is_final)
+
+        screening = job.rounds.get(name='Screening')
+        self.assertFalse(screening.is_final)
+
+        interview = job.rounds.get(name='Interview')
+        self.assertFalse(interview.is_final)

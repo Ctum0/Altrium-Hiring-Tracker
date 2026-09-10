@@ -256,7 +256,8 @@ class UploadTests(CandidatesBaseTestCase):
             'files': [garbage],
         })
         self.assertEqual(r.status_code, 302)  # falls back gracefully, no 500
-        self.assertTrue(Candidate.objects.filter(source='upload').exists())
+        # Files with no readable text are skipped, not created as candidates.
+        self.assertFalse(Candidate.objects.filter(source='upload').exists())
 
     def test_upload_rejects_unsupported_extension(self):
         self.login('hr')
@@ -957,3 +958,150 @@ class ReassignmentSlotReconciliationTests(CandidatesBaseTestCase):
 
         self.application.refresh_from_db()
         self.assertIsNone(self.application.interview_at)
+
+
+class InterviewDetailsSchedulingTests(CandidatesBaseTestCase):
+    """InterviewDetailsView scheduling: availability, clash, and edge cases."""
+
+    def _schedule(self, app, dt_str, **extra):
+        self.login('hr')
+        return self.client.post(
+            reverse('candidates:interview_details', args=[app.pk]),
+            {'interview_at': dt_str, **extra},
+        )
+
+    def test_scheduling_without_interviewer_stores_datetime(self):
+        # No interviewer assigned: datetime is stored without validation failure.
+        r = self._schedule(self.application, '2030-01-06 09:00')
+        self.application.refresh_from_db()
+        self.assertIsNotNone(self.application.interview_at)
+
+    def test_double_booking_overlapping_time_blocked(self):
+        # Assign interviewer, book at 09:00 Monday, then try to book another app at 09:30.
+        self.application.assigned_to = self.interviewer
+        self.application.interview_at = datetime(2030, 1, 7, 9, 0, tzinfo=dt_timezone.utc)
+        self.application.save(update_fields=['assigned_to', 'interview_at'])
+        other_cand = Candidate.objects.create(
+            first_name='Other', last_name='Person', email='other@example.com',
+        )
+        other_app = JobApplication.objects.create(
+            candidate=other_cand, job=self.job,
+            status=JobApplication.Status.NEW,
+            assigned_to=self.interviewer,
+        )
+        r = self._schedule(other_app, '2030-01-07 09:30')
+        other_app.refresh_from_db()
+        self.assertIsNone(other_app.interview_at)
+
+    def test_double_booking_non_overlapping_time_succeeds(self):
+        # Book at 09:00 Monday, then another app at 10:30 (90 min gap > 60 min slot) -> ok.
+        self.application.assigned_to = self.interviewer
+        self.application.interview_at = datetime(2030, 1, 7, 9, 0, tzinfo=dt_timezone.utc)
+        self.application.save(update_fields=['assigned_to', 'interview_at'])
+        other_cand = Candidate.objects.create(
+            first_name='Far', last_name='Away', email='far@example.com',
+        )
+        other_app = JobApplication.objects.create(
+            candidate=other_cand, job=self.job,
+            status=JobApplication.Status.NEW,
+            assigned_to=self.interviewer,
+        )
+        r = self._schedule(other_app, '2030-01-07 10:30')
+        other_app.refresh_from_db()
+        self.assertIsNotNone(other_app.interview_at)
+
+
+class NonNumericInterviewerPKTests(CandidatesBaseTestCase):
+    """Non-numeric interviewer PK returns 400, not 500."""
+
+    def test_assign_non_numeric_pk_returns_400(self):
+        self.login('hr')
+        r = self.client.post(
+            reverse('candidates:assign', args=[self.application.pk]),
+            {'interviewer': 'not-a-number'},
+        )
+        self.assertEqual(r.status_code, 400)
+
+    def test_slot_preview_non_numeric_pk_returns_400(self):
+        self.login('hr')
+        r = self.client.get(
+            reverse('candidates:interviewer_slots', args=[self.application.pk]),
+            {'interviewer': 'not-a-number'},
+        )
+        self.assertEqual(r.status_code, 400)
+
+
+class DeactivatedInterviewerFilterTests(CandidatesBaseTestCase):
+    """Deactivated interviewers must not appear in eligible_interviewers."""
+
+    def test_deactivated_interviewer_excluded(self):
+        self.interviewer.is_active = False
+        self.interviewer.save(update_fields=['is_active'])
+        eligible = self.application.eligible_interviewers
+        self.assertNotIn(self.interviewer, eligible)
+
+
+class EmptyPDFUploadTests(CandidatesBaseTestCase):
+    """Files with no readable text should be skipped during upload."""
+
+    def test_empty_text_file_skipped(self):
+        self.login('hr')
+        empty_cv = SimpleUploadedFile('empty.pdf', b'%PDF-1.4 some binary garbage', content_type='application/pdf')
+        r = self.client.post(
+            reverse('candidates:upload'),
+            {'job': self.job.pk, 'files': [empty_cv]},
+        )
+        # Should redirect without creating a candidate
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(Candidate.objects.count(), 1)  # only the setUp candidate
+
+
+class ConfidenceTests(TestCase):
+    """Confidence assessment for CV parse results."""
+
+    def test_no_email_flagged(self):
+        from ai.confidence import assess_confidence
+        parsed = {'first_name': 'John', 'last_name': 'Doe', 'email': '', 'phone': '555-1234', 'skills': ['Python']}
+        raw_text = ' '.join(['word'] * 100)
+        needs_review, reasons = assess_confidence(parsed, raw_text)
+        self.assertTrue(needs_review)
+        self.assertIn('no_email', reasons)
+
+    def test_low_text_volume_flagged(self):
+        from ai.confidence import assess_confidence
+        parsed = {'first_name': 'John', 'last_name': 'Doe', 'email': 'john@example.com', 'phone': '555-1234', 'skills': ['Python']}
+        raw_text = 'short cv text'
+        needs_review, reasons = assess_confidence(parsed, raw_text)
+        self.assertTrue(needs_review)
+        self.assertIn('low_text_volume', reasons)
+
+    def test_name_matching_skill_flagged(self):
+        from ai.confidence import assess_confidence
+        parsed = {'first_name': 'python', 'last_name': 'Doe', 'email': 'python@example.com', 'phone': '555-1234', 'skills': ['Python']}
+        raw_text = ' '.join(['word'] * 100)
+        needs_review, reasons = assess_confidence(parsed, raw_text)
+        self.assertTrue(needs_review)
+        self.assertIn('name_is_skill_word', reasons)
+
+    def test_single_word_name_flagged(self):
+        from ai.confidence import assess_confidence
+        parsed = {'first_name': 'John', 'last_name': '', 'email': 'john@example.com', 'phone': '555-1234', 'skills': ['Python']}
+        raw_text = ' '.join(['word'] * 100)
+        needs_review, reasons = assess_confidence(parsed, raw_text)
+        self.assertTrue(needs_review)
+        self.assertIn('single_word_name', reasons)
+
+    def test_clean_parse_passes(self):
+        from ai.confidence import assess_confidence
+        parsed = {'first_name': 'John', 'last_name': 'Doe', 'email': 'john@example.com', 'phone': '555-1234', 'skills': ['Python']}
+        raw_text = ' '.join(['word'] * 100)
+        needs_review, reasons = assess_confidence(parsed, raw_text)
+        self.assertFalse(needs_review)
+        self.assertEqual(reasons, [])
+
+    def test_used_fallback_flag(self):
+        from unittest.mock import patch
+        from ai.services import parse_cv
+        with patch('ai.services._chat', return_value=''):
+            result = parse_cv('Some CV text here ' * 10)
+            self.assertTrue(result['used_fallback'])

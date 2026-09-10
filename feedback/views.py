@@ -80,8 +80,13 @@ class FeedbackListView(LoginRequiredMixin, ListView):
 
         if status == 'pending':
             context['pending_applications'] = pending_qs.order_by('-updated_at')
+            # Set of PKs where the user is a panel member (for "Submit Feedback" button).
+            context['panel_member_app_ids'] = set(
+                pending_qs.filter(panel_interviewers=user).values_list('pk', flat=True)
+            )
         else:
             context['pending_applications'] = None
+            context['panel_member_app_ids'] = set()
 
         return context
 
@@ -164,13 +169,20 @@ class FeedbackFormView(LoginRequiredMixin, View):
             # mutates `existing` in place (form.instance IS existing), so the
             # old values must come from a pristine re-fetch.
             pristine = InterviewFeedback.objects.get(pk=existing.pk)
-            FeedbackEditHistory.objects.create(
-                feedback=pristine,
-                old_score=pristine.score,
-                old_notes=pristine.notes,
-                old_raw_notes=pristine.raw_notes or '',
-                edited_by=request.user,
+            # Only record history when something actually changed.
+            data_changed = (
+                feedback.score != pristine.score
+                or feedback.notes != pristine.notes
+                or (feedback.raw_notes or '') != (pristine.raw_notes or '')
             )
+            if data_changed:
+                FeedbackEditHistory.objects.create(
+                    feedback=pristine,
+                    old_score=pristine.score,
+                    old_notes=pristine.notes,
+                    old_raw_notes=pristine.raw_notes or '',
+                    edited_by=request.user,
+                )
             feedback.id = existing.id
         else:
             feedback.application = self.application
@@ -186,6 +198,15 @@ class FeedbackFormView(LoginRequiredMixin, View):
                 application=self.application,
                 round=self.round_obj,
                 interviewer=request.user,
+            )
+            # Snapshot the pristine row before overwriting, so we have a
+            # complete edit trail even for race-condition saves.
+            FeedbackEditHistory.objects.create(
+                feedback=existing,
+                old_score=existing.score,
+                old_notes=existing.notes,
+                old_raw_notes=existing.raw_notes or '',
+                edited_by=request.user,
             )
             feedback.pk = existing.pk
             feedback.save()

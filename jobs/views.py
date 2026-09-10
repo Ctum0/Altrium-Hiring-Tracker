@@ -1,6 +1,7 @@
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import Count
+from django.db.models import Count, Max
+from django.db.utils import IntegrityError
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
 from django.utils import timezone
@@ -159,10 +160,26 @@ class RoundCreateView(LoginRequiredMixin, CreateView):
             return redirect('jobs:detail', pk=job.pk)
         return super().dispatch(request, *args, **kwargs)
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['job'] = get_object_or_404(Job, pk=self.kwargs['job_pk'])
+        return kwargs
+
+    def get_initial(self):
+        initial = super().get_initial()
+        max_order = Job.objects.get(pk=self.kwargs['job_pk']).rounds.aggregate(
+            Max('order')
+        )['order__max'] or 0
+        initial['order'] = max_order + 1
+        return initial
+
     def form_valid(self, form):
         form.instance.job_id = self.kwargs['job_pk']
-        messages.success(self.request, f'Round "{form.instance.name}" added.')
-        return super().form_valid(form)
+        try:
+            return super().form_valid(form)
+        except IntegrityError:
+            messages.error(self.request, 'A round with this name already exists for this job.')
+            return self.form_invalid(form)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -176,12 +193,17 @@ class RoundCreateView(LoginRequiredMixin, CreateView):
 class RoundDeleteView(LoginRequiredMixin, DeleteView):
     """Remove an interview round from a job (HR only)."""
     model = InterviewRound
+    template_name = 'jobs/round_form.html'
 
     def dispatch(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
             return self.handle_no_permission()
         if not request.user.is_hr():
             return redirect('jobs:list')
+        obj = self.get_object()
+        if not obj.job.is_active:
+            messages.error(request, 'This job is closed; its rounds cannot be deleted.')
+            return redirect('jobs:detail', pk=obj.job_id)
         return super().dispatch(request, *args, **kwargs)
 
     def form_valid(self, form):

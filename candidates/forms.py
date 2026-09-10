@@ -1,5 +1,7 @@
 from django import forms
 
+from .models import Candidate
+
 
 class CandidateImportForm(forms.Form):
     job = forms.ChoiceField(
@@ -35,3 +37,18 @@ class CandidateImportForm(forms.Form):
         self.fields['job'].choices = [('', 'Select a position')] + [
             (j.pk, j.title) for j in jobs
         ]
+
+
+class CandidateEditForm(forms.ModelForm):
+    """HR-only form for editing candidate contact info and skills."""
+
+    class Meta:
+        model = Candidate
+        fields = ['first_name', 'last_name', 'email', 'phone', 'skills']
+        widgets = {
+            'first_name': forms.TextInput(attrs={'class': 'form-input'}),
+            'last_name': forms.TextInput(attrs={'class': 'form-input'}),
+            'email': forms.EmailInput(attrs={'class': 'form-input'}),
+            'phone': forms.TextInput(attrs={'class': 'form-input'}),
+            'skills': forms.Textarea(attrs={'class': 'form-textarea', 'rows': 3}),
+        }
