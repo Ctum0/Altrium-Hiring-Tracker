@@ -19,6 +19,7 @@ Vision UI: a deep-navy frosted-glass dashboard language with ambient glow, gradi
 
 ## Type
 Plus Jakarta Sans (geometric sans) with a system-ui fallback, fixed rem scale 1.125 ratio. No display/body pairing: one family carries everything. Mono reserved for numeric data (scores). Minimum helper-text size is 11px in the dashboard surfaces.
+Exception: the signed-out login page only, where a single italicized word in the hero headline runs in Instrument Serif (`--font-display`, `.font-display`) as a one-off editorial accent. This is the one deliberate display/body pairing in the product — never extend it into the authenticated app.
 
 ## Shape
 One radius system: 20px for glass cards, 12px for controls/buttons, pill (999px) for badges and segmented controls. Documented and consistent.

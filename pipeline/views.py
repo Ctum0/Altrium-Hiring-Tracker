@@ -4,6 +4,7 @@ from django.shortcuts import get_object_or_404, render
 from django.views import View
 
 from candidates.models import JobApplication
+from candidates.views import workload_context
 from jobs.models import InterviewRound
 
 from .models import PipelineMove
@@ -92,5 +93,8 @@ class PipelineMoveView(LoginRequiredMixin, View):
         # Return the updated row so HTMX can swap it in place.
         app.refresh_from_db()
         source = request.POST.get('source', 'detail')
-        template = 'pipeline/_list_app_row.html' if source == 'list' else 'pipeline/_app_row.html'
-        return render(request, template, {'app': app, 'is_hr': True})
+        if source == 'list':
+            return render(request, 'pipeline/_list_app_row.html', {'app': app, 'is_hr': True})
+        context = {'app': app, 'is_hr': True}
+        context.update(workload_context())
+        return render(request, 'pipeline/_app_row.html', context)

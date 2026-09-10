@@ -91,7 +91,7 @@
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px">
         {% if candidate.extracted_education %}
         <div style="background:var(--surface-2);padding:10px 12px;border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow-sm)">
-          <h4 class="section-label" style="margin-bottom:6px">Education</h4>
+          <h3 class="section-label" style="margin-bottom:6px">Education</h3>
           <ul style="margin:0;padding-left:16px;font-size:var(--text-xs);color:var(--ink);line-height:1.4">
             {% for edu in candidate.extracted_education %}
             <li style="margin-bottom:3px">{{ edu }}</li>
@@ -102,7 +102,7 @@
 
         {% if candidate.extracted_highlights %}
         <div style="background:var(--surface-2);padding:10px 12px;border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow-sm)">
-          <h4 class="section-label" style="margin-bottom:6px">Key Highlights</h4>
+          <h3 class="section-label" style="margin-bottom:6px">Key Highlights</h3>
           <ul style="margin:0;padding-left:16px;font-size:var(--text-xs);color:var(--ink);line-height:1.4">
             {% for hl in candidate.extracted_highlights %}
             <li style="margin-bottom:3px">{{ hl }}</li>
@@ -116,7 +116,7 @@
       <!-- Skills Breakdown -->
       {% if candidate.skills %}
       <div style="margin-bottom:8px">
-        <h4 class="section-label">Skills & Competencies</h4>
+        <h3 class="section-label">Skills & Competencies</h3>
         <div class="flex gap-1" style="flex-wrap:wrap">
           {% for skill in candidate.skills_list|slice:":10" %}
           <span class="badge badge-role" style="font-size:var(--text-xs);padding:2px 7px">{{ skill }}</span>
@@ -128,7 +128,7 @@
       <!-- CV Executive Overview -->
       {% if candidate.resume_text %}
       <div style="margin-bottom:8px">
-        <h4 class="section-label">CV Executive Summary</h4>
+        <h3 class="section-label">CV Executive Summary</h3>
         <p class="text-xs text-muted" style="line-height:1.45;background:var(--surface-2);padding:8px 10px;border-radius:var(--radius);border:1px solid var(--border);margin-bottom:4px;box-shadow:var(--shadow-sm)">
           {{ candidate.resume_preview_snippet }}
         </p>
@@ -140,10 +140,10 @@
       {% for app in applications %}
         {% if app.job.requirements %}
         <div class="fit-panel">
-          <h4>Job fit · {{ app.job.title }}</h4>
+          <h3>Job fit · {{ app.job.title }}</h3>
           <div class="fit-grid">
             <div class="fit-col">
-              <h5>Matched</h5>
+              <h4>Matched</h4>
               {% for skill in app.fit.matched|slice:":5" %}
               <span class="fit-tag matched">{{ skill }}</span>
               {% empty %}
@@ -151,7 +151,7 @@
               {% endfor %}
             </div>
             <div class="fit-col">
-              <h5>Missing</h5>
+              <h4>Missing</h4>
               {% for skill in app.fit.missing|slice:":5" %}
               <span class="fit-tag missing">{{ skill }}</span>
               {% empty %}

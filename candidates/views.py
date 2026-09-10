@@ -41,6 +41,17 @@ def visible_applications(user):
     return qs
 
 
+def workload_context():
+    """Active-assignment counts per interviewer, for the assign dropdown's
+    "(N active)" labels. Shared by CandidateDetailView and PipelineMoveView
+    (both render pipeline/_app_row.html, which reads these keys)."""
+    active_apps = JobApplication.objects.exclude(status__in=['hired', 'rejected', 'on_hold'])
+    workload_data = active_apps.values('assigned_to_id').annotate(cnt=Count('id')).values_list('assigned_to_id', 'cnt')
+    workload_counts = dict(workload_data)
+    team_avg_workload = round(sum(workload_counts.values()) / max(len(workload_counts), 1), 1)
+    return {'workload_counts': workload_counts, 'team_avg_workload': team_avg_workload}
+
+
 class CandidateListView(LoginRequiredMixin, ListView):
     template_name = 'candidates/candidate_list.html'
     context_object_name = 'applications'
@@ -161,12 +172,7 @@ class CandidateDetailView(LoginRequiredMixin, DetailView):
             (app, job_fit(self.object, app.job))
             for app in applications
         ]
-        # Workload counts for eligible interviewers
-        active_apps = JobApplication.objects.exclude(status__in=['hired', 'rejected', 'on_hold'])
-        workload_data = active_apps.values('assigned_to_id').annotate(cnt=Count('id')).values_list('assigned_to_id', 'cnt')
-        workload_counts = dict(workload_data)
-        context['workload_counts'] = workload_counts
-        context['team_avg_workload'] = round(sum(workload_counts.values()) / max(len(workload_counts), 1), 1)
+        context.update(workload_context())
         return context
 
 

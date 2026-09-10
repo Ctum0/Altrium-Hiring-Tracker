@@ -71,7 +71,7 @@
           <form method="post" action="{% url 'accounts:deactivate_interviewer' iv.pk %}" style="display:inline"
                 onsubmit="event.preventDefault();confirmAction(this,'Deactivate {{ iv.get_full_name|default:iv.username }}?','This will exclude them from future assignments. Their existing feedback stays attributed. Active assignments will need reassignment.','danger')">
             {% csrf_token %}
-            <button type="submit" class="btn btn-danger btn-xs" style="font-size:10px;padding:2px 8px">Deactivate</button>
+            <button type="submit" class="btn btn-danger btn-xs" style="font-size:var(--text-micro);padding:2px 8px">Deactivate</button>
           </form>
         </td>
         {% elif user.is_hr and not iv.is_active %}

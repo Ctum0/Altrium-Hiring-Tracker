@@ -4,7 +4,7 @@
     {% for n in notifications|slice:":5" %}
     {% if n.link|safe_link %}
     <a href="{{ n.link|safe_link }}" class="popover-item {% if not n.is_read %}unread{% endif %}"
-       {% if not n.is_read %}hx-post="{% url 'notifications:mark_read' n.pk %}" hx-trigger="click" hx-swap="none"{% endif %}>
+       {% if not n.is_read %}onclick="markNotifRead('{% url 'notifications:mark_read' n.pk %}')"{% endif %}>
     {% else %}
     <div class="popover-item {% if not n.is_read %}unread{% endif %}">
     {% endif %}

@@ -153,6 +153,11 @@
   --danger: var(--vui-danger-red);
   --danger-hover: #EF4444;
   --danger-soft: rgba(248, 113, 113, 0.20);
+  /* --danger is tuned as a light-on-dark accent (text, soft-tint badges) and
+     fails 4.5:1 for white text on a solid fill. Solid danger surfaces (button
+     fills, count badges) use this darker pair instead. */
+  --danger-solid: #DC2626;
+  --danger-solid-hover: #B91C1C;
 
   --font-sans: var(--vui-font-family);
   --font-display: 'Instrument Serif', Georgia, serif;
@@ -292,6 +297,8 @@
   --danger: #DC2626;
   --danger-hover: #B91C1C;
   --danger-soft: rgba(220, 38, 38, 0.14);
+  --danger-solid: #DC2626;
+  --danger-solid-hover: #B91C1C;
 
   --shadow-sm: 0 1px 2px rgba(16,24,40,0.06), 0 4px 12px rgba(16,24,40,0.06);
   --shadow-md: 0 1px 3px rgba(16,24,40,0.08), 0 8px 24px rgba(16,24,40,0.08);
@@ -1770,7 +1777,7 @@ a:hover {
   height: 16px;
   padding: 0 4px;
   border-radius: var(--radius-pill);
-  background: var(--danger);
+  background: var(--danger-solid);
   color: white;
   font-size: var(--text-xs);
   font-weight: 700;
@@ -1804,6 +1811,20 @@ a:hover {
   box-shadow: var(--shadow-lg);
   overflow: hidden;
   animation: popoverFadeIn 150ms ease-out forwards;
+}
+
+@media (max-width: 480px) {
+  /* right:0 anchors to the bell button, not the viewport edge — with the
+     user avatar sitting further right in the topbar, a 340px popover
+     anchored there runs off the left edge of narrow viewports. Anchor to
+     the viewport itself instead so it always fits. */
+  .notif-popover {
+    position: fixed;
+    top: 68px;
+    left: 16px;
+    right: 16px;
+    width: auto;
+  }
 }
 
 .notif-popover-header {
@@ -2030,13 +2051,13 @@ a:hover {
 }
 
 .btn-danger {
-  background: var(--danger);
+  background: var(--danger-solid);
   color: white;
-  border-color: var(--danger);
+  border-color: var(--danger-solid);
 }
 
 .btn-danger:hover {
-  background: var(--danger-hover);
+  background: var(--danger-solid-hover);
   color: white;
   text-decoration: none;
 }
@@ -4041,10 +4062,18 @@ a.ref-kpi-card.kpi-card-link:focus-visible {
     gap: 16px;
   }
 
+  /* min-height/min-width: 0 on these (set for the desktop inner-scroll
+     columns) must also reset here, or CSS Grid's auto-row-sizing keeps
+     using their collapsed min-content size instead of actual content
+     height once overflow goes back to visible — tall content (e.g. a
+     generated AI fit summary) then spills out and overlaps the next
+     section instead of pushing it down. */
   .candidate-detail-profile,
   .candidate-detail-apps,
   .candidate-detail-apps-scroll {
     height: auto;
+    min-height: auto;
+    min-width: auto;
     max-height: none;
     overflow: visible;
   }
@@ -4064,7 +4093,7 @@ a.ref-kpi-card.kpi-card-link:focus-visible {
   box-shadow: var(--shadow-sm);
 }
 
-.fit-panel h4 {
+.fit-panel h3 {
   margin: 0 0 8px;
   font-size: var(--text-sm);
   font-weight: 700;
@@ -4090,7 +4119,7 @@ a.ref-kpi-card.kpi-card-link:focus-visible {
   gap: 4px;
 }
 
-.fit-col h5 {
+.fit-col h4 {
   margin: 0;
   font-size: var(--text-xs);
   font-weight: 700;
@@ -4335,12 +4364,12 @@ body.no-scroll {
   text-transform: uppercase;
 }
 .cand-avatar-0 { background: var(--brand-gradient); }
-.cand-avatar-1 { background: var(--grad-violet); }
+.cand-avatar-1 { background: var(--grad-violet); color: #1f0a33; }
 .cand-avatar-2 { background: var(--grad-teal); color: #062b29; }
-.cand-avatar-3 { background: var(--grad-danger); }
+.cand-avatar-3 { background: var(--grad-danger); color: #330a05; }
 .cand-avatar-4 { background: var(--grad-amber); color: #1a1000; }
-.cand-avatar-5 { background: var(--grad-emerald); }
-.cand-avatar-6 { background: linear-gradient(135deg, #3182CE 0%, #2B6CB0 100%); }
+.cand-avatar-5 { background: var(--grad-emerald); color: #052e1f; }
+.cand-avatar-6 { background: linear-gradient(135deg, #3182CE 0%, #2B6CB0 100%); color: #0a1f33; }
 .cand-avatar-7 { background: linear-gradient(135deg, #D69E2E 0%, #B7791F 100%); color: #1a1000; }
 .cand-avatar-8 { background: linear-gradient(135deg, #805AD5 0%, #6B46C1 100%); }
 .cand-avatar-9 { background: linear-gradient(135deg, #E53E3E 0%, #C53030 100%); }

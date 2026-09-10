@@ -102,7 +102,7 @@
     <div class="dash-chart-card">
       <div class="dash-chart-header">
         <div>
-          <h3 class="dash-chart-title" id="analytics-chart-title">Candidates by Stage</h3>
+          <h2 class="dash-chart-title" id="analytics-chart-title">Candidates by Stage</h2>
           <p class="dash-chart-sub" id="analytics-chart-sub">Current candidates at each pipeline stage</p>
         </div>
         <div class="seg-control" role="tablist" aria-label="Analytics view" id="analytics-tablist">
@@ -142,7 +142,7 @@
       <!-- Pipeline Velocity & Escalation Monitor -->
       <div class="panel panel-pad ref-card">
         <div class="ref-card-header">
-          <h3 class="ref-card-title">Pipeline Velocity</h3>
+          <h2 class="ref-card-title">Pipeline Velocity</h2>
           <span class="text-xs text-muted">avg days in current stage</span>
         </div>
         <div class="ref-velocity-list">
@@ -178,7 +178,7 @@
       <!-- Feedback Turnaround -->
       <div class="panel panel-pad ref-card ref-card-stack">
         <div class="ref-card-header">
-          <h3 class="ref-card-title">Feedback Completion</h3>
+          <h2 class="ref-card-title">Feedback Completion</h2>
           <a href="{% url 'feedback:list' %}" class="text-xs ref-card-link">Details &rarr;</a>
         </div>
         <div class="ref-feedback-analytics">
@@ -210,7 +210,7 @@
     <!-- AI Insights / Pipeline Intelligence -->
     <div class="panel panel-pad ref-card ref-card-stack ai-insights">
       <div class="ref-card-header">
-        <h3 class="ref-card-title">AI Insights</h3>
+        <h2 class="ref-card-title">AI Insights</h2>
         <a href="{% url 'candidates:list' %}" class="text-xs ref-card-link">View all insights &rarr;</a>
       </div>
       <div class="ai-insights-grid">
@@ -228,7 +228,7 @@
 
           <!-- Section 2: Main Finding -->
           <div class="ai-card-sec-finding">
-            <h4 class="ai-main-title" title="{{ insight.finding }}">{{ insight.finding }}</h4>
+            <h3 class="ai-main-title" title="{{ insight.finding }}">{{ insight.finding }}</h3>
             <div class="ai-sub-score"><span class="ai-score-label">Candidates:</span> <span class="ai-score-val ai-text-blue">{{ insight.distribution.0.count }}</span></div>
           </div>
 
@@ -275,7 +275,7 @@
 
           <!-- Section 2: Main Finding -->
           <div class="ai-card-sec-finding">
-            <h4 class="ai-main-title" title="{{ insight.finding }}">{{ insight.finding }}</h4>
+            <h3 class="ai-main-title" title="{{ insight.finding }}">{{ insight.finding }}</h3>
           </div>
 
           <!-- Section 3: Supporting Intelligence -->
@@ -313,7 +313,7 @@
 
           <!-- Section 2: Main Finding -->
           <div class="ai-card-sec-finding">
-            <h4 class="ai-main-title">Pipeline Health</h4>
+            <h3 class="ai-main-title">Pipeline Health</h3>
             <div class="ai-sub-score">
               <span class="ai-score-val ai-text-amber">{{ insight.score }}%</span>
               <span class="ai-status-badge ai-badge-amber">Status: {{ insight.status }}</span>
@@ -355,7 +355,7 @@
 
           <!-- Section 2: Main Finding -->
           <div class="ai-card-sec-finding">
-            <h4 class="ai-main-title">Risk Status</h4>
+            <h3 class="ai-main-title">Risk Status</h3>
             <span class="ai-risk-badge ai-risk-badge-{{ insight.risk_tone }}">{{ insight.risk_level }}</span>
           </div>
 
@@ -395,7 +395,7 @@
     <!-- Recent Activity Timeline -->
     <div class="panel panel-pad ref-card ref-card-stretch">
       <div class="ref-card-header">
-        <h3 class="ref-card-title">Recent Activity</h3>
+        <h2 class="ref-card-title">Recent Activity</h2>
         <a href="{% url 'candidates:list' %}" class="text-xs ref-card-link">View all &rarr;</a>
       </div>
       {% if recent_applications %}
@@ -434,7 +434,7 @@
     {% if stalled_applications %}
     <div class="panel panel-pad ref-card">
       <div class="ref-card-header">
-        <h3 class="ref-card-title">Escalations &mdash; Stalled &gt; 7 Days</h3>
+        <h2 class="ref-card-title">Escalations &mdash; Stalled &gt; 7 Days</h2>
         <span class="badge badge-feedback">{{ stalled_applications|length }} shown</span>
       </div>
       <div class="ref-jobs-list">
@@ -456,7 +456,7 @@
     <!-- Active Open Roles -->
     <div class="panel panel-pad ref-card">
       <div class="ref-card-header">
-        <h3 class="ref-card-title">Top Positions</h3>
+        <h2 class="ref-card-title">Top Positions</h2>
         <a href="{% url 'jobs:list' %}" class="text-xs ref-card-link">All jobs &rarr;</a>
       </div>
       {% if top_positions %}

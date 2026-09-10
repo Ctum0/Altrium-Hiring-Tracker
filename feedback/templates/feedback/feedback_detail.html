@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load feedback_extras %}
 {% block title %}Feedback: {{ feedback.application.candidate.full_name }} | Altrium Tracker{% endblock %}
 {% block page_title %}Feedback detail{% endblock %}
 {% block content %}
@@ -22,7 +23,7 @@
 <div class="panel panel-pad">
   <div class="flex items-center justify-between" style="margin-bottom:var(--sp-3)">
     <span class="text-sm text-muted">
-      Score: <span class="score-chip has-score">{{ feedback.score }}</span>
+      Score: <span class="score-ring {{ feedback.score|score_ring_class }}">{{ feedback.score }}</span>
       &middot; Interviewer: {{ feedback.interviewer.get_full_name|default:feedback.interviewer.username }}
     </span>
   </div>

@@ -27,16 +27,16 @@
   <a href="{% url 'jobs:detail' job.pk %}" class="job-card-premium">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:var(--sp-2)">
       <div style="flex:1;min-width:0">
-        <h3 class="job-card-title">{{ job.title }}</h3>
+        <h2 class="job-card-title">{{ job.title }}</h2>
         <div style="font-size:11px;color:var(--muted);margin-top:2px">
           {{ job.created_at|date:'M j, Y' }}
           {% if job.hiring_manager %}&middot; {{ job.hiring_manager.get_full_name|default:job.hiring_manager.username }}{% endif %}
         </div>
       </div>
       {% if job.is_active %}
-      <span class="badge badge-in_progress" style="flex-shrink:0;font-size:10px;padding:2px 7px">Active</span>
+      <span class="badge badge-in_progress" style="flex-shrink:0;font-size:var(--text-micro);padding:2px 7px">Active</span>
       {% else %}
-      <span class="badge badge-hold" style="flex-shrink:0;font-size:10px;padding:2px 7px">Closed</span>
+      <span class="badge badge-hold" style="flex-shrink:0;font-size:var(--text-micro);padding:2px 7px">Closed</span>
       {% endif %}
     </div>
     <div class="job-card-meta">
@@ -44,7 +44,7 @@
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle;margin-right:3px"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
         {{ job.num_applications }} candidate{{ job.num_applications|pluralize }}
         {% if job.num_openings > 1 %}
-        <span style="font-size:10px;color:var(--vui-text-muted);margin-left:4px">({{ job.hires_made }}/{{ job.num_openings }} hired)</span>
+        <span style="font-size:var(--text-micro);color:var(--vui-text-muted);margin-left:4px">({{ job.hires_made }}/{{ job.num_openings }} hired)</span>
         {% endif %}
       </span>
       <span style="font-size:11px;color:var(--brand)">View &rarr;</span>

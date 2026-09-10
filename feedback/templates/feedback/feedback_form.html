@@ -36,9 +36,9 @@
         <button type="button" id="ai-polish-btn" class="btn btn-secondary btn-sm"
                 hx-post="{% url 'feedback:ai_polish' %}"
                 hx-include="[name='raw_notes']"
-                hx-target="#{{ form.notes.id_for_label }}"
                 hx-indicator="#ai-polish-btn"
-                hx-swap="innerHTML">
+                hx-swap="none"
+                hx-on::after-request="if(event.detail.successful){var t=document.getElementById('{{ form.notes.id_for_label }}');t.value=event.detail.xhr.responseText;t.dispatchEvent(new Event('input',{bubbles:true}));}">
           Summarize with AI
         </button>
         <span class="text-xs text-muted" style="margin-left:var(--sp-2)">

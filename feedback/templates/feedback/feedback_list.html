@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load accounts_extras %}
+{% load accounts_extras feedback_extras %}
 {% block title %}Feedback | Altrium Tracker{% endblock %}
 {% block page_title %}Feedback{% endblock %}
 {% block content %}
@@ -120,13 +120,7 @@
           <td>{{ fb.application.job.title }}</td>
           <td><span class="badge badge-in_progress">{{ fb.round.name }}</span></td>
           <td>
-            {% if fb.score >= 75 %}
-            <span class="score-ring score-ring-high">{{ fb.score }}</span>
-            {% elif fb.score >= 50 %}
-            <span class="score-ring score-ring-mid">{{ fb.score }}</span>
-            {% else %}
-            <span class="score-ring score-ring-low">{{ fb.score }}</span>
-            {% endif %}
+            <span class="score-ring {{ fb.score|score_ring_class }}">{{ fb.score }}</span>
           </td>
           <td>{{ fb.interviewer.get_full_name|default:fb.interviewer.username }}</td>
           <td class="text-muted text-xs">{{ fb.submitted_at|date:'M j, Y' }}</td>

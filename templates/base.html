@@ -175,6 +175,20 @@
     if (token) e.detail.headers['X-CSRFToken'] = token.getAttribute('content');
   });
 
+  // Mark a notification read without blocking the popover link's normal
+  // navigation. An hx-post on the same <a> would preventDefault() the click
+  // (htmx always does, even with hx-swap="none"), leaving the click dead —
+  // no navigation, no visual update — so this fires a plain fetch instead.
+  // keepalive lets it finish after the browser starts navigating away.
+  window.markNotifRead = function(url) {
+    var token = document.querySelector('meta[name="csrf-token"]');
+    fetch(url, {
+      method: 'POST',
+      headers: token ? { 'X-CSRFToken': token.getAttribute('content') } : {},
+      keepalive: true,
+    }).catch(function() {});
+  };
+
   var dialog = document.getElementById('confirm-modal');
   var title = document.getElementById('confirm-title');
   var body = document.getElementById('confirm-body');
@@ -219,10 +233,17 @@
     okBtn.focus();
   };
 
-  function closeModal() {
+  // `confirmed` is true only on the OK path: the select must keep the value
+  // the user picked (and just confirmed) so form.submit()/the dispatched
+  // stagechange event carries it — only cancel/backdrop/Escape should revert.
+  function closeModal(confirmed) {
     dialog.close();
-    if (targetSelect) {
+    if (targetSelect && !confirmed) {
       targetSelect.value = targetSelectPrev;
+      // Let anything wired to `change` (e.g. the interviewer slot-preview
+      // HTMX fetch) resync to the reverted value. Harmless no-op for
+      // .stage-select, which only listens for the custom `stagechange` event.
+      targetSelect.dispatchEvent(new Event('change', { bubbles: true }));
     }
     targetForm = null;
     targetSelect = null;
@@ -233,18 +254,18 @@
     returnFocus = null;
   }
 
-  cancelBtn.addEventListener('click', closeModal);
+  cancelBtn.addEventListener('click', function() { closeModal(false); });
 
   dialog.addEventListener('click', function(e) {
     if (e.target === dialog) {
-      closeModal();
+      closeModal(false);
     }
   });
 
   okBtn.addEventListener('click', function() {
     var form = targetForm;
     var select = targetSelect;
-    closeModal();
+    closeModal(true);
     if (form) {
       form.submit();
     } else if (select) {
@@ -261,7 +282,7 @@
   });
 
   // Escape is handled natively by <dialog>. Cancel event closes it.
-  dialog.addEventListener('cancel', closeModal);
+  dialog.addEventListener('cancel', function() { closeModal(false); });
 
   // Surface HTMX error responses (e.g. 409 "Feedback required") as a toast
   // instead of leaving the row in a silently-broken state.
@@ -427,6 +448,8 @@
     if (btn.dataset.confirmed === '1') { return; } // second click submits
     e.preventDefault();
     var title, bodyText, tone;
+    var assignSelect = null;
+    var assignSelectPrev = '';
     if (btn.dataset.confirmAction === 'assign') {
       var sel = form.querySelector('select[name="interviewer"]');
       if (!sel) return;
@@ -442,6 +465,12 @@
         bodyText = 'The interviewer will be notified. Check the availability preview below the dropdown before confirming.';
         tone = 'safe';
       }
+      // Cancel must revert the dropdown (and its HTMX-fetched slot preview)
+      // to the server's actual assignment, not leave the picked-but-unsaved
+      // interviewer showing as if already assigned.
+      assignSelect = sel;
+      var serverOpt = sel.querySelector('option[selected]');
+      assignSelectPrev = serverOpt ? serverOpt.value : '';
     } else {
       title = btn.dataset.confirmTitle || 'Are you sure?';
       bodyText = btn.dataset.confirmBody || 'This action cannot be undone.';
@@ -453,6 +482,12 @@
     }
     btn.dataset.confirmed = '1';
     window.confirmAction(form, title, bodyText, tone);
+    if (assignSelect) {
+      // confirmAction() clears targetSelect unconditionally; set it after so
+      // closeModal()'s cancel-path reverts this dropdown.
+      targetSelect = assignSelect;
+      targetSelectPrev = assignSelectPrev;
+    }
     var dialogEl = document.getElementById('confirm-modal');
     if (dialogEl) {
       var onClose = function() {
