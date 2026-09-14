@@ -176,6 +176,14 @@ class JobApplication(models.Model):
         blank=True,
         help_text='Scheduled interview start time for the assigned interviewer.',
     )
+    stage_entered_at = models.DateTimeField(
+        default=None,
+        null=True,
+        blank=True,
+        help_text='When the application last moved to its current round/status. '
+                   'Used for escalation timing and time-in-stage analytics; '
+                   'unlike updated_at, this only changes on a pipeline move.',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -187,6 +195,7 @@ class JobApplication(models.Model):
             models.Index(fields=['current_round'], name='ix_app_round'),
             models.Index(fields=['assigned_to'], name='ix_app_assigned_to'),
             models.Index(fields=['interview_at'], name='ix_app_interview_at'),
+            models.Index(fields=['stage_entered_at'], name='ix_app_stage_entered'),
         ]
         constraints = [
             models.UniqueConstraint(fields=['candidate', 'job'], name='unique_candidate_job'),
@@ -232,14 +241,20 @@ class JobApplication(models.Model):
     def slot_preview_context(self):
         """Availability-preview payload for the CURRENTLY assigned
         interviewer, mirroring InterviewerSlotsView so HR sees the assigned
-        interviewer's fit and free slots without re-selecting them."""
+        interviewer's fit and free slots without re-selecting them.
+
+        A slot is only offered as "free" if it also survives the save-time
+        clash check in InterviewDetailsView.post, which rejects anything
+        within +-60 minutes of an existing booking for that interviewer
+        (not just an exact datetime match)."""
         iv = self.assigned_to
         if not iv:
             return None
         from django.utils import timezone
         from datetime import datetime, timedelta
         windows = list(iv.availability_windows.all())
-        booked = set(
+        slot_duration = timedelta(minutes=60)
+        booked = list(
             JobApplication.objects.filter(
                 assigned_to=iv, interview_at__isnull=False,
             ).exclude(pk=self.pk).values_list('interview_at', flat=True)
@@ -255,7 +270,11 @@ class JobApplication(models.Model):
                 slot = timezone.make_aware(datetime.combine(day_date, window.start_time))
                 end = timezone.make_aware(datetime.combine(day_date, window.end_time))
                 while slot + step <= end:
-                    if slot >= now and slot not in booked:
+                    clashes = any(
+                        slot - slot_duration <= booked_at < slot + slot_duration
+                        for booked_at in booked
+                    )
+                    if slot >= now and not clashes:
                         free_slots.append(slot)
                     slot += step
             if len(free_slots) >= 6:
@@ -270,10 +289,14 @@ class JobApplication(models.Model):
         }
 
     def save(self, *args, **kwargs):
-        if self._state.adding and not self.current_round_id and self.job_id:
-            first_round = self.job.rounds.first()
-            if first_round:
-                self.current_round = first_round
+        if self._state.adding:
+            if not self.current_round_id and self.job_id:
+                first_round = self.job.rounds.first()
+                if first_round:
+                    self.current_round = first_round
+            if self.stage_entered_at is None:
+                from django.utils import timezone
+                self.stage_entered_at = timezone.now()
         super().save(*args, **kwargs)
 
 

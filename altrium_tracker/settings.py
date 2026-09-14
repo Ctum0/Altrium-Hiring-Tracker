@@ -246,6 +246,23 @@ else:
         }
     }
 
+# Startup guard: without REDIS_URL in production, django-axes' failed-login
+# counters live in per-process LocMemCache, so each gunicorn worker enforces
+# AXES_FAILURE_LIMIT independently instead of sharing one shared counter --
+# silently multiplying the effective lockout threshold by the worker count.
+# Warn loudly in deploy logs rather than raising, so a misconfigured cache
+# degrades rate-limiting instead of taking down a working deployment.
+if not DEBUG and not _redis_url:
+    import warnings
+
+    warnings.warn(
+        'REDIS_URL is not set: django-axes lockout counters are using '
+        'per-process LocMemCache and are NOT shared across gunicorn '
+        'workers. Brute-force rate-limiting is significantly weaker than '
+        'AXES_FAILURE_LIMIT implies. Set REDIS_URL to share the cache.',
+        RuntimeWarning,
+    )
+
 # Security settings - only enforced in production (DEBUG=False)
 if not DEBUG:
     SECURE_SSL_REDIRECT = _env('DJANGO_SECURE_SSL_REDIRECT', default=True, cast=bool)

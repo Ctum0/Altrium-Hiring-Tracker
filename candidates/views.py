@@ -4,7 +4,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Count, F, Q
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -717,6 +717,17 @@ class InterviewDetailsView(LoginRequiredMixin, View):
                 )
                 return redirect('candidates:detail', pk=app.candidate_id)
 
+            # Well-formedness and "not in the past" are validated regardless
+            # of whether an interviewer is assigned yet — there's no reason
+            # to accept a nonsense or already-elapsed time even for a
+            # placeholder booking.
+            if scheduled < timezone.now():
+                messages.error(
+                    request,
+                    'The interview time cannot be in the past.',
+                )
+                return redirect('candidates:detail', pk=app.candidate_id)
+
             if scheduled.hour == 0 and scheduled.minute == 0:
                 messages.warning(
                     request,
@@ -726,9 +737,28 @@ class InterviewDetailsView(LoginRequiredMixin, View):
         app.interview_details = details
         app.interview_at = scheduled
 
-        if scheduled:
-            interviewer = app.assigned_to
+        # Availability/clash validation below only runs when an interviewer
+        # is assigned — there's nothing to check availability against
+        # otherwise. HR is allowed to pencil in a placeholder time before
+        # assigning anyone; this is intentional, not a validation gap: once
+        # an interviewer IS assigned (or reassigned), AssignApplicationView
+        # ._reconcile_inherited_slot re-validates the inherited interview_at
+        # against that interviewer's windows and existing bookings, clearing
+        # it if it no longer fits.
+        interviewer = app.assigned_to if scheduled else None
+        slot_duration = timedelta(minutes=60)
+
+        with transaction.atomic():
             if interviewer:
+                # Lock the interviewer's row for the remainder of this
+                # transaction. A second concurrent request scheduling the
+                # same interviewer blocks here until this transaction
+                # commits (or rolls back), so the clash check below can
+                # never race with another request's save — closing the
+                # TOCTOU window that used to let two requests both pass the
+                # check before either had saved.
+                User.objects.select_for_update().get(pk=interviewer.pk)
+
                 if not interviewer.is_available_at(scheduled):
                     messages.error(
                         request,
@@ -738,7 +768,6 @@ class InterviewDetailsView(LoginRequiredMixin, View):
                     )
                     return redirect('candidates:detail', pk=app.candidate_id)
 
-                slot_duration = timedelta(minutes=60)
                 clash = JobApplication.objects.filter(
                     assigned_to=interviewer,
                     interview_at__lt=scheduled + slot_duration,
@@ -752,7 +781,6 @@ class InterviewDetailsView(LoginRequiredMixin, View):
                     )
                     return redirect('candidates:detail', pk=app.candidate_id)
 
-        with transaction.atomic():
             if scheduled:
                 messages.success(
                     request,
@@ -820,14 +848,18 @@ class InterviewerSlotsView(LoginRequiredMixin, View):
         windows = list(interviewer.availability_windows.all())
 
         # Pre-computed free slots: walk each weekly window over the next
-        # HORIZON_DAYS days, hourly steps, skipping booked times and the past.
+        # HORIZON_DAYS days, hourly steps, skipping the past and any slot
+        # within +-SLOT_MINUTES of an existing booking — same window the
+        # save-time clash check in InterviewDetailsView.post enforces, so
+        # this preview never offers a slot the save would reject.
         now = timezone.now()
-        booked = set(
+        booked = list(
             JobApplication.objects.filter(
                 assigned_to=interviewer, interview_at__isnull=False,
             ).exclude(pk=app.pk).values_list('interview_at', flat=True)
         )
         step = timedelta(minutes=self.SLOT_MINUTES)
+        slot_duration = timedelta(minutes=self.SLOT_MINUTES)
         free_slots = []
         if windows and role_fit:
             for day in range(self.HORIZON_DAYS):
@@ -839,7 +871,11 @@ class InterviewerSlotsView(LoginRequiredMixin, View):
                     slot = timezone.make_aware(datetime.combine(day_date, window.start_time))
                     end = timezone.make_aware(datetime.combine(day_date, window.end_time))
                     while slot + step <= end:
-                        if slot >= now and slot not in booked:
+                        clashes = any(
+                            slot - slot_duration <= booked_at < slot + slot_duration
+                            for booked_at in booked
+                        )
+                        if slot >= now and not clashes:
                             free_slots.append(slot)
                         slot += step
                 if len(free_slots) >= 6:
@@ -906,6 +942,10 @@ class CandidateDeleteView(LoginRequiredMixin, View):
             return redirect('candidates:detail', pk=pk)
 
         name = candidate.full_name
+        # Remove the stored CV from media storage too, or it's orphaned —
+        # nothing else references it once the row is gone.
+        if candidate.resume_file:
+            candidate.resume_file.delete(save=False)
         candidate.delete()
         messages.success(request, f'Candidate profile for "{name}" has been permanently removed.')
         return redirect('candidates:list')
@@ -941,7 +981,29 @@ class CandidateReviewView(LoginRequiredMixin, View):
         candidate.needs_review_reasons = ''
         candidate.reviewed_by = request.user
         candidate.reviewed_at = timezone.now()
-        candidate.save()
+        try:
+            with transaction.atomic():
+                candidate.save()
+        except IntegrityError:
+            messages.error(
+                request,
+                f'Could not save: the email "{candidate.email}" is already used by '
+                f'another candidate. Choose a different email and try again.',
+            )
+            # Re-render with the user's other edits intact; needs_review and
+            # its reasons weren't actually persisted (the save rolled back),
+            # so pull the original reasons back from the database for display.
+            original = Candidate.objects.get(pk=candidate.pk)
+            reasons_list = [
+                r.strip() for r in (original.needs_review_reasons or '').split(',') if r.strip()
+            ]
+            latest_app = candidate.applications.select_related('job').order_by('-created_at').first()
+            return render(request, 'candidates/candidate_review.html', {
+                'candidate': candidate,
+                'reasons_list': reasons_list,
+                'latest_job': latest_app.job if latest_app else None,
+                'active_nav': 'candidates',
+            })
         messages.success(request, f'Reviewed and corrected {candidate.full_name}.')
         return redirect('candidates:detail', pk=pk)
 

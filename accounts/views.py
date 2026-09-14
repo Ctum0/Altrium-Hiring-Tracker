@@ -363,9 +363,12 @@ class HRDashboardView(LoginRequiredMixin, ListView):
 
         context['ai_insights'] = ai_insights
 
-        # Pipeline velocity: REAL measured time-in-stage. For every
-        # application currently sitting in a stage, days since its last
-        # state change (updated_at) — actual elapsed time, no formula.
+        # Pipeline velocity. "Screening"/"Interview" are REAL measured
+        # time-in-stage: for every application currently sitting in a
+        # stage, days since its last state change (moved_at, falling back
+        # to updated_at) — actual elapsed time, no formula. "Hired" is
+        # different in kind: it is a completed outcome, so it measures
+        # time-TO-hire (creation -> first hire), not time-since-hire.
         now = timezone.now()
 
         def _avg_days_in_status(status_value):
@@ -402,9 +405,49 @@ class HRDashboardView(LoginRequiredMixin, ListView):
 
             return round(sum(ages) / len(ages), 1) if ages else None
 
+        def _avg_days_to_hire():
+            """Average days from application creation to first hire.
+
+            Uses the earliest PipelineMove(to_status='hired') per hired
+            application (time-to-hire), not the most recent one (which
+            would just measure time-since-hire). Falls back to
+            stage_entered_at for hires with no move history (e.g.
+            seeded/legacy data predating pipeline move logging).
+            """
+            hired_apps = list(
+                JobApplication.objects.filter(status='hired')
+                .values_list('id', 'created_at')
+            )
+            if not hired_apps:
+                return None
+
+            hired_ids = [app_id for app_id, _ in hired_apps]
+            first_hire_move = {}
+            for move in (
+                PipelineMove.objects.filter(application_id__in=hired_ids, to_status='hired')
+                .order_by('application_id', 'moved_at')
+            ):
+                if move.application_id not in first_hire_move:
+                    first_hire_move[move.application_id] = move.moved_at
+
+            durations = []
+            for app_id, created_at in hired_apps:
+                hired_at = first_hire_move.get(app_id)
+                if hired_at is None:
+                    # No move history — fall back to stage_entered_at.
+                    hired_at = (
+                        JobApplication.objects.filter(id=app_id)
+                        .values_list('stage_entered_at', flat=True)
+                        .first()
+                    )
+                if hired_at and created_at:
+                    durations.append((hired_at - created_at).total_seconds() / 86400.0)
+
+            return round(sum(durations) / len(durations), 1) if durations else None
+
         context['velocity_screening'] = _avg_days_in_status('shortlisted')
         context['velocity_interview'] = _avg_days_in_status('in_progress')
-        context['velocity_offer'] = _avg_days_in_status('hired')
+        context['velocity_offer'] = _avg_days_to_hire()
         context['has_velocity_data'] = any(
             context[k] is not None
             for k in ('velocity_screening', 'velocity_interview', 'velocity_offer')

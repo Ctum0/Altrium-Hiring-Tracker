@@ -58,7 +58,17 @@ class PipelineMoveView(LoginRequiredMixin, View):
             app.current_round = to_round
             app.status = JobApplication.Status.IN_PROGRESS
         elif to_status:
-            # Feedback gate: leaving a round for a terminal status requires feedback
+            # Feedback gate: a terminal move is blocked only when it leaves
+            # a round without feedback on that round. current_round is None
+            # for two legitimate reasons this gate does not police: the
+            # application never entered a round (e.g. reject on resume
+            # alone, before any interview), or it is re-entering from a
+            # prior terminal status (which resumes evaluation rather than
+            # skipping it -- the gate re-applies on the next move out of
+            # whatever round it lands in). Confirmed against
+            # pipeline/tests.py: test_move_to_final_status and
+            # test_terminal_move_no_current_round_allowed both require this
+            # to succeed with no feedback when from_round is None.
             if from_round:
                 has_feedback = app.feedbacks.filter(round=from_round).exists()
                 if not has_feedback:
@@ -81,12 +91,18 @@ class PipelineMoveView(LoginRequiredMixin, View):
         elif to_status:
             app.feedback_submitted = False
 
-        app.save(update_fields=['current_round', 'status', 'feedback_submitted', 'updated_at'])
+        from django.utils import timezone
+        app.stage_entered_at = timezone.now()
+        app.save(update_fields=[
+            'current_round', 'status', 'feedback_submitted', 'stage_entered_at', 'updated_at',
+        ])
 
         PipelineMove.objects.create(
             application=app,
             from_round=from_round,
             to_round=to_round if to_round_id is not None else None,
+            from_status=from_status,
+            to_status=app.status,
             moved_by=request.user,
         )
 

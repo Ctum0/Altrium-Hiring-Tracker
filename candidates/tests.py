@@ -1,10 +1,12 @@
-from datetime import datetime, time, timezone as dt_timezone
+from datetime import datetime, time, timedelta, timezone as dt_timezone
 from io import BytesIO
 
 from django.contrib.auth import get_user_model
+from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone as django_timezone
 
 
 from accounts.models import InterviewerAvailability, Role
@@ -1105,3 +1107,221 @@ class ConfidenceTests(TestCase):
         with patch('ai.services._chat', return_value=''):
             result = parse_cv('Some CV text here ' * 10)
             self.assertTrue(result['used_fallback'])
+
+
+def _next_weekly_slot(weekday, hour, minute=0):
+    """Next aware datetime on *weekday* at *hour*:*minute*, strictly in the
+    future relative to `timezone.now()`. Used so slot-preview tests (bounded
+    to a 14-day horizon from "now") don't depend on a hardcoded date."""
+    now = django_timezone.now()
+    days_ahead = (weekday - now.weekday()) % 7
+    candidate_date = (now + timedelta(days=days_ahead)).date()
+    candidate = django_timezone.make_aware(datetime.combine(candidate_date, time(hour, minute)))
+    if candidate <= now:
+        candidate_date = (now + timedelta(days=days_ahead + 7)).date()
+        candidate = django_timezone.make_aware(datetime.combine(candidate_date, time(hour, minute)))
+    return candidate
+
+
+class SlotPreviewClashWindowTests(CandidatesBaseTestCase):
+    """P1-5: slot_preview_context and InterviewerSlotsView must honor the
+    same +-60 minute clash window as the save-time check in
+    InterviewDetailsView.post, not just exact-datetime matches."""
+
+    def setUp(self):
+        super().setUp()
+        # Interviewer window is Monday 09:00-12:00 (see CandidatesBaseTestCase).
+        self.booked_at = _next_weekly_slot(0, 9, 0)
+        self.application.assigned_to = self.interviewer
+        self.application.interview_at = self.booked_at
+        self.application.save(update_fields=['assigned_to', 'interview_at'])
+        # A second application for the same interviewer — its preview is what we inspect.
+        self.other_cand = Candidate.objects.create(
+            first_name='Preview', last_name='Target', email='preview-target@example.com',
+        )
+        self.other_app = JobApplication.objects.create(
+            candidate=self.other_cand, job=self.job,
+            status=JobApplication.Status.NEW, assigned_to=self.interviewer,
+        )
+
+    def test_model_property_excludes_near_miss_slot(self):
+        near_miss = self.booked_at + timedelta(hours=1)  # 60 min after booking, still a clash
+        ctx = self.other_app.slot_preview_context
+        self.assertNotIn(self.booked_at, ctx['free_slots'])
+        self.assertNotIn(near_miss, ctx['free_slots'])
+
+    def test_model_property_offers_slot_outside_clash_window(self):
+        clear = self.booked_at + timedelta(hours=2)  # still inside 09:00-12:00 window
+        ctx = self.other_app.slot_preview_context
+        self.assertIn(clear, ctx['free_slots'])
+
+    def test_interviewer_slots_view_excludes_near_miss_slot(self):
+        near_miss = self.booked_at + timedelta(hours=1)
+        self.login('hr')
+        response = self.client.get(
+            reverse('candidates:interviewer_slots', args=[self.other_app.pk]),
+            {'interviewer': self.interviewer.pk},
+        )
+        free_slots = response.context['preview']['free_slots']
+        self.assertNotIn(self.booked_at, free_slots)
+        self.assertNotIn(near_miss, free_slots)
+
+    def test_interviewer_slots_view_offers_slot_outside_clash_window(self):
+        clear = self.booked_at + timedelta(hours=2)
+        self.login('hr')
+        response = self.client.get(
+            reverse('candidates:interviewer_slots', args=[self.other_app.pk]),
+            {'interviewer': self.interviewer.pk},
+        )
+        free_slots = response.context['preview']['free_slots']
+        self.assertIn(clear, free_slots)
+
+
+class UnassignedSchedulingValidationTests(CandidatesBaseTestCase):
+    """P1-6: scheduling without an assigned interviewer still validates
+    well-formedness and "not in the past"; full availability/clash
+    validation is intentionally deferred to assignment time, where
+    AssignApplicationView._reconcile_inherited_slot re-validates any
+    inherited interview_at (covered by ReassignmentSlotReconciliationTests)."""
+
+    def test_unassigned_future_datetime_is_accepted(self):
+        self.login('hr')
+        self.client.post(
+            reverse('candidates:interview_details', args=[self.application.pk]),
+            {'interview_at': '2030-01-07 10:00'},
+        )
+        self.application.refresh_from_db()
+        self.assertIsNotNone(self.application.interview_at)
+
+    def test_unassigned_past_datetime_is_rejected(self):
+        self.login('hr')
+        response = self.client.post(
+            reverse('candidates:interview_details', args=[self.application.pk]),
+            {'interview_at': '2000-01-07 10:00'},
+        )
+        self.application.refresh_from_db()
+        self.assertIsNone(self.application.interview_at)
+        self.assertEqual(response.status_code, 302)
+
+    def test_assigned_past_datetime_is_also_rejected(self):
+        self.application.assigned_to = self.interviewer
+        self.application.save(update_fields=['assigned_to'])
+        self.login('hr')
+        self.client.post(
+            reverse('candidates:interview_details', args=[self.application.pk]),
+            {'interview_at': '2000-01-07 09:00'},
+        )
+        self.application.refresh_from_db()
+        self.assertIsNone(self.application.interview_at)
+
+
+class ToctouAtomicGuardTests(CandidatesBaseTestCase):
+    """P1-7: the clash-check-then-save sequence runs inside
+    transaction.atomic() with the interviewer row locked via
+    select_for_update(). True concurrent-race simulation isn't practical
+    under Django's synchronous TestCase; this guards against regressing the
+    existing accept/reject behavior now that it runs inside the lock."""
+
+    def test_clash_still_rejected_inside_atomic_block(self):
+        self.application.assigned_to = self.interviewer
+        self.application.interview_at = datetime(2030, 1, 7, 9, 0, tzinfo=dt_timezone.utc)
+        self.application.save(update_fields=['assigned_to', 'interview_at'])
+        other = JobApplication.objects.create(
+            candidate=Candidate.objects.create(
+                first_name='Lock', last_name='Test', email='locktest@example.com',
+            ),
+            job=self.job, assigned_to=self.interviewer,
+        )
+        self.login('hr')
+        self.client.post(
+            reverse('candidates:interview_details', args=[other.pk]),
+            {'interview_at': '2030-01-07 09:00'},
+        )
+        other.refresh_from_db()
+        self.assertIsNone(other.interview_at)
+
+    def test_non_clashing_booking_still_saves_inside_atomic_block(self):
+        self.application.assigned_to = self.interviewer
+        self.application.save(update_fields=['assigned_to'])
+        self.login('hr')
+        self.client.post(
+            reverse('candidates:interview_details', args=[self.application.pk]),
+            {'interview_at': '2030-01-07 10:00'},
+        )
+        self.application.refresh_from_db()
+        self.assertIsNotNone(self.application.interview_at)
+
+
+class ReviewSaveIntegrityErrorTests(CandidatesBaseTestCase):
+    """P1-8: an email collision on CandidateReviewView.post must render a
+    friendly error, not raise an uncaught IntegrityError (500)."""
+
+    def test_email_collision_shows_friendly_error_not_500(self):
+        Candidate.objects.create(
+            first_name='Taken', last_name='Email', email='taken@example.com',
+        )
+        flagged = Candidate.objects.create(
+            first_name='Needs', last_name='Review', email='flagged@example.com',
+            needs_review=True, needs_review_reasons='no_email',
+        )
+        self.login('hr')
+        response = self.client.post(
+            reverse('candidates:review', args=[flagged.pk]),
+            {
+                'first_name': 'Updated',
+                'last_name': 'Review',
+                'email': 'taken@example.com',
+                'phone': '',
+                'skills': 'Python',
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'already')
+        flagged.refresh_from_db()
+        # The candidate was NOT silently corrupted: still flagged, original email kept.
+        self.assertTrue(flagged.needs_review)
+        self.assertEqual(flagged.email, 'flagged@example.com')
+        # The user's other edits are preserved in the re-rendered form.
+        self.assertContains(response, 'value="Updated"')
+
+
+class CandidateDeleteMediaTests(CandidatesBaseTestCase):
+    """P2-14: deleting a candidate must also remove their resume file from
+    storage, or it's orphaned."""
+
+    def test_delete_removes_resume_file_from_storage(self):
+        # Mirror the real upload flow (CandidateUploadView): assign then a
+        # single save() call — Candidate.save() renames the field to a uuid
+        # name and writes it to storage in that one pass.
+        self.candidate.resume_file = ContentFile(b'resume contents', name='test_resume.txt')
+        self.candidate.save()
+        storage = self.candidate.resume_file.storage
+        file_name = self.candidate.resume_file.name
+        self.assertTrue(storage.exists(file_name))
+        try:
+            self.login('hr')
+            self.client.post(reverse('candidates:delete', args=[self.candidate.pk]))
+            self.assertFalse(storage.exists(file_name))
+        finally:
+            if storage.exists(file_name):
+                storage.delete(file_name)
+
+
+class StageSelectTerminalStateTests(CandidatesBaseTestCase):
+    """P2-14: candidate_list.html must not offer the stage-move select for
+    a terminal-status application, matching pipeline/_list_app_row.html's
+    "Final state" treatment."""
+
+    def test_non_terminal_status_shows_select(self):
+        self.login('hr')
+        response = self.client.get(reverse('candidates:list') + '?all=1')
+        self.assertContains(response, 'class="stage-select"')
+        self.assertNotContains(response, 'Final state')
+
+    def test_terminal_status_hides_select_and_shows_final_state(self):
+        self.application.status = JobApplication.Status.HIRED
+        self.application.save(update_fields=['status'])
+        self.login('hr')
+        response = self.client.get(reverse('candidates:list') + '?all=1')
+        self.assertNotContains(response, 'class="stage-select"')
+        self.assertContains(response, 'Final state')

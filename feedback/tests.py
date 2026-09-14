@@ -113,6 +113,22 @@ class TestFeedbackSubmission(FeedbackBaseTestCase):
             Notification.objects.filter(recipient=self.hr).exists(),
         )
 
+    def test_edit_feedback_notification_says_updated(self):
+        """Editing existing feedback must notify with 'updated', not 'submitted'."""
+        InterviewFeedback.objects.create(
+            application=self.app, round=self.round1, interviewer=self.interviewer,
+            score=70, notes='Original notes', raw_notes='raw',
+        )
+        self.client.login(username='interviewer1', password='testpass123')
+        self.client.post(
+            f'/feedback/{self.app.pk}/{self.round1.pk}/',
+            data={'score': 85, 'notes': 'Updated notes', 'raw_notes': 'updated raw'},
+        )
+        from notifications.models import Notification
+        notif = Notification.objects.filter(recipient=self.hr).latest('id')
+        self.assertIn('updated feedback', notif.message)
+        self.assertNotIn('submitted feedback', notif.message)
+
 
 # ---------------------------------------------------------------------------
 # 2. Feedback edit + FeedbackEditHistory
@@ -429,3 +445,23 @@ class TestFeedbackFormValidation(FeedbackBaseTestCase):
     def test_valid_score_accepted(self):
         form = FeedbackForm(data={'score': 75, 'notes': 'Test', 'raw_notes': ''})
         self.assertTrue(form.is_valid())
+
+
+# ---------------------------------------------------------------------------
+# 10. Feedback list heading role scoping
+# ---------------------------------------------------------------------------
+class TestFeedbackListHeading(FeedbackBaseTestCase):
+
+    def test_interviewer_heading_not_all(self):
+        """An interviewer's scoped view must not claim to show 'All' feedback."""
+        self.client.login(username='interviewer1', password='testpass123')
+        resp = self.client.get('/feedback/')
+        self.assertContains(resp, 'My Submitted Feedback')
+        self.assertNotContains(resp, 'All Submitted Feedback')
+
+    def test_hr_heading_says_all(self):
+        """HR sees the true unscoped 'All Submitted Feedback' heading."""
+        self.client.login(username='hr_user', password='testpass123')
+        resp = self.client.get('/feedback/')
+        self.assertContains(resp, 'All Submitted Feedback')
+

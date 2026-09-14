@@ -10,6 +10,8 @@
         {{ filter_candidate }}
       {% elif filter_status == 'pending' %}
         Pending Feedback Requests
+      {% elif is_interviewer %}
+        My Submitted Feedback
       {% else %}
         All Submitted Feedback
       {% endif %}

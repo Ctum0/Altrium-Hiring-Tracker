@@ -45,6 +45,20 @@ class GroqClientTests(SimpleTestCase):
         self.assertEqual(result['first_name'], 'Jane')
         self.assertEqual(result['skills'], [])
 
+    def test_parse_cv_partial_ai_response_blends_with_fallback(self):
+        # Groq extracts email but no skills; the resume text contains a
+        # skill keyword the local fallback parser can find. The final
+        # result must contain fields contributed by BOTH sources.
+        payload = '{"email": "jane@example.com"}'
+        resume_text = 'Jane Smith\nExperienced with Python and Django.'
+        with override_settings(GROQ_API_KEY='key'), \
+             patch.object(services._client, 'post', return_value=_FakeResp(payload)):
+            result = services.parse_cv(resume_text)
+        self.assertEqual(result['email'], 'jane@example.com')
+        self.assertIn('Python', result['skills'])
+        self.assertIn('Django', result['skills'])
+        self.assertEqual(result['first_name'], 'Jane')
+
     def test_parse_cv_empty_text(self):
         result = services.parse_cv('   ')
         self.assertEqual(result['skills'], [])

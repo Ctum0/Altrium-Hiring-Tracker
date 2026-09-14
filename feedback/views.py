@@ -46,6 +46,7 @@ class FeedbackListView(LoginRequiredMixin, ListView):
         app_pk = self.request.GET.get('application')
         status = self.request.GET.get('status', '')
         context['filter_status'] = status
+        context['is_interviewer'] = user.is_interviewer()
 
         if app_pk:
             app = JobApplication.objects.filter(pk=app_pk).select_related('candidate').first()
@@ -217,19 +218,19 @@ class FeedbackFormView(LoginRequiredMixin, View):
             self.application.feedback_submitted = True
             self.application.save(update_fields=['feedback_submitted', 'updated_at'])
 
+        action = 'updated' if existing else 'submitted'
         # Notify HR (job creator) so they know an evaluation landed.
         if self.application.job.created_by and self.application.job.created_by != request.user:
             Notification.objects.create(
                 recipient=self.application.job.created_by,
                 message=(
                     f'{request.user.get_full_name() or request.user.username} '
-                    f'submitted feedback for {self.application.candidate.full_name} '
+                    f'{action} feedback for {self.application.candidate.full_name} '
                     f'({self.round_obj.name}).'
                 ),
                 link=reverse('candidates:detail', kwargs={'pk': self.application.candidate_id}),
             )
 
-        action = 'updated' if existing else 'submitted'
         messages.success(
             request,
             f'Feedback {action} for {self.application.candidate.full_name} '

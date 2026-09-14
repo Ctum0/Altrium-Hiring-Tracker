@@ -55,6 +55,26 @@ class JobCreateTests(JobsBaseTestCase):
         })
         self.assertEqual(r.status_code, 200)  # form re-rendered with errors
 
+    def test_hiring_manager_saved_and_displayed_with_no_full_name(self):
+        """A hiring manager with no first/last name shows their username, not '-'."""
+        self.login('hr')
+        manager = User.objects.create_user(
+            username='mgr_no_name', password='pass12345', role=Role.HR,
+        )
+        r = self.client.post(reverse('jobs:create'), {
+            'title': 'Frontend Engineer',
+            'description': 'Build the UI.',
+            'num_openings': 1,
+            'hiring_manager': manager.pk,
+        })
+        self.assertEqual(r.status_code, 302)
+        from jobs.models import Job
+        job = Job.objects.get(title='Frontend Engineer')
+        self.assertEqual(job.hiring_manager_id, manager.pk)
+        detail = self.client.get(reverse('jobs:detail', args=[job.pk]))
+        self.assertContains(detail, 'mgr_no_name')
+        self.assertNotContains(detail, '<dd>-</dd>')
+
 
 class JobRoundTests(JobsBaseTestCase):
     def test_round_create_and_list(self):
@@ -172,6 +192,25 @@ class RoundValidationTests(JobsBaseTestCase):
         job = Job.objects.create(title='Dev', created_by=self.hr, is_active=False)
         round_ = InterviewRound.objects.create(job=job, name='Tech Test', order=99)
         r = self.client.get(reverse('jobs:round_delete', args=[round_.pk]))
+        self.assertEqual(r.status_code, 302)
+        self.assertIn(reverse('jobs:detail', args=[job.pk]), r.url)
+        self.assertTrue(InterviewRound.objects.filter(pk=round_.pk).exists())
+
+    def test_round_delete_blocked_when_feedback_exists(self):
+        """Deleting a round with submitted feedback must not 500 (ProtectedError)."""
+        self.login('hr')
+        from candidates.models import Candidate, JobApplication
+        from feedback.models import InterviewFeedback
+        from jobs.models import InterviewRound, Job
+        job = Job.objects.create(title='Dev', created_by=self.hr)
+        round_ = InterviewRound.objects.create(job=job, name='Tech Test', order=99)
+        cand = Candidate.objects.create(email='fb@example.com', first_name='Fiona')
+        app = JobApplication.objects.create(candidate=cand, job=job)
+        InterviewFeedback.objects.create(
+            application=app, round=round_, interviewer=self.interviewer,
+            score=80, notes='Good.',
+        )
+        r = self.client.post(reverse('jobs:round_delete', args=[round_.pk]))
         self.assertEqual(r.status_code, 302)
         self.assertIn(reverse('jobs:detail', args=[job.pk]), r.url)
         self.assertTrue(InterviewRound.objects.filter(pk=round_.pk).exists())

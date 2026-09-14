@@ -130,13 +130,13 @@ def parse_cv(text: str) -> dict:
     Never returns empty fields if contact info or skills are present in raw text.
     """
     result = {'first_name': '', 'last_name': '', 'email': '', 'phone': '', 'skills': []}
-    used_fallback = True
 
     if not text.strip():
         result['used_fallback'] = True
         return result
 
     content = _chat(SYSTEM_PARSE, text[:12000])
+    ai_extracted = False
     if content:
         try:
             content = content.strip()
@@ -155,20 +155,20 @@ def parse_cv(text: str) -> dict:
                 else:
                     result[key] = str(parsed.get(key, '')).strip()
 
-            # Verify that remote parse extracted email/skills; if incomplete, blend with fallback
-            if result['email'] or result['first_name'] or result['skills']:
-                result['used_fallback'] = False
-                return result
+            ai_extracted = bool(result['email'] or result['first_name'] or result['skills'])
         except (json.JSONDecodeError, AttributeError):
             logger.error('Could not parse Groq response: %s', content[:200])
 
-    # If Groq failed or returned incomplete data, use fallback parser
-    fallback = _fallback_parse_cv(text)
-    for key in result:
-        if not result[key]:
-            result[key] = fallback[key]
+    # A partial AI response (some fields populated, others not) must still be
+    # blended with the local fallback so the missing fields get filled in
+    # rather than dropped. Only a fully-populated AI response skips this.
+    if not all(result[key] for key in result):
+        fallback = _fallback_parse_cv(text)
+        for key in result:
+            if not result[key]:
+                result[key] = fallback[key]
 
-    result['used_fallback'] = used_fallback
+    result['used_fallback'] = not ai_extracted
     return result
 
 

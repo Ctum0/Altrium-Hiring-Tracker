@@ -24,6 +24,8 @@ class PipelineMove(models.Model):
         blank=True,
         related_name='moves_to',
     )
+    from_status = models.CharField(max_length=20, blank=True, default='')
+    to_status = models.CharField(max_length=20, blank=True, default='')
     moved_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -34,6 +36,10 @@ class PipelineMove(models.Model):
 
     class Meta:
         ordering = ['-moved_at']
+        indexes = [
+            models.Index(fields=['to_status'], name='ix_move_to_status'),
+            models.Index(fields=['-moved_at'], name='ix_move_moved_at'),
+        ]
 
     def __str__(self):
         return f'{self.application} -> {self.to_round}'

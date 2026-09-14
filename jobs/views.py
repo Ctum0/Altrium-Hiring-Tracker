@@ -8,6 +8,8 @@ from django.utils import timezone
 from django.views import View
 from django.views.generic import CreateView, DeleteView, DetailView, ListView, UpdateView
 
+from feedback.models import InterviewFeedback
+
 from .forms import JobForm, RoundForm
 from .models import InterviewRound, Job
 
@@ -203,6 +205,12 @@ class RoundDeleteView(LoginRequiredMixin, DeleteView):
         obj = self.get_object()
         if not obj.job.is_active:
             messages.error(request, 'This job is closed; its rounds cannot be deleted.')
+            return redirect('jobs:detail', pk=obj.job_id)
+        if InterviewFeedback.objects.filter(round=obj).exists():
+            messages.error(
+                request,
+                'This round has submitted feedback and cannot be deleted.',
+            )
             return redirect('jobs:detail', pk=obj.job_id)
         return super().dispatch(request, *args, **kwargs)
 
