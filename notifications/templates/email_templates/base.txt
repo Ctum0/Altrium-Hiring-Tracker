@@ -1,0 +1,8 @@
+{% block greeting %}Hello {% firstof recipient_name candidate_name "there" %},{% endblock %}
+
+{% block content %}{% endblock %}
+
+{% block footer %}--
+{{ product_name|default:"Altrium Hiring Tracker" }}
+You are part of a hiring process managed in Altrium. This is an automated message; replies to this address are not monitored.
+{% endblock %}

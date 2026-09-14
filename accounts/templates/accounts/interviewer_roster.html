@@ -9,6 +9,11 @@
     <h1 class="page-title">Interviewer Availability</h1>
     <p class="page-sub">Live weekly windows, role coverage, and current workload for every interviewer.</p>
   </div>
+  {% if user.is_hr %}
+  <div class="page-actions">
+    <a href="{% url 'accounts:onboard_user' %}" class="btn btn-primary">Onboard account</a>
+  </div>
+  {% endif %}
 </div>
 
 {% if interviewers %}
@@ -18,7 +23,7 @@
       <tr>
         <th>Interviewer</th>
         <th>Specialty</th>
-        <th>Weekly Availability</th>
+        <th>Seniority</th>
         <th>Active Load</th>
         <th>Pending Feedback</th>
         {% if user.is_hr %}<th>Action</th>{% endif %}
@@ -31,9 +36,8 @@
           <div class="cand-name-cell">
             <div class="cand-avatar cand-avatar-{{ iv.get_full_name|default:iv.username|avatar_index }}" aria-hidden="true">
               {{ iv.first_name|first|upper }}{{ iv.last_name|first|upper }}
-            </div>
             <div class="cand-name-info">
-              <span class="cand-name-main">{{ iv.get_full_name|default:iv.username }}</span>
+              <a href="{% url 'accounts:interviewer_profile' iv.pk %}" class="cand-name-main" style="text-decoration:none;color:inherit">{{ iv.get_full_name|default:iv.username }}</a>
               <span class="cand-name-email">{{ iv.email|default:iv.username }}</span>
             </div>
           </div>
@@ -43,6 +47,13 @@
           <span class="badge badge-in_progress">{{ iv.specialty }}</span>
           {% else %}
           <span class="text-xs text-muted">Generalist</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if iv.seniority %}
+          <span class="badge badge-in_progress">{{ iv.get_seniority_display }}</span>
+          {% else %}
+          <span class="text-xs text-muted">Not set</span>
           {% endif %}
         </td>
         <td>

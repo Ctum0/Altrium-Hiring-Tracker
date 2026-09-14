@@ -29,6 +29,20 @@
     </div>
 
     <div class="form-field">
+      <label class="form-label" for="{{ form.domain.id_for_label }}">Domain</label>
+      {{ form.domain }}
+      {% if form.domain.errors %}<p class="form-error">{{ form.domain.errors.0 }}</p>{% endif %}
+      <p class="form-help">{{ form.domain.help_text }}</p>
+    </div>
+
+    <div class="form-field">
+      <label class="form-label" for="{{ form.seniority.id_for_label }}">Seniority level</label>
+      {{ form.seniority }}
+      {% if form.seniority.errors %}<p class="form-error">{{ form.seniority.errors.0 }}</p>{% endif %}
+      <p class="form-help">{{ form.seniority.help_text }}</p>
+    </div>
+
+    <div class="form-field">
       <label class="form-label" for="{{ form.description.id_for_label }}">Description</label>
       {{ form.description }}
       {% if form.description.errors %}<p class="form-error">{{ form.description.errors.0 }}</p>{% endif %}

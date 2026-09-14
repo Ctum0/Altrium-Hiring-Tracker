@@ -1,0 +1,8 @@
+{% extends "email_templates/base.txt" %}
+{% block content %}
+Thank you for applying to the {{ job_title }} position.
+
+Your application has been received and our hiring team will review it shortly. If your profile matches what we are looking for, we will reach out to schedule the next step.
+
+No action is needed from you right now.
+{% endblock %}

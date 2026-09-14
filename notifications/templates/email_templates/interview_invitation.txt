@@ -1,0 +1,11 @@
+{% extends "email_templates/base.txt" %}
+{% block content %}
+Good news — you have been selected for the next round of the {{ job_title }} position.
+
+{% if interview_date or interview_time %}Scheduled: {{ interview_date }} {{ interview_time }}
+{% endif %}Round: {{ round_name|default:"Interview" }}
+{% if interview_details %}Details: {{ interview_details }}
+{% endif %}{% if interview_link %}Join here: {{ interview_link }}
+{% endif %}
+Please join a few minutes early. If the time does not work for you, contact your recruiter and we will reschedule.
+{% endblock %}

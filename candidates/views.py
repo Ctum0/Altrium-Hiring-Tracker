@@ -553,13 +553,25 @@ class AssignApplicationView(LoginRequiredMixin, View):
         except (ValueError, TypeError):
             return HttpResponse('Invalid interviewer.', status=400)
 
-        # Role-match: interviewer's specialty must align with the job.
+        # Role-match: interviewer's specialty must align with the job, and
+        # their seniority must be at or above the job's requirement.
         if not interviewer.is_eligible_interviewer_for(app.job):
             messages.error(
                 request,
                 f'{interviewer.get_full_name() or interviewer.username} is not '
                 f'qualified for {app.job.department or app.job.title}. '
                 f'Pick an interviewer whose specialty matches the role.',
+            )
+            return redirect('candidates:detail', pk=app.candidate_id)
+
+        if not interviewer.meets_seniority_for(app.job):
+            required = app.job.get_seniority_display() or 'the required level'
+            messages.error(
+                request,
+                f'{interviewer.get_full_name() or interviewer.username} '
+                f'({interviewer.get_seniority_display() or "seniority not set"}) is '
+                f'not senior enough for this {required} role. '
+                f'Pick an interviewer at or above the required seniority.',
             )
             return redirect('candidates:detail', pk=app.candidate_id)
 
@@ -844,7 +856,10 @@ class InterviewerSlotsView(LoginRequiredMixin, View):
         except (ValueError, TypeError):
             return HttpResponse('Invalid interviewer.', status=400)
 
-        role_fit = interviewer.is_eligible_interviewer_for(app.job)
+        role_fit = (
+            interviewer.is_eligible_interviewer_for(app.job)
+            and interviewer.meets_seniority_for(app.job)
+        )
         windows = list(interviewer.availability_windows.all())
 
         # Pre-computed free slots: walk each weekly window over the next

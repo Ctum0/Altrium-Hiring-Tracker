@@ -1,0 +1,117 @@
+{% extends 'base.html' %}
+{% load accounts_extras %}
+{% block title %}{{ interviewer.get_full_name|default:interviewer.username }} | Altrium Tracker{% endblock %}
+{% block page_title %}Interviewer Profile{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">{{ interviewer.get_full_name|default:interviewer.username }}</h1>
+    <p class="page-sub">{{ interviewer.email|default:interviewer.username }}</p>
+  </div>
+  <div class="page-actions">
+    <a href="{% url 'accounts:interviewer_roster' %}" class="btn btn-secondary">Back to roster</a>
+  </div>
+</div>
+
+<div class="ref-kpi-row" style="grid-template-columns: repeat(3, 1fr); margin-bottom: var(--sp-5)">
+  <div class="ref-kpi-card glass-panel vui-card">
+    <div class="ref-kpi-meta">
+      <span class="ref-kpi-label">Active Load</span>
+      <span class="ref-kpi-value">{{ active_load }}</span>
+      <span class="kpi-trend kpi-trend-neutral">In-flight applications</span>
+    </div>
+  </div>
+  <div class="ref-kpi-card glass-panel vui-card {% if pending_feedback_count > 0 %}kpi-card-danger-3d{% endif %}">
+    <div class="ref-kpi-meta">
+      <span class="ref-kpi-label">Pending Feedback</span>
+      <span class="ref-kpi-value">{{ pending_feedback_count }}</span>
+      <span class="kpi-trend {% if pending_feedback_count > 0 %}kpi-trend-down{% else %}kpi-trend-up{% endif %}">
+        {% if pending_feedback_count > 0 %}Action needed{% else %}All submitted{% endif %}
+      </span>
+    </div>
+  </div>
+  <div class="ref-kpi-card glass-panel vui-card">
+    <div class="ref-kpi-meta">
+      <span class="ref-kpi-label">Upcoming Interviews</span>
+      <span class="ref-kpi-value">{{ upcoming_interviews|length }}</span>
+      <span class="kpi-trend kpi-trend-neutral">Scheduled ahead</span>
+    </div>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-4)">
+  <div class="glass-panel" style="padding:var(--sp-4)">
+    <h2 style="font-size:var(--text-xs);font-weight:700;margin:0 0 var(--sp-3);letter-spacing:0.05em;text-transform:uppercase;color:var(--muted)">Matching Profile</h2>
+    <div style="display:grid;grid-template-columns:auto 1fr;gap:var(--sp-2) var(--sp-4);font-size:var(--text-sm)">
+      <span class="text-muted">Role</span>
+      <span>{{ interviewer.get_role_display }}</span>
+      <span class="text-muted">Specialty</span>
+      <span>
+        {% if interviewer.specialty %}{{ interviewer.specialty }}{% else %}<span class="text-xs text-muted">Generalist</span>{% endif %}
+      </span>
+      <span class="text-muted">Seniority</span>
+      <span>
+        {% if interviewer.seniority %}<span class="badge badge-in_progress">{{ interviewer.get_seniority_display }}</span>{% else %}<span class="text-xs text-muted">Not set</span>{% endif %}
+      </span>
+      <span class="text-muted">Domain</span>
+      <span>
+        {% if interviewer.domain %}{{ interviewer.get_domain_display }}{% else %}<span class="text-xs text-muted">Not set</span>{% endif %}
+      </span>
+      <span class="text-muted">Status</span>
+      <span>
+        {% if interviewer.is_active %}<span class="badge badge-hired">Active</span>{% else %}<span class="badge badge-rejected">Deactivated</span>{% endif %}
+      </span>
+    </div>
+  </div>
+
+  <div class="glass-panel" style="padding:var(--sp-4)">
+    <h2 style="font-size:var(--text-xs);font-weight:700;margin:0 0 var(--sp-3);letter-spacing:0.05em;text-transform:uppercase;color:var(--muted)">Weekly Availability</h2>
+    {% if availability_windows %}
+      {% for w in availability_windows %}
+      <div class="text-sm" style="white-space:nowrap;margin-bottom:var(--sp-1)">
+        {{ w.get_weekday_display }} {{ w.start_time|time:"H:i" }}&ndash;{{ w.end_time|time:"H:i" }}
+      </div>
+      {% endfor %}
+    {% else %}
+      <div style="padding:var(--sp-3);border-radius:8px;background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.2)">
+        <span class="text-xs" style="color:#f59e0b"><strong>Not yet available.</strong> No weekly windows declared &mdash; scheduling is blocked until at least one window exists.</span>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="glass-panel" style="padding:var(--sp-4);margin-top:var(--sp-4)">
+  <h2 style="font-size:var(--text-xs);font-weight:700;margin:0 0 var(--sp-3);letter-spacing:0.05em;text-transform:uppercase;color:var(--muted)">Upcoming Interviews</h2>
+  {% if upcoming_interviews %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>When (UTC)</th>
+          <th>Candidate</th>
+          <th>Position</th>
+          <th>Round</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for app in upcoming_interviews %}
+        <tr class="cand-row">
+          <td><span class="text-xs" style="white-space:nowrap;font-weight:600">{{ app.interview_at|date:'M j, H:i' }} UTC</span></td>
+          <td><a href="{% url 'candidates:detail' app.candidate.pk %}" class="cand-name-main" style="text-decoration:none;color:inherit">{{ app.candidate.full_name }}</a></td>
+          <td>{{ app.job.title }}</td>
+          <td>
+            {% if app.current_round %}
+            <span class="badge badge-in_progress">{{ app.current_round.name }}</span>
+            {% else %}-{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="text-sm text-muted" style="margin:0">No upcoming interviews scheduled.</p>
+  {% endif %}
+</div>
+{% endblock %}

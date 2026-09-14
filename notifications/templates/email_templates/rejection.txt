@@ -1,0 +1,8 @@
+{% extends "email_templates/base.txt" %}
+{% block content %}
+Thank you for taking the time to apply for the {{ job_title }} position and for your interest in Altrium.
+
+After careful review, we have decided not to move forward with your application. This was a difficult decision — we received many strong candidates.
+
+{{ rejection_notes|default:"We encourage you to apply again for future openings that match your skills and experience." }}
+{% endblock %}

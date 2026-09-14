@@ -72,9 +72,13 @@
   <div class="table-wrap">
     <table class="table">
       <thead>
+      <thead>
         <tr>
           <th>Order</th>
           <th>Round name</th>
+          <th>Candidates in round</th>
+          <th>Assigned interviewer</th>
+          <th>Next interview</th>
           {% if can_edit %}<th></th>{% endif %}
         </tr>
       </thead>
@@ -85,6 +89,11 @@
           <td class="strong">
             {{ round.name }}
             {% if round.is_final %}<span class="badge badge-hold" style="margin-left:var(--sp-2)">Final</span>{% endif %}
+          </td>
+          <td class="mono">{{ round.candidate_count }}</td>
+          <td>{{ round.assigned_interviewers|join:', '|default:'-' }}</td>
+          <td>
+            {% if round.next_interview_at %}{{ round.next_interview_at|date:'M j, Y H:i' }}{% else %}-{% endif %}
           </td>
           {% if can_edit %}
           <td style="text-align:right">
@@ -98,6 +107,7 @@
           {% endif %}
         </tr>
         {% endfor %}
+
       </tbody>
     </table>
   </div>
@@ -107,6 +117,7 @@
     <p class="empty-state-body">Add stages such as Phone Screen, Technical Test, or Final Interview. Final states like Hired and Rejected are added later.</p>
   </div>
   {% endif %}
+
 
   {% if can_edit %}
   <form method="post" action="{% url 'jobs:round_create' job.pk %}" class="flex gap-3" style="margin-top:var(--sp-4);align-items:flex-end">
@@ -123,4 +134,39 @@
   </form>
   {% endif %}
 </div>
+{% if talent_pool_suggestions %}
+<div class="panel panel-pad" style="margin-top:var(--sp-6)">
+  <h3 style="font-size:var(--text-base);font-weight:700;margin-bottom:var(--sp-1)">Talent pool &mdash; suggested re-engagements</h3>
+  <p class="text-sm text-muted" style="margin-bottom:var(--sp-4)">Past candidates from closed jobs who scored well and match this job's domain. Add them to this posting to reopen the conversation.</p>
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Candidate</th>
+          <th>Email</th>
+          <th>Previous role</th>
+          <th>Score</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in talent_pool_suggestions %}
+        <tr>
+          <td class="strong">{{ s.candidate_name }}</td>
+          <td>{{ s.candidate_email|default:'-' }}</td>
+          <td>{{ s.old_job_title }}</td>
+          <td class="mono">{{ s.score }}</td>
+          <td style="text-align:right">
+            <form method="post" action="{% url 'jobs:talent_pool_add' job.pk s.old_application_pk %}">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-secondary btn-sm">Add to this job</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
 {% endblock %}

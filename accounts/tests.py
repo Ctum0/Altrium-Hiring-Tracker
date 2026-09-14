@@ -368,3 +368,292 @@ class DeploySeedUsersGatingTest(TestCase):
                 f'{name} still runs seed_users unconditionally after migrate',
             )
             self.assertIn('seed_users --noinput', content)
+
+def _make_job(hr, title='Backend Engineer', department='Engineering', seniority='mid'):
+    from jobs.models import Job
+    return Job.objects.create(
+        title=title, department=department, seniority=seniority,
+        is_active=True, created_by=hr,
+    )
+
+
+class OnboardUserTests(AuthAndRoleTestBase):
+    """HR-only account onboarding (Feature 2: Account Onboarding)."""
+
+    def _payload(self, **overrides):
+        data = {
+            'username': 'newiv',
+            'first_name': 'Nina',
+            'last_name': 'Newcomer',
+            'email': 'nina@example.com',
+            'role': Role.INTERVIEWER,
+            'specialty': 'Engineering',
+            'seniority': 'senior',
+            'domain': 'engineering',
+            'password1': 'glitterfox42',
+            'password2': 'glitterfox42',
+        }
+        data.update(overrides)
+        return data
+
+    def test_hr_can_onboard_interviewer(self):
+        c = Client()
+        assert c.login(username='hr', password='pass12345')
+        r = c.post(reverse('accounts:onboard_user'), self._payload(), follow=True)
+        self.assertRedirects(r, reverse('accounts:interviewer_roster'))
+        user = User.objects.get(username='newiv')
+        self.assertEqual(user.role, Role.INTERVIEWER)
+        self.assertEqual(user.seniority, 'senior')
+        self.assertEqual(user.domain, 'engineering')
+        self.assertTrue(user.check_password('glitterfox42'))
+        self.assertContains(r, 'has been onboarded')
+
+    def test_onboard_requires_hr(self):
+        for username in ('iv', 'mgmt'):
+            c = Client()
+            assert c.login(username=username, password='pass12345')
+            r = c.get(reverse('accounts:onboard_user'))
+            self.assertEqual(r.status_code, 302)
+            self.assertEqual(r.url, reverse('accounts:home'))
+
+    def test_onboard_requires_login(self):
+        r = Client().get(reverse('accounts:onboard_user'))
+        self.assertEqual(r.status_code, 302)
+        self.assertIn('/login/', r.url)
+
+    def test_onboard_rejects_weak_password(self):
+        c = Client()
+        assert c.login(username='hr', password='pass12345')
+        r = c.post(reverse('accounts:onboard_user'), self._payload(password1='password', password2='password'))
+        self.assertEqual(r.status_code, 200)
+        self.assertFalse(User.objects.filter(username='newiv').exists())
+        self.assertContains(r, 'password')
+
+
+class MyAvailabilityTests(AuthAndRoleTestBase):
+    """Interviewer self-service availability (Feature 2: Availability Self-Service)."""
+
+    def _login_iv(self):
+        c = Client()
+        assert c.login(username='iv', password='pass12345')
+        return c
+
+    def test_add_and_remove_window(self):
+        c = self._login_iv()
+        r = c.post(
+            reverse('accounts:my_availability'),
+            {'weekday': 0, 'start_time': '09:00', 'end_time': '12:00'},
+            follow=True,
+        )
+        self.assertRedirects(r, reverse('accounts:my_availability'))
+        window = InterviewerAvailability.objects.get(interviewer=self.interviewer)
+        self.assertEqual(window.weekday, 0)
+        self.assertEqual(window.start_time.strftime('%H:%M'), '09:00')
+        # Grouped display: one group labeled Monday.
+        groups = r.context['weekday_groups']
+        self.assertEqual(len(groups), 1)
+        self.assertEqual(groups[0][0], 'Monday')
+        # Remove it again.
+        r = c.post(reverse('accounts:my_availability'), {'remove': window.pk}, follow=True)
+        self.assertRedirects(r, reverse('accounts:my_availability'))
+        self.assertEqual(InterviewerAvailability.objects.count(), 0)
+
+    def test_rejects_end_before_start(self):
+        c = self._login_iv()
+        r = c.post(reverse('accounts:my_availability'), {
+            'weekday': 1, 'start_time': '14:00', 'end_time': '10:00',
+        })
+        self.assertEqual(r.status_code, 200)
+        self.assertFalse(InterviewerAvailability.objects.exists())
+        self.assertTrue(r.context['form'].errors)
+
+    def test_duplicate_window_handled_gracefully(self):
+        """Same interviewer + weekday + start_time → friendly error, no 500."""
+        c = self._login_iv()
+        c.post(reverse('accounts:my_availability'), {
+            'weekday': 0, 'start_time': '09:00', 'end_time': '12:00',
+        })
+        r = c.post(reverse('accounts:my_availability'), {
+            'weekday': 0, 'start_time': '09:00', 'end_time': '15:00',
+        })
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'already have a window')
+        self.assertEqual(
+            InterviewerAvailability.objects.filter(interviewer=self.interviewer).count(), 1,
+        )
+
+    def test_interviewer_only(self):
+        # HR and management are bounced home.
+        for username in ('hr', 'mgmt'):
+            c = Client()
+            assert c.login(username=username, password='pass12345')
+            r = c.get(reverse('accounts:my_availability'))
+            self.assertEqual(r.status_code, 302)
+            self.assertEqual(r.url, reverse('accounts:home'))
+        # Anonymous goes to login.
+        r = Client().get(reverse('accounts:my_availability'))
+        self.assertEqual(r.status_code, 302)
+        self.assertIn('/login/', r.url)
+
+    def test_owner_scoping(self):
+        """Another interviewer's window is invisible and unremovable here."""
+        other = User.objects.create_user(username='iv2', password='pass12345', role=Role.INTERVIEWER)
+        window = InterviewerAvailability.objects.create(
+            interviewer=other, weekday=2, start_time='09:00', end_time='11:00',
+        )
+        c = self._login_iv()
+        r = c.get(reverse('accounts:my_availability'))
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.context['weekday_groups'], [])
+        # Removing someone else's window 404s (pk scoped to request.user).
+
+
+
+class MyCalendarTests(AuthAndRoleTestBase):
+    """Interviewer calendar of booked interviews (Feature 2: My Calendar)."""
+
+    def _make_booked(self, interviewer, when, job=None, candidate_email=None):
+        job = job or _make_job(self.hr)
+        candidate = Candidate.objects.create(
+            first_name='Cara', last_name='Cand',
+            email=candidate_email or f'cara{Candidate.objects.count()}@example.com',
+        )
+        return JobApplication.objects.create(
+            candidate=candidate, job=job, status='in_progress',
+            assigned_to=interviewer, interview_at=when,
+            interview_details='https://meet.example.com/abc',
+        )
+
+    def test_grouped_by_date_and_ordered(self):
+        job = _make_job(self.hr)
+        day1 = timezone.now() + timedelta(days=1)
+        day2 = timezone.now() + timedelta(days=2)
+        later = self._make_booked(self.interviewer, day2.replace(hour=10, minute=0, second=0, microsecond=0), job=job)
+        earlier = self._make_booked(
+            self.interviewer, day1.replace(hour=15, minute=0, second=0, microsecond=0),
+            job=job,
+        )
+        # Someone else's interview must not leak in.
+        other_iv = User.objects.create_user(username='iv2', password='pass12345', role=Role.INTERVIEWER)
+        self._make_booked(other_iv, day1.replace(hour=9, minute=0, second=0, microsecond=0), job=job)
+
+        c = Client()
+        assert c.login(username='iv', password='pass12345')
+        r = c.get(reverse('accounts:my_calendar'))
+        self.assertEqual(r.status_code, 200)
+        days = r.context['calendar_days']
+        self.assertEqual(len(days), 2)
+        self.assertEqual([a.pk for a in days[0]['apps']], [earlier.pk])
+        self.assertEqual([a.pk for a in days[1]['apps']], [later.pk])
+        self.assertContains(r, 'Cara Cand')
+        self.assertContains(r, 'https://meet.example.com/abc')
+
+    def test_empty_state(self):
+        c = Client()
+        assert c.login(username='iv', password='pass12345')
+        r = c.get(reverse('accounts:my_calendar'))
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.context['calendar_days'], [])
+        self.assertContains(r, 'No interviews booked')
+
+    def test_interviewer_only(self):
+        for username in ('hr', 'mgmt'):
+            c = Client()
+            assert c.login(username=username, password='pass12345')
+            r = c.get(reverse('accounts:my_calendar'))
+            self.assertEqual(r.status_code, 302)
+            self.assertEqual(r.url, reverse('accounts:home'))
+        r = Client().get(reverse('accounts:my_calendar'))
+        self.assertEqual(r.status_code, 302)
+        self.assertIn('/login/', r.url)
+
+
+class InterviewerProfileTests(AuthAndRoleTestBase):
+    def _build_data(self):
+        job = _make_job(self.hr)
+        # jobs.signals auto-creates default rounds (Screening first), and
+        # JobApplication.save() sets current_round to the job's first round.
+        candidate = Candidate.objects.create(
+            first_name='Pat', last_name='Person', email='pat@example.com',
+        )
+        app = JobApplication.objects.create(
+            candidate=candidate, job=job, status='in_progress',
+            assigned_to=self.interviewer,
+            interview_at=timezone.now() + timedelta(days=1),
+            feedback_submitted=False,
+        )
+        # current_round auto-set to the first round on create.
+        return app
+
+    def test_hr_sees_profile_sections(self):
+        app = self._build_data()
+        InterviewerAvailability.objects.create(
+            interviewer=self.interviewer, weekday=3, start_time='13:00', end_time='17:00',
+        )
+        c = Client()
+        assert c.login(username='hr', password='pass12345')
+        r = c.get(reverse('accounts:interviewer_profile', args=[self.interviewer.pk]))
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.context['interviewer'], self.interviewer)
+        self.assertEqual(r.context['active_load'], 1)
+        self.assertEqual(r.context['pending_feedback_count'], 1)
+        self.assertEqual(len(r.context['upcoming_interviews']), 1)
+        self.assertContains(r, 'Thursday')
+        self.assertContains(r, 'Pat Person')
+
+    def test_management_has_read_access(self):
+        self._build_data()
+        c = Client()
+        assert c.login(username='mgmt', password='pass12345')
+        r = c.get(reverse('accounts:interviewer_profile', args=[self.interviewer.pk]))
+        self.assertEqual(r.status_code, 200)
+
+    def test_interviewer_redirected(self):
+        self._build_data()
+        c = Client()
+        assert c.login(username='iv', password='pass12345')
+        r = c.get(reverse('accounts:interviewer_profile', args=[self.interviewer.pk]))
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(r.url, reverse('accounts:home'))
+
+    def test_requires_login(self):
+        r = Client().get(reverse('accounts:interviewer_profile', args=[self.interviewer.pk]))
+        self.assertEqual(r.status_code, 302)
+        self.assertIn('/login/', r.url)
+
+
+class SeniorityEligibilityTests(AuthAndRoleTestBase):
+    """User.meets_seniority_for and the combined is_fully_eligible_for rule."""
+
+    def _job(self, seniority):
+        return _make_job(self.hr, seniority=seniority)
+
+    def test_blank_seniority_treated_as_junior(self):
+        """An interviewer with blank seniority fails the floor on a senior job."""
+        job = self._job('senior')
+        self.interviewer.seniority = ''
+        self.interviewer.specialty = 'Engineering'
+        self.interviewer.save()
+        self.assertFalse(self.interviewer.meets_seniority_for(job))
+        # Specialty matches, so the seniority rule is what blocks.
+        self.assertTrue(self.interviewer.is_eligible_interviewer_for(job))
+        self.assertFalse(self.interviewer.is_fully_eligible_for(job))
+
+    def test_senior_passes_senior_job_and_fails_lead(self):
+        job = self._job('senior')
+        self.interviewer.seniority = 'senior'
+        self.interviewer.save()
+        self.assertTrue(self.interviewer.meets_seniority_for(job))
+        lead_job = self._job('lead')
+        self.assertFalse(self.interviewer.meets_seniority_for(lead_job))
+
+    def test_fully_eligible_combines_domain_and_seniority(self):
+        eng_job = self._job('mid')
+        design_job = _make_job(self.hr, title='Product Designer', department='Design')
+        design_job.seniority = 'mid'
+        design_job.save()
+        self.interviewer.seniority = 'senior'
+        self.interviewer.specialty = 'Engineering'
+        self.interviewer.save()
+        self.assertTrue(self.interviewer.is_fully_eligible_for(eng_job))
+        self.assertFalse(self.interviewer.is_fully_eligible_for(design_job))

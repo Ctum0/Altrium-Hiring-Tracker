@@ -2,8 +2,8 @@
 {% if preview %}
   <div class="slot-preview-card glass-panel" style="padding:var(--sp-3);margin-top:var(--sp-2);font-size:var(--text-xs)">
     {% if not preview.role_fit %}
-      <span class="badge badge-rejected">Specialty mismatch</span>
-      <span class="text-muted">Not qualified for {{ app.job.department|default:app.job.title }} — assignment will be blocked.</span>
+      <span class="badge badge-rejected">Not a match</span>
+      <span class="text-muted">Specialty or seniority does not meet this role's requirement — assignment will be blocked.</span>
     {% elif not preview.has_windows %}
       <span class="badge badge-feedback">No availability</span>
       <span class="text-muted">No weekly windows on file — assignment will be blocked.</span>

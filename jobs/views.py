@@ -5,13 +5,17 @@ from django.db.utils import IntegrityError
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views import View
-from django.views.generic import CreateView, DeleteView, DetailView, ListView, UpdateView
+from django.views.generic import CreateView, DeleteView, DetailView, ListView, TemplateView, UpdateView
 
+from ai.matching import auto_apply
+from candidates.models import JobApplication
 from feedback.models import InterviewFeedback
 
 from .forms import JobForm, RoundForm
 from .models import InterviewRound, Job
+from .talent_pool import find_suggestions
 
 
 class JobListView(LoginRequiredMixin, ListView):
@@ -60,8 +64,9 @@ class JobCreateView(LoginRequiredMixin, CreateView):
 
     def form_valid(self, form):
         form.instance.created_by = self.request.user
+        response = super().form_valid(form)
         messages.success(self.request, f'Job "{form.instance.title}" created.')
-        return super().form_valid(form)
+        return redirect('jobs:rounds_setup', pk=form.instance.pk)
 
 
 class JobEditView(LoginRequiredMixin, UpdateView):
@@ -133,16 +138,161 @@ class JobDetailView(LoginRequiredMixin, DetailView):
     template_name = 'jobs/job_detail.html'
     context_object_name = 'job'
 
+    def get_queryset(self):
+        return Job.objects.select_related('hiring_manager', 'created_by')
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['active_nav'] = 'jobs'
-        context['rounds'] = self.object.rounds.all()
+        job = self.object
+        rounds = list(job.rounds.all())
+        round_ids = [r.pk for r in rounds]
+        # Per-round aggregates in 2 queries total (1 grouped count, 1 row
+        # scan) instead of one query per round. Interviewer names and the
+        # earliest scheduled interview are folded onto each round here so
+        # the template stays query-free.
+        counts = (
+            JobApplication.objects.filter(current_round_id__in=round_ids)
+            .values('current_round_id')
+            .annotate(n=Count('pk'))
+        )
+        count_by_round = {row['current_round_id']: row['n'] for row in counts}
+        apps_in_rounds = (
+            JobApplication.objects.filter(current_round_id__in=round_ids)
+            .select_related('assigned_to')
+        )
+        detail_by_round = {
+            rid: {'interviewers': [], 'next_interview_at': None}
+            for rid in round_ids
+        }
+        for app in apps_in_rounds:
+            entry = detail_by_round[app.current_round_id]
+            if app.assigned_to_id:
+                name = app.assigned_to.get_full_name() or app.assigned_to.username
+                if name not in entry['interviewers']:
+                    entry['interviewers'].append(name)
+            if app.interview_at and (
+                entry['next_interview_at'] is None
+                or app.interview_at < entry['next_interview_at']
+            ):
+                entry['next_interview_at'] = app.interview_at
+        for r in rounds:
+            d = detail_by_round[r.pk]
+            r.candidate_count = count_by_round.get(r.pk, 0)
+            r.assigned_interviewers = d['interviewers']
+            r.next_interview_at = d['next_interview_at']
+        context['rounds'] = rounds
         context['round_form'] = RoundForm()
         context['can_edit'] = self.request.user.is_hr()
         context['requirements_list'] = [
-            s.strip() for s in self.object.requirements.split(',') if s.strip()
+            s.strip() for s in job.requirements.split(',') if s.strip()
         ]
+        if self.request.user.is_hr():
+            context['talent_pool_suggestions'] = find_suggestions(job)
         return context
+
+
+class RoundsSetupView(LoginRequiredMixin, TemplateView):
+    """Rounds-in-creation step: configure rounds inline before job detail."""
+
+    template_name = 'jobs/rounds_setup.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
+        if not request.user.is_hr():
+            return redirect('jobs:list')
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        job = get_object_or_404(Job, pk=self.kwargs['pk'])
+        context['job'] = job
+        context['rounds'] = job.rounds.all()
+        context['round_form'] = RoundForm()
+        context['active_nav'] = 'jobs'
+        return context
+
+
+class TalentPoolAddView(LoginRequiredMixin, View):
+    """Re-engage a talent-pool suggestion: link the candidate to this job.
+
+    HR-only, idempotent via get_or_create. The new application is scored
+    against the new job's requirements and auto-rejected when it falls
+    below the job's auto-reject baseline, mirroring CV upload/import.
+    """
+
+    def post(self, request, pk, application_pk):
+        job = get_object_or_404(Job, pk=pk)
+        if not request.user.is_hr():
+            messages.error(request, 'Only HR can add candidates from the talent pool.')
+            return redirect('jobs:list')
+
+        old_application = get_object_or_404(
+            JobApplication, pk=application_pk, job__is_active=False
+        )
+        application, created = JobApplication.objects.get_or_create(
+            candidate=old_application.candidate,
+            job=job,
+            defaults={'status': JobApplication.Status.NEW},
+        )
+        candidate = old_application.candidate
+        if job.requirements.strip() and candidate.skills.strip():
+            application.shortlist_score = auto_apply(candidate, job)
+        if (
+            job.auto_reject_score is not None
+            and application.status == JobApplication.Status.NEW
+            and application.shortlist_score is not None
+            and application.shortlist_score < job.auto_reject_score
+        ):
+            application.status = JobApplication.Status.REJECTED
+        application.save(update_fields=['shortlist_score', 'status', 'updated_at'])
+        messages.success(
+            request,
+            f'{candidate.full_name} added to "{job.title}"'
+            + ('' if created else ' (already on this job).'),
+        )
+        return redirect('jobs:detail', pk=job.pk)
+
+
+class RoundReorderView(LoginRequiredMixin, View):
+    """Apply inline reorder edits from the rounds-setup step.
+
+    Accepts one ``order_<pk>`` field per round, then renormalizes the
+    sequence to 1..N (sorted by requested order, then current order) so
+    duplicate or gapped inputs can never collide.
+    """
+
+    def post(self, request, pk):
+        job = get_object_or_404(Job, pk=pk)
+        if not request.user.is_hr():
+            messages.error(request, 'Only HR can reorder rounds.')
+            return redirect('jobs:list')
+
+        requested = {}
+        for r in job.rounds.all():
+            raw = request.POST.get(f'order_{r.pk}', '')
+            try:
+                requested[r.pk] = int(raw)
+            except (TypeError, ValueError):
+                continue
+        rounds = sorted(
+            job.rounds.all(),
+            key=lambda r: (requested.get(r.pk, r.order), r.order, r.pk),
+        )
+        for index, r in enumerate(rounds, start=1):
+            if r.order != index:
+                r.order = index
+                r.save(update_fields=['order'])
+        messages.success(request, 'Round order updated.')
+        return redirect(self._safe_next(request) or reverse('jobs:detail', kwargs={'pk': job.pk}))
+
+    @staticmethod
+    def _safe_next(request):
+        next_url = request.POST.get('next')
+        if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
+            return next_url
+        return None
 
 
 class RoundCreateView(LoginRequiredMixin, CreateView):
@@ -189,6 +339,9 @@ class RoundCreateView(LoginRequiredMixin, CreateView):
         return context
 
     def get_success_url(self):
+        next_url = self.request.POST.get('next')
+        if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={self.request.get_host()}):
+            return next_url
         return reverse('jobs:detail', kwargs={'pk': self.object.job_id})
 
 
@@ -221,4 +374,7 @@ class RoundDeleteView(LoginRequiredMixin, DeleteView):
         return response
 
     def get_success_url(self):
+        next_url = self.request.POST.get('next')
+        if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={self.request.get_host()}):
+            return next_url
         return reverse('jobs:detail', kwargs={'pk': self.object.job_id})

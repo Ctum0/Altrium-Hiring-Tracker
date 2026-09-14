@@ -284,3 +284,26 @@ GROQ_MODEL = _env('GROQ_MODEL', default='llama-3.3-70b-versatile')
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# ---------------------------------------------------------------------------
+# Email (Sprint 2 Phase 1/2: mail foundation — see SPRINT2_READINESS_AUDIT.md)
+# ---------------------------------------------------------------------------
+# Backend selection is deliberately forgiving so local development never
+# breaks:
+#   * DEBUG=True (default): console backend — rendered emails print to the
+#     runserver log instead of being delivered.
+#   * DEBUG=False and EMAIL_HOST is unset: still console. A misconfigured
+#     production deploy must not crash on boot; it just logs.
+#   * DEBUG=False and EMAIL_HOST is set: real SMTP via the EMAIL_* vars below
+#     (all read through the same _env() pattern as every other setting, so
+#     both Render env vars and the local .env file work identically).
+if EMAIL_HOST := _env('EMAIL_HOST', default=''):
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+    EMAIL_PORT = _env('EMAIL_PORT', default='587', cast=int)
+    EMAIL_HOST_USER = _env('EMAIL_HOST_USER', default='')
+    EMAIL_HOST_PASSWORD = _env('EMAIL_HOST_PASSWORD', default='')
+    EMAIL_USE_TLS = _env('EMAIL_USE_TLS', default=True, cast=bool)
+else:
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+DEFAULT_FROM_EMAIL = _env('DEFAULT_FROM_EMAIL', default='altrium-tracker@noreply.local')

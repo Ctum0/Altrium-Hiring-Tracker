@@ -5,10 +5,37 @@ from django.urls import reverse
 
 
 class Job(models.Model):
+    class Domain(models.TextChoices):
+        ENGINEERING = 'engineering', 'Engineering'
+        INFRASTRUCTURE = 'infrastructure', 'Infrastructure'
+        QUALITY_ASSURANCE = 'quality_assurance', 'Quality Assurance'
+        DESIGN = 'design', 'Design'
+        PRODUCT = 'product', 'Product'
+        DATA = 'data', 'Data'
+        OTHER = 'other', 'Other'
+
+    class Seniority(models.TextChoices):
+        JUNIOR = 'junior', 'Junior'
+        MID = 'mid', 'Mid'
+        SENIOR = 'senior', 'Senior'
+        LEAD = 'lead', 'Lead'
+
     title = models.CharField(max_length=200)
     department = models.CharField(
         max_length=100, blank=True, default='',
         help_text='e.g. Engineering, Design, Marketing',
+    )
+    domain = models.CharField(
+        max_length=20,
+        choices=Domain.choices,
+        default=Domain.OTHER,
+        help_text='Structured functional domain, used for interviewer matching and talent-pool search.',
+    )
+    seniority = models.CharField(
+        max_length=10,
+        choices=Seniority.choices,
+        default=Seniority.MID,
+        help_text='Required seniority level. Only interviewers at or above this level can be assigned.',
     )
     description = models.TextField(blank=True)
     requirements = models.TextField(

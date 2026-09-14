@@ -40,7 +40,10 @@ class CandidatesBaseTestCase(TestCase):
             interviewer=self.interviewer,
             weekday=0, start_time=time(9, 0), end_time=time(12, 0),
         )
-        self.job = Job.objects.create(title='Backend', created_by=self.hr)
+        # seniority defaults to 'mid': existing test interviewers (blank
+        # seniority -> treated as junior) must still be assignable, so the
+        # base job must not require more than mid.
+        self.job = Job.objects.create(title='Backend', created_by=self.hr, seniority='mid')
         self.round1 = InterviewRound.objects.create(job=self.job, name='Screen', order=1)
         self.round2 = InterviewRound.objects.create(job=self.job, name='Tech', order=2)
         self.candidate = Candidate.objects.create(
@@ -702,7 +705,7 @@ class SlotPreviewTests(CandidatesBaseTestCase):
             reverse('candidates:interviewer_slots', args=[self.application.pk]),
             {'interviewer': self.interviewer.pk},
         )
-        self.assertContains(response, 'Specialty mismatch')
+        self.assertContains(response, 'Not a match')
 
     def test_slot_preview_shows_free_slots_for_fit(self):
         # Interviewer has Monday 09:00-12:00; Monday slots must be offered.

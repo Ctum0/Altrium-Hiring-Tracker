@@ -1,12 +1,62 @@
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from jobs.models import Job
 
 
 class Role(models.TextChoices):
     HR = 'HR', 'Human Resources'
     INTERVIEWER = 'IV', 'Interviewer'
     MANAGEMENT = 'MGMT', 'Management'
+
+
+class Seniority(models.TextChoices):
+    JUNIOR = 'junior', 'Junior'
+    MID = 'mid', 'Mid'
+    SENIOR = 'senior', 'Senior'
+    LEAD = 'lead', 'Lead'
+
+    @classmethod
+    def rank(cls, value):
+        """Numeric rank for seniority comparison; 0 for blank/unknown."""
+        order = {cls.JUNIOR: 1, cls.MID: 2, cls.SENIOR: 3, cls.LEAD: 4}
+        return order.get(value, 0)
+
+
+def _domain_from_department(department: str) -> str:
+    """Map a legacy free-text department/specialty to the closest Job.Domain choice."""
+    d = (department or '').strip().lower()
+    if not d:
+        return ''
+    if 'qa' in d or 'quality' in d or 'test' in d:
+        return 'quality_assurance'
+    if 'infra' in d or 'devops' in d or 'sre' in d or 'operation' in d:
+        return 'infrastructure'
+    if 'design' in d or 'ux' in d or 'ui' in d:
+        return 'design'
+    if 'product' in d:
+        return 'product'
+    if 'data' in d or 'analytic' in d or 'ml' in d:
+        return 'data'
+    if 'engineer' in d or 'develop' in d or 'software' in d or 'backend' in d or 'frontend' in d:
+        return 'engineering'
+    return 'other'
+
+
+def _seniority_from_title(title: str) -> str:
+    """Heuristic seniority from a legacy job title; defaults to mid."""
+    t = (title or '').lower()
+    if 'lead' in t or 'principal' in t or 'staff' in t or 'head ' in t or 'director' in t:
+        return 'lead'
+    if 'senior' in t or 'sr.' in t or 'sr ' in t:
+        return 'senior'
+    if 'junior' in t or 'jr.' in t or 'jr ' in t or 'entry' in t or 'graduate' in t or 'intern' in t:
+        return 'junior'
+    return 'mid'
+
+
+def _specialty_to_domain(specialty: str) -> str:
+    return _domain_from_department(specialty)
 
 
 class User(AbstractUser):
@@ -16,6 +66,20 @@ class User(AbstractUser):
         blank=True,
         default='',
         help_text='Functional area this interviewer covers (e.g. Engineering, Design, QA).',
+    )
+    seniority = models.CharField(
+        max_length=10,
+        choices=Seniority.choices,
+        blank=True,
+        default='',
+        help_text='Interviewer seniority level. Must be at or above the job requirement to be assignable.',
+    )
+    domain = models.CharField(
+        max_length=20,
+        choices=Job.Domain.choices,
+        blank=True,
+        default='',
+        help_text='Structured domain, aligned with Job.Domain. Blank maps to blank (generalist).',
     )
 
     def is_hr(self) -> bool:
@@ -64,6 +128,36 @@ class User(AbstractUser):
             return True
         return specialty in department or department in specialty
 
+    def meets_seniority_for(self, job) -> bool:
+        """True when this interviewer's seniority is at or above the job's.
+
+        Blank job seniority imposes no constraint. A blank interviewer
+        seniority (HR has not classified this person yet) is treated as
+        unclassified rather than junior: compatible with junior and mid
+        roles, but never with senior/lead roles. This keeps existing
+        unclassified interviewers working on mid-level work while still
+        enforcing the seniority floor where it matters (junior interviewer,
+        senior job). HR should classify everyone via onboarding or admin.
+        """
+        required = getattr(job, 'seniority', '') or ''
+        mine = (self.seniority or '').strip()
+        if not required:
+            return True
+        if not mine:
+            return Seniority.rank(Seniority.MID) >= Seniority.rank(required)
+        return Seniority.rank(mine) >= Seniority.rank(required)
+
+    def is_fully_eligible_for(self, job) -> bool:
+        """Combined assignment eligibility: role-match AND seniority.
+
+        True when the interviewer passes both the specialty/department
+        match (is_eligible_interviewer_for) and the seniority floor
+        (meets_seniority_for). This is the rule assignment dropdowns and
+        server-side saves should use from Phase 3 onward so juniors can
+        no longer be assigned above their level; callers currently using
+        is_eligible_interviewer_for alone should migrate here.
+        """
+        return self.is_eligible_interviewer_for(job) and self.meets_seniority_for(job)
 
 
 class InterviewerAvailability(models.Model):
@@ -85,8 +179,8 @@ class InterviewerAvailability(models.Model):
     interviewer = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name='availability_windows',
         limit_choices_to={'role': Role.INTERVIEWER},
+        related_name='availability_windows',
     )
     weekday = models.IntegerField(choices=Weekday.choices)
     start_time = models.TimeField()

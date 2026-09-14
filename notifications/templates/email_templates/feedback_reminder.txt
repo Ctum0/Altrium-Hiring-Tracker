@@ -1,0 +1,9 @@
+{% extends "email_templates/base.txt" %}
+{% block greeting %}Hello {{ interviewer_name }},{% endblock %}
+{% block content %}
+This is a friendly reminder that your interview feedback for {{ candidate_name }} ({{ job_title }}) is still pending.
+
+Round: {{ round_name }}
+
+Please submit your feedback in the Altrium Hiring Tracker so the hiring team can move the candidate to the next step.
+{% endblock %}

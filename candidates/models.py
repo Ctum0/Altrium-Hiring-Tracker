@@ -234,7 +234,7 @@ class JobApplication(models.Model):
         return [
             user
             for user in User.objects.filter(role='IV', is_active=True).order_by('first_name', 'last_name')
-            if user.is_eligible_interviewer_for(self.job)
+            if user.is_fully_eligible_for(self.job)
         ]
 
     @property

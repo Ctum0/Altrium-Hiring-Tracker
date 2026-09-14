@@ -1,0 +1,6 @@
+{% extends "email_templates/base.txt" %}
+{% block content %}
+Congratulations — we are delighted to tell you that you have been selected for the {{ job_title }} position. Welcome to the team!
+
+Your hiring coordinator will reach out shortly with the offer details and onboarding next steps.
+{% endblock %}

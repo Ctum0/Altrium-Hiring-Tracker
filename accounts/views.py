@@ -1,13 +1,21 @@
+from itertools import groupby
+
+from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth import views as auth_views
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Avg, Count, Q
-from django.shortcuts import redirect
+from django.http import HttpResponse
+from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
-from django.views.generic import ListView, RedirectView, TemplateView, View
+from django.views.generic import (
+    CreateView, DetailView, ListView, RedirectView, TemplateView, View,
+)
 
-from accounts.models import Role
+from accounts.forms import AvailabilityWindowForm, OnboardUserForm
+from accounts.models import InterviewerAvailability, Role
+
 from candidates.models import Candidate, JobApplication
 from jobs.models import Job
 from pipeline.models import PipelineMove
@@ -606,3 +614,185 @@ class DeactivateInterviewerView(LoginRequiredMixin, View):
             f'Active assignments are listed on the offboarding page.',
         )
         return redirect('accounts:interviewer_roster')
+
+
+class HRRequiredMixin:
+    """Dispatch gate: full access for HR; other roles bounce to home.
+
+    Mirrors the role check in InterviewerRosterView.dispatch(). Management
+    keeps read-only oversight of the roster, so anything that mutates
+    interviewer data is restricted to HR only.
+    """
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
+        if not request.user.is_hr():
+            return redirect('accounts:home')
+        return super().dispatch(request, *args, **kwargs)
+
+
+class OnboardUserView(LoginRequiredMixin, HRRequiredMixin, CreateView):
+    """HR creates a new account (interviewer / HR / management) directly.
+
+    Sets the initial password chosen by HR, then routes HR to the roster
+    where the new interviewer shows up with their matching fields.
+    """
+
+    template_name = 'accounts/onboard_user.html'
+    form_class = OnboardUserForm
+
+    def get_initial(self):
+        return {'role': Role.INTERVIEWER}
+
+    def form_valid(self, form):
+        user = form.save()
+        role_label = user.get_role_display()
+        messages.success(
+            self.request,
+            f'{user.get_full_name() or user.username} has been onboarded as '
+            f'{role_label}.',
+        )
+        return redirect('accounts:interviewer_roster')
+
+
+class MyAvailabilityView(LoginRequiredMixin, TemplateView):
+    """Interviewer self-service for their recurring weekly windows.
+
+    There is no pk parameter by design: an interviewer can only ever see
+    and edit their own windows (request.user is the owner).
+    """
+
+    template_name = 'accounts/my_availability.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
+        if not request.user.is_interviewer():
+            return redirect('accounts:home')
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_windows(self):
+        return self.request.user.availability_windows.order_by('weekday', 'start_time')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        windows = self.get_windows()
+        weekdays = InterviewerAvailability.Weekday
+        grouped = [
+            (label, list(rows))
+            for label, rows in groupby(windows, key=lambda w: w.get_weekday_display())
+        ]
+        context['weekday_groups'] = grouped
+        context['has_availability'] = windows.exists()
+        context['form'] = kwargs.get('form') or AvailabilityWindowForm()
+        context['active_nav'] = 'availability'
+        return context
+
+    def get(self, request, *args, **kwargs):
+        return self.render_to_response(self.get_context_data())
+
+    def post(self, request, *args, **kwargs):
+        if 'remove' in request.POST:
+            window = get_object_or_404(
+                InterviewerAvailability,
+                pk=request.POST['remove'],
+                interviewer=request.user,
+            )
+            window.delete()
+            messages.success(request, 'Availability window removed.')
+            return redirect('accounts:my_availability')
+        form = AvailabilityWindowForm(request.POST)
+        if form.is_valid():
+            saved = form.save_for(request.user)
+            if saved is not None:
+                messages.success(request, 'Availability window added.')
+                return redirect('accounts:my_availability')
+        # Re-render with errors plus the current windows (post-save state).
+        return self.render_to_response(self.get_context_data(form=form))
+
+
+class MyCalendarView(LoginRequiredMixin, TemplateView):
+    """Interviewer's own booked interviews grouped by date."""
+
+    template_name = 'accounts/my_calendar.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
+        if not request.user.is_interviewer():
+            return redirect('accounts:home')
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        booked = (
+            JobApplication.objects
+            .filter(assigned_to=self.request.user, interview_at__isnull=False)
+            .exclude(status__in=['hired', 'rejected'])
+            .select_related('candidate', 'job', 'current_round')
+            .order_by('interview_at')
+        )
+        days = []
+        for date, apps in groupby(booked, key=lambda app: timezone.localdate(app.interview_at)):
+            days.append({'date': date, 'apps': list(apps)})
+        context['calendar_days'] = days
+        context['active_nav'] = 'calendar'
+        return context
+
+
+class InterviewerProfileView(LoginRequiredMixin, DetailView):
+    """HR/Management profile of one interviewer: matching fields, weekly
+    availability, current load, pending feedback, upcoming interviews.
+
+    Role-mirrors InterviewerRosterView: HR and Management have read access;
+    interviewers are redirected to home.
+    """
+
+    template_name = 'accounts/interviewer_profile.html'
+    context_object_name = 'interviewer'
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
+        if not (request.user.is_hr() or request.user.is_management()):
+            return redirect('accounts:home')
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_queryset(self):
+        return User.objects.filter(role=Role.INTERVIEWER)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        interviewer = self.object
+
+        work_qs = JobApplication.objects.exclude(status__in=['hired', 'rejected', 'on_hold'])
+        active_load = (
+            work_qs.filter(Q(assigned_to=interviewer) | Q(panel_interviewers=interviewer))
+            .distinct()
+            .count()
+        )
+        pending_feedback = (
+            JobApplication.objects
+            .filter(assigned_to=interviewer, feedback_submitted=False, current_round__isnull=False)
+            .exclude(status__in=['hired', 'rejected'])
+            .count()
+        )
+        upcoming = (
+            JobApplication.objects
+            .filter(
+                Q(assigned_to=interviewer) | Q(panel_interviewers=interviewer),
+                interview_at__isnull=False,
+                interview_at__gte=timezone.now(),
+            )
+            .exclude(status__in=['hired', 'rejected'])
+            .select_related('candidate', 'job', 'current_round')
+            .order_by('interview_at')[:10]
+        )
+
+        context['availability_windows'] = interviewer.availability_windows.all()
+        context['active_load'] = active_load
+        context['pending_feedback_count'] = pending_feedback
+        context['upcoming_interviews'] = upcoming
+        context['active_nav'] = 'roster'
+        return context

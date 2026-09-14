@@ -10,6 +10,9 @@ class InterviewRoundInline(admin.TabularInline):
 
 @admin.register(Job)
 class JobAdmin(admin.ModelAdmin):
-    list_display = ('title', 'is_active', 'hiring_manager', 'created_by', 'created_at')
-    list_filter = ('is_active',)
+    list_display = (
+        'title', 'domain', 'seniority', 'is_active', 'hiring_manager',
+        'created_by', 'created_at',
+    )
+    list_filter = ('is_active', 'domain', 'seniority')
     inlines = [InterviewRoundInline]

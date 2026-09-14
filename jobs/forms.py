@@ -27,8 +27,9 @@ class JobForm(forms.ModelForm):
     class Meta:
         model = Job
         fields = [
-            'title', 'department', 'description', 'requirements',
-            'auto_reject_score', 'num_openings', 'hiring_manager',
+            'title', 'department', 'domain', 'seniority', 'description',
+            'requirements', 'auto_reject_score', 'num_openings',
+            'hiring_manager',
         ]
         widgets = {
             'title': forms.TextInput(attrs={
@@ -39,6 +40,8 @@ class JobForm(forms.ModelForm):
                 'class': 'form-input',
                 'placeholder': 'e.g. Engineering, Design, Marketing',
             }),
+            'domain': forms.Select(attrs={'class': 'form-select'}),
+            'seniority': forms.Select(attrs={'class': 'form-select'}),
             'description': forms.Textarea(attrs={
                 'class': 'form-textarea',
                 'placeholder': 'Describe the role, team, and what you are looking for.',
@@ -72,6 +75,18 @@ class JobForm(forms.ModelForm):
             'Used to match interviewer specialties (e.g. an Engineering job '
             'is interviewed by Engineering-specialty interviewers).'
         )
+        self.fields['domain'].help_text = (
+            'Structured functional domain, used for interviewer matching and '
+            'talent-pool search.'
+        )
+        self.fields['seniority'].help_text = (
+            'Only interviewers at or above this level can be assigned.'
+        )
+        # Selects always submit a value from browsers, but programmatic
+        # posts may omit them; keep them optional so the model defaults
+        # ('other' / 'mid') apply, exactly as an unselected select would.
+        self.fields['domain'].required = False
+        self.fields['seniority'].required = False
 
     def clean(self):
         cleaned = super().clean()

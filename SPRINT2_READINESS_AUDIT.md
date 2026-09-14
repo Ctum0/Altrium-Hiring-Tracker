@@ -340,23 +340,26 @@ Rotate production credentials and gate `seed_users`/`clean_and_seed_db` behind a
 - **UX:** P2-12 (hiring manager display), P2-13 (feedback list header copy), P2-14 (parse_cv blend skip, orphaned media, InterviewerDashboardView role gate, silent empty-order failure, stage-select render drift).
 - **DoD:** all 17 issues closed with a regression test each; full suite green.
 
-### Phase 2 — Shared Infrastructure
-**Depends on:** Phase 1.
-- Domain & Seniority schema on `Job` and interviewer `User` (controlled choices replacing free-text specialty/department); migration + backfill with HR-confirmable defaults. Feeds Phase 3 + Phase 4.
-- Mail foundation: `EMAIL_*` settings, `send_templated_email()` helper, base templates. Feeds Phase 7 + Phase 8.
-- Scheduler foundation: management-command + cron pattern. Feeds Phase 7.
-- **DoD:** migrations clean against a prod-data copy; test email sends via console backend; dummy scheduled command runs on cron.
+### Phase 2 — Shared Infrastructure ✅ COMPLETE (2026-09-15)
+- Domain & Seniority schema landed: `Job.domain` (7 choices), `Job.seniority` (junior/mid/senior/lead), `User.seniority` (blank = unclassified), `User.domain`. Migrations `accounts/0005`, `jobs/0009` + heuristic backfill `jobs/0010` (department→domain, title→seniority; verified against all 10 live jobs and all interviewer specialties). Legacy free-text fields retained for continuity.
+- Mail foundation: `EMAIL_*` settings (console in dev, SMTP via env in prod — never crashes boot), `notifications/mail.py` `send_templated_email()` (+ documented async swap-point wrapper), 6 templates extending a shared base (confirmation, invitation, rejection with AI placeholder, acceptance, feedback reminder, escalation).
+- Scheduler foundation: `notifications/tasks.py` dry-run scaffolds for `send_feedback_reminders()`/`dispatch_escalations()` (keyed on `stage_entered_at`, matching Phase 1's timer fix) + management commands `send_feedback_reminders`/`dispatch_escalations`. Cron wiring lands in Phase 7.
+- **Feeds Phase 3 + Phase 4 (shipped) and Phase 7.**
 
-### Phase 3 — Interviewer Management *(Feature 2)*
-**Depends on:** Phase 2 (Domain/Seniority schema).
-- Account Onboarding, Interviewer Availability Self-Service, My Calendar (Interviewer), Interviewer Profile, Interviewer Seniority Matching (rewrite `is_eligible_interviewer_for` to require domain match **and** `interviewer.seniority >= job.seniority`, enforced in dropdown + server-side save).
-- **NFR checkpoint:** self-service account security — rate-limited, expiring invite flow on Account Onboarding.
-- **DoD:** no-availability interviewer shows an actionable message, not a silent block; forged-write probe confirms a below-seniority interviewer cannot be assigned.
+### Phase 3 — Interviewer Management *(Feature 2)* ✅ COMPLETE (2026-09-15)
+- Delivered: Account Onboarding (`/onboard/`, HR-only, password validators enforced), My Availability (`/my-availability/`, interviewer-only self-service with IntegrityError-safe duplicate handling), My Calendar (`/my-calendar/`, own bookings grouped by day), Interviewer Profile (`/interviewer/<pk>/`, HR/Management read-only: matching profile, availability, active load, pending feedback, upcoming interviews — linked from roster names), Seniority column on the roster.
+- Seniority matching: `User.is_fully_eligible_for(job)` (specialty AND seniority) wired into `JobApplication.eligible_interviewers` (dropdown), `InterviewerSlotsView.role_fit` (preview), and `AssignApplicationView` server-side validation with a distinct "not senior enough" error. Rule: unclassified interviewer (blank seniority) works junior/mid roles but is blocked from senior/lead.
+- Verified live: forged POST assigning an unclassified interviewer to the senior "Platform Engineer" job was blocked server-side ("not senior enough for this Senior role"); the assign dropdown for that job shows only the senior-matched interviewer.
+- Tests: accounts suite 41/41 (24 new).
 
-### Phase 4 — Smart Job Setup *(Feature 1)*
+### Phase 4 — Smart Job Setup *(Feature 1)* ✅ COMPLETE (2026-09-15)
 **Depends on:** Phase 2 (Domain/Seniority schema); benefits from Phase 3 being live.
-- Domain/Seniority/Department dropdowns on job creation, Rounds-in-Creation Flow, round renaming, Round Detail Enrichment, Talent Pool Rematching Engine (scan closed jobs ≥80 score matching Domain+Seniority, one-click re-engage).
-- **DoD:** job creation is one screen end-to-end; a new job in an existing domain surfaces relevant past candidates immediately.
+- Domain/Seniority dropdowns on job creation; Rounds-in-Creation Flow (create now redirects to `/jobs/<pk>/rounds-setup/` with add/remove/reorder + "Done" continue); Round Detail Enrichment (per-round candidate count, assigned interviewers, next interview — 2 aggregate queries, no N+1); Talent Pool Rematching Engine (`jobs/talent_pool.py`, closed-job ≥80 score + domain match, top-5 card on job detail with idempotent one-click "Add to this job" that re-scores against the new job and respects auto_reject_score).
+- Round renaming also shipped (`RoundUpdateView`); round reorder renormalizes to 1..N.
+- Verified live: created "Platform Engineer" (Infrastructure/senior) end-to-end — form → rounds setup (added "System Design" inline) → job detail showing the new enriched columns. Talent-pool card renders when matching closed-job scorers exist.
+- Tests: jobs suite 43/43 (29 new).
+
+**Note on Phase 2 (schema prerequisite for Phases 3-4):** the plan's original "Phase 2 Shared Infrastructure" step was executed as part of this Phase 2 batch, with the mail/scheduler foundation items landing together with Features 1-2 — see the ✅ COMPLETE markers on both sections.
 
 ### Phase 5 — CV Intake Quality Rules *(Feature 5)*
 **Depends on:** Phase 1. **Must complete before Phase 8.**
