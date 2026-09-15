@@ -768,7 +768,7 @@ a:hover {
 .main-content.dashboard-single-screen .status-dot-rejected { background: var(--status-rejected); box-shadow: 0 0 6px var(--status-rejected); }
 .main-content.dashboard-single-screen .status-dot-in_progress { background: var(--status-progress); box-shadow: 0 0 6px var(--status-progress); }
 .main-content.dashboard-single-screen .status-dot-shortlisted { background: var(--status-shortlisted); box-shadow: 0 0 6px var(--status-shortlisted); }
-.main-content.dashboard-single-screen .status-dot-new { background: var(--status-new); box-shadow: 0 0 6px var(--status-new); }
+.main-content.dashboard-single-screen .status-dot-new { background: var(--status-new); box-shadow: 0 0 6px rgba(34, 211, 238, 0.4); }
 .main-content.dashboard-single-screen .status-dot-on_hold { background: var(--status-hold); box-shadow: 0 0 6px var(--status-hold); }
 .main-content.dashboard-single-screen .activity-meta-row .badge { padding: var(--sp-1) var(--sp-2) !important; }
 .main-content.dashboard-single-screen .ref-jobs-list { justify-content: flex-start; flex: none; gap: var(--sp-2); }
@@ -1621,14 +1621,22 @@ a:hover {
   position: relative;
 }
 
-.notif-popover {
+.notif-popover.notif-popover {
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
   width: min(340px, calc(100vw - 32px));
   max-height: 400px;
   z-index: var(--z-dropdown);
-  background: var(--surface);
+  /* Opaque background: text-dense floating surfaces must fully occlude the
+     page. The glass --surface token is 0.38/0.58 alpha - fine for large
+     static cards, but rows here garbled with page content behind them in
+     both themes (rect-proven in UI_THEME_AUDIT). The element also carries
+     .glass-panel whose background would otherwise win the cascade, so the
+     selector is doubled for specificity. Keep the glass feel via the
+     existing border/shadow/blur, not via transparency. */
+  background: var(--bg);
+  background-image: none;
   opacity: 1 !important;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-lg);
@@ -1649,6 +1657,14 @@ a:hover {
     right: 16px;
     width: auto;
   }
+}
+
+/* Light theme: app.css:368 sets a 0.58-alpha !important background on
+   .glass-panel, which beats the doubled selector above and reintroduces
+   the bleed-through. Match its importance and specificity here. */
+:root[data-theme='light'] .notif-popover.notif-popover {
+  background: var(--bg) !important;
+  background-image: none !important;
 }
 
 .notif-popover-header {
@@ -2165,7 +2181,9 @@ a:hover {
   white-space: nowrap;
   position: sticky;
   top: 0;
-  background: var(--surface-2);
+  /* Opaque fill: --surface-2 is 0.65-alpha dark glass, which let scrolled
+     rows bleed through the sticky header (rect-proven). --bg is opaque. */
+  background: var(--bg);
   z-index: 1;
 }
 
@@ -2855,6 +2873,10 @@ a:hover {
 }
 
 .auth-preview-bar-track {
+  /* display:block required: as a bare inline span inside a grid column
+     the % width on the child .auth-preview-bar-fill resolved to 0,
+     rendering the decorative pipeline bars empty on the login hero. */
+  display: block;
   height: 8px;
   background: var(--surface);
   border-radius: 4px;
@@ -4153,6 +4175,7 @@ body.no-scroll {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  align-items: flex-start;
 }
 .cand-name-main {
   font-size: var(--text-sm);

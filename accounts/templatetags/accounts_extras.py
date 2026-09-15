@@ -1,4 +1,4 @@
-"""Template helpers for candidate avatars."""
+"""Template helpers for candidate avatars and name initials."""
 from django import template
 
 register = template.Library()
@@ -20,3 +20,23 @@ def get_item(dictionary, key):
     if dictionary is None:
         return None
     return dictionary.get(key)
+
+
+@register.filter
+def initials(value):
+    """Return 1-2 uppercase initials from a full name.
+
+    'Jane Auditwalk' -> 'JA'; 'Repro' -> 'R'; '' -> '?'.
+
+    Replaces the broken inline pattern
+    ``{{ name|first|upper }}{{ name|cut:' '|last|upper }}`` which
+    rendered the LAST CHARACTER of the name (``cut`` strips every
+    space, so ``|last`` hits the final letter) - e.g. Jane Auditwalk
+    rendered as 'Jk'.
+    """
+    tokens = [t for t in (value or '').split() if t]
+    if not tokens:
+        return '?'
+    first = tokens[0][0]
+    last = tokens[-1][0] if len(tokens) > 1 else ''
+    return (first + last).upper()

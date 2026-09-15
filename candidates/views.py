@@ -132,7 +132,16 @@ class CandidateListView(LoginRequiredMixin, ListView):
         )
         context['stages'] = JobApplication.Status.choices
         context['is_hr'] = self.request.user.is_hr()
-        context['needs_review_count'] = Candidate.objects.filter(needs_review=True).count()
+        # Count flagged APPLICATIONS (not candidates) so the badge matches
+        # the rows the Needs Review tab renders - one flagged candidate
+        # applied to N jobs shows N rows, and terminal-status applications
+        # are excluded the same way the Active tab excludes them.
+        context['needs_review_count'] = (
+            visible_applications(self.request.user)
+            .filter(candidate__needs_review=True)
+            .exclude(status__in=['hired', 'rejected'])
+            .count()
+        )
         context['filter_needs_review'] = self.request.GET.get('needs_review') == '1'
         return context
 

@@ -77,7 +77,7 @@
         <td>
           <div class="cand-name-cell">
             <div class="cand-avatar cand-avatar-{{ app.candidate.full_name|avatar_index }}" aria-hidden="true">
-              {{ app.candidate.full_name|first|upper }}{% if app.candidate.full_name|wordcount > 1 %}{{ app.candidate.full_name|cut:" "|last|upper }}{% endif %}
+              {{ app.candidate.full_name|initials }}
             </div>
             <div class="cand-name-info">
               <a href="{% url 'candidates:detail' app.candidate.pk %}" class="cand-name-main" style="text-decoration:none;color:inherit">{{ app.candidate.full_name }}</a>
