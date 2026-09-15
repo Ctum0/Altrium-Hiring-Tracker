@@ -101,7 +101,7 @@
           <th>Position</th>
           <th>Round</th>
           <th>Score</th>
-          <th>Interviewer</th>
+          {% if not is_interviewer %}<th>Interviewer</th>{% endif %}
           <th>Submitted</th>
         </tr>
       </thead>
@@ -123,7 +123,7 @@
           <td>
             <span class="score-ring {{ fb.score|score_ring_class }}">{{ fb.score }}</span>
           </td>
-          <td>{{ fb.interviewer.get_full_name|default:fb.interviewer.username }}</td>
+          {% if not is_interviewer %}<td>{{ fb.interviewer.get_full_name|default:fb.interviewer.username }}</td>{% endif %}
           <td class="text-muted text-xs">{{ fb.submitted_at|date:'M j, Y' }}</td>
         </tr>
         {% endfor %}

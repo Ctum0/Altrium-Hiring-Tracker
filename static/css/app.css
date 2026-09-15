@@ -8,19 +8,23 @@
 
 :root {
   /* ==========================================================================
-   *     FIGMA GLASSMORPHISM CYAN DASHBOARD DESIGN TOKENS (DARK MODE DEFAULT)
+   *     ALTRIUM GLASSMORPHISM DESIGN TOKENS (DARK MODE DEFAULT: true black)
    *     ========================================================================== */
-  --vui-bg-page-gradient: radial-gradient(ellipse at 50% 0%, #0a1b2e 0%, #05101e 50%, #020712 100%);
-  --vui-bg-body: #05101e;
-  --vui-bg-surface-dark: rgba(8, 22, 38, 0.65);
-  --vui-bg-surface-darker: rgba(5, 15, 27, 0.80);
-  
-  /* Glass Card Backgrounds (Satin Heavy Blur - Extracted from Reference Image) */
-  --vui-glass-card-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0.03) 100%), rgba(8, 24, 44, 0.38);
-  --vui-glass-card-bg-alt: linear-gradient(135deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.04) 100%), rgba(10, 28, 50, 0.45);
+  /* Canvas: near-black. The former deep-navy gradient (#0a1b2e/#05101e/
+     #020712) read as distinctly blue; the product direction is black.
+     #050507 keeps a hair of cool so pure-#000 OLED flatness is avoided. */
+  --vui-bg-page-gradient: radial-gradient(ellipse at 50% 0%, #0a0a0c 0%, #060608 50%, #020203 100%);
+  --vui-bg-body: #050507;
+  --vui-bg-surface-dark: rgba(10, 10, 12, 0.65);
+  --vui-bg-surface-darker: rgba(6, 6, 8, 0.80);
+
+  /* Glass Card Backgrounds: the navy tint inside the alpha layer is
+     replaced with neutral black; white-alpha satin top-coat unchanged. */
+  --vui-glass-card-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0.03) 100%), rgba(10, 10, 12, 0.38);
+  --vui-glass-card-bg-alt: linear-gradient(135deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.04) 100%), rgba(12, 12, 14, 0.45);
   --vui-glass-panel-light: linear-gradient(135deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.06) 100%);
-  --vui-glass-hover-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.20) 0%, rgba(255, 255, 255, 0.05) 100%), rgba(12, 34, 60, 0.50);
-  
+  --vui-glass-hover-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.20) 0%, rgba(255, 255, 255, 0.05) 100%), rgba(14, 14, 16, 0.50);
+
   /* Active / Highlight Surface */
   --vui-active-item-bg: linear-gradient(135deg, rgba(34, 211, 238, 0.25) 0%, rgba(2, 132, 199, 0.20) 100%);
   
@@ -121,8 +125,8 @@
 
   /* Neutrals */
   --bg: var(--vui-bg-body);
-  --bg-1: #092135;
-  --bg-2: #0B2B43;
+  --bg-1: #0a0a0c;
+  --bg-2: #131316;
   --bg-gradient: var(--vui-bg-page-gradient);
   --surface: var(--vui-glass-card-bg);
   --surface-2: var(--vui-bg-surface-dark);
@@ -868,7 +872,7 @@ a:hover {
   flex-direction: column;
   padding: 14px 16px;
   border-radius: var(--radius-md, 14px);
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0.03) 100%), rgba(8, 24, 44, 0.38);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0.03) 100%), rgba(10, 10, 12, 0.38);
   backdrop-filter: blur(50px) saturate(140%) brightness(105%);
   -webkit-backdrop-filter: blur(50px) saturate(140%) brightness(105%);
   border: 1px solid rgba(255, 255, 255, 0.16);
@@ -881,7 +885,7 @@ a:hover {
 
 .ai-insight-card:hover {
   transform: translateY(-3px);
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.05) 100%), rgba(12, 34, 60, 0.50);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.05) 100%), rgba(14, 14, 16, 0.50);
   border-color: rgba(255, 255, 255, 0.28);
   box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.38), 0 28px 65px rgba(0, 0, 0, 0.40);
 }
@@ -1058,9 +1062,10 @@ a:hover {
   font-size: 11px;
   font-weight: 600;
   color: var(--muted);
-  white-space: nowrap;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .ai-dist-track {
   height: 5px;

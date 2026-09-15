@@ -161,13 +161,13 @@
             <option value="">Move to…</option>
             <optgroup label="Advance to round">
             {% for round in app.job.rounds.all %}
-            <option value="round:{{ round.pk }}" {% if app.current_round_id == round.pk %}selected{% endif %}>{{ round.name }}</option>
+            <option value="round:{{ round.pk }}">{{ round.name }}</option>
             {% endfor %}
             </optgroup>
             <optgroup label="End candidacy">
-            <option value="status:hired" {% if app.status == 'hired' %}selected{% endif %}>Hired</option>
-            <option value="status:rejected" {% if app.status == 'rejected' %}selected{% endif %}>Rejected</option>
-            <option value="status:on_hold" {% if app.status == 'on_hold' %}selected{% endif %}>On Hold</option>
+            <option value="status:hired">Hired</option>
+            <option value="status:rejected">Rejected</option>
+            <option value="status:on_hold">On Hold</option>
             </optgroup>
           </select>
           {% else %}
