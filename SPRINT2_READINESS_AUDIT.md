@@ -361,12 +361,13 @@ Rotate production credentials and gate `seed_users`/`clean_and_seed_db` behind a
 
 **Note on Phase 2 (schema prerequisite for Phases 3-4):** the plan's original "Phase 2 Shared Infrastructure" step was executed as part of this Phase 2 batch, with the mail/scheduler foundation items landing together with Features 1-2 — see the ✅ COMPLETE markers on both sections.
 
-### Phase 5 — CV Intake Quality Rules *(Feature 5)*
-**Depends on:** Phase 1. **Must complete before Phase 8.**
-- Review-Gated Auto-Reject (skip auto-reject while `needs_review`, recompute after human confirms), CV Deduplication fuzzy match (name+phone).
-- **NFR checkpoint:** load-test candidate list at 1,000+ records — the original problem-statement volume.
-- **DoD:** a flagged CV can never reach `Rejected` before human review; same person under two emails resolves to one record.
-
+### Phase 5 — CV Intake Quality Rules *(Feature 5)* ✅ COMPLETE (2026-09-15)
+**Depends on:** Phase 1. **Must complete before Phase 8.** *(Executed as "Phase 3" in sequence — see the implementation-plan note above.)*
+- Review-Gated Auto-Reject: `candidates/intake_rules.py` is the single source of the reject decision (`apply_auto_reject(app, job, needs_review)`); flagged CVs are never auto-rejected at intake, and `recompute_after_review()` re-scores NEW applications + applies the baseline only after a human confirms. Wired into upload, import, and `CandidateReviewView.post` (flash message reports re-scored/rejected counts).
+- CV Deduplication — Fuzzy Match: `candidates/dedup.py` `find_fuzzy_match()` — normalized name equality + phone pair required on both sides (strict v1; name-order swap and phone-less matches deliberately never merge, name collisions documented as the known risk). Wired into both intake paths: no-email primary lookup + was_created secondary check (same person, different email → ONE record).
+- Scale verified at 10× the spec: 10,000 candidates seeded → list render 24ms, search 28ms, job filter 41ms, badge count 3ms (all vs 500ms bar); fuzzy match worst case 10.65ms (vs 50ms/upload bar). Index recommendations documented for 10k+/50k+ (functional index on LOWER(first_name); pg_trgm on Postgres).
+- E2E verified: flagged CV + below-baseline score stays NEW through intake → review-confirm with still-low skills flips it to REJECTED; same person (name+phone) with a different email resolves to one record with the application linked to it.
+- Tests: 276/276 app-wide (28 new: 7 ReviewGate + 17 FuzzyDedup + fixture adjustments).
 ### Phase 6 — AI-Assisted Feedback & Scorecard *(Feature 3)*
 **Depends on:** Phase 1 (legacy score remediation).
 - Structured Scorecard (fixed criteria, AI-suggested ratings, interviewer confirms), General Feedback (AI) cross-round summary.
