@@ -530,6 +530,11 @@ class InterviewerRosterView(LoginRequiredMixin, ListView):
 
     def dispatch(self, request, *args, **kwargs):
         # Read-only oversight for management; full view for HR.
+        # The is_authenticated check MUST come first: role helpers on
+        # AnonymousUser raise AttributeError, and dispatch runs before
+        # LoginRequiredMixin gets a chance to redirect.
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
         if not (request.user.is_hr() or request.user.is_management()):
             return redirect('accounts:home')
         return super().dispatch(request, *args, **kwargs)

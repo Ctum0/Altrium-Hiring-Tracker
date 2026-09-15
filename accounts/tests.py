@@ -622,6 +622,35 @@ class InterviewerProfileTests(AuthAndRoleTestBase):
         self.assertIn('/login/', r.url)
 
 
+
+class InterviewerRosterAccessTest(AuthAndRoleTestBase):
+    """InterviewerRosterView gating — including the anonymous 500 regression
+    where dispatch() called request.user.is_hr() before the login check
+    ran, crashing on AnonymousUser (caught by live UI audit)."""
+
+    def test_anonymous_redirects_to_login_not_500(self):
+        r = Client().get(reverse('accounts:interviewer_roster'))
+        self.assertEqual(r.status_code, 302)
+        self.assertIn('/login/', r.url)
+
+    def test_hr_can_access(self):
+        c = Client()
+        c.login(username='hr', password='pass12345')
+        r = c.get(reverse('accounts:interviewer_roster'))
+        self.assertEqual(r.status_code, 200)
+
+    def test_management_can_access(self):
+        c = Client()
+        c.login(username='mgmt', password='pass12345')
+        r = c.get(reverse('accounts:interviewer_roster'))
+        self.assertEqual(r.status_code, 200)
+
+    def test_interviewer_redirected_to_home(self):
+        c = Client()
+        c.login(username='iv', password='pass12345')
+        r = c.get(reverse('accounts:interviewer_roster'))
+        self.assertEqual(r.status_code, 302)
+
 class SeniorityEligibilityTests(AuthAndRoleTestBase):
     """User.meets_seniority_for and the combined is_fully_eligible_for rule."""
 
