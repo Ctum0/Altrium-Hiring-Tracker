@@ -1,7 +1,9 @@
-from django.contrib.auth import get_user_model
-from django.test import TestCase
-from django.urls import reverse
+from unittest.mock import patch
 
+from django.contrib.auth import get_user_model
+from django.core import mail
+from django.test import TestCase, override_settings
+from django.urls import reverse
 from accounts.models import Role
 from candidates.models import Candidate, JobApplication
 from feedback.models import InterviewFeedback
@@ -183,3 +185,88 @@ class PipelineTests(TestCase):
         self.app.refresh_from_db()
         self.assertEqual(self.app.current_round, self.round1)
         self.assertEqual(self.app.status, JobApplication.Status.NEW)
+
+
+class PipelineMailTriggerTests(TestCase):
+    """Feature 4: rejection (AI-personalized) and acceptance emails on
+    terminal pipeline moves. A mail failure must never fail the move."""
+
+    def setUp(self):
+        self.hr = User.objects.create_user(
+            username='hr', password='pass12345', role=Role.HR
+        )
+        self.job = Job.objects.create(title='Dev', created_by=self.hr)
+        self.cand = Candidate.objects.create(email='a@example.com', first_name='Anna')
+        self.app = JobApplication.objects.create(candidate=self.cand, job=self.job)
+        # Jobs auto-create default rounds via signal; a terminal move from
+        # a round without feedback is gated (409). Mirror PipelineTests:
+        # the application sits outside any round for these tests.
+        self.app.current_round = None
+        self.app.save(update_fields=['current_round'])
+
+    def _move(self, stage):
+        assert self.client.login(username='hr', password='pass12345')
+        return self.client.post(reverse('pipeline:move', args=[self.app.pk]), {
+            'stage': stage,
+        })
+
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+    @patch('pipeline.views.send_rejection_email')
+    def test_move_to_rejected_sends_rejection_email(self, mock_send):
+        r = self._move('status:rejected')
+        self.assertEqual(r.status_code, 200)
+        self.app.refresh_from_db()
+        self.assertEqual(self.app.status, JobApplication.Status.REJECTED)
+        mock_send.assert_called_once()
+        self.assertEqual(self.cand.pk, mock_send.call_args[0][0].pk)
+        self.assertEqual(mock_send.call_args[0][1], 'Dev')
+
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+    @patch('pipeline.views.send_candidate_email')
+    def test_move_to_hired_sends_acceptance_email(self, mock_send):
+        r = self._move('status:hired')
+        self.assertEqual(r.status_code, 200)
+        self.app.refresh_from_db()
+        self.assertEqual(self.app.status, JobApplication.Status.HIRED)
+        mock_send.assert_called_once()
+        self.assertEqual(mock_send.call_args[0][0], 'acceptance.txt')
+
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+    def test_move_to_rejected_no_email_when_candidate_email_missing(self):
+        self.cand.email = None
+        self.cand.save()
+        r = self._move('status:rejected')
+        self.assertEqual(r.status_code, 200)
+        self.app.refresh_from_db()
+        self.assertEqual(self.app.status, JobApplication.Status.REJECTED)
+        self.assertEqual(len(mail.outbox), 0)
+
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+    def test_move_to_hired_no_email_when_candidate_email_missing(self):
+        self.cand.email = None
+        self.cand.save()
+        r = self._move('status:hired')
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(len(mail.outbox), 0)
+
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+    def test_rejection_email_failure_does_not_break_move(self):
+        with patch('pipeline.views.send_rejection_email', side_effect=Exception('SMTP down')):
+            r = self._move('status:rejected')
+        self.assertEqual(r.status_code, 200)
+        self.app.refresh_from_db()
+        self.assertEqual(self.app.status, JobApplication.Status.REJECTED)
+
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+    def test_acceptance_email_failure_does_not_break_move(self):
+        with patch('pipeline.views.send_candidate_email', side_effect=Exception('SMTP down')):
+            r = self._move('status:hired')
+        self.assertEqual(r.status_code, 200)
+        self.app.refresh_from_db()
+        self.assertEqual(self.app.status, JobApplication.Status.HIRED)
+
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+    def test_move_to_rejected_sends_no_other_email(self):
+        r = self._move('status:on_hold')
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(len(mail.outbox), 0)

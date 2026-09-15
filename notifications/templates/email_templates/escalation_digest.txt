@@ -1,0 +1,11 @@
+{% extends "email_templates/base.txt" %}
+{% block greeting %}Hello Hiring Team,{% endblock %}
+{% block content %}
+The following application(s) have been sitting in the same stage for a while and may need attention:
+
+{% for item in items %}
+- {{ item.candidate_name }} — {{ item.job_title }}: {{ item.days_stalled }} day{{ item.days_stalled|pluralize }} in current stage, assigned interviewer: {{ item.assigned_interviewer }}
+{% endfor %}
+
+Please review the pipeline and either move these applications forward or close the loop with the candidates.
+{% endblock %}

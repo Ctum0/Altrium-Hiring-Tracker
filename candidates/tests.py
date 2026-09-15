@@ -1,7 +1,9 @@
 from datetime import datetime, time, timedelta, timezone as dt_timezone
 from io import BytesIO
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.core import mail
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
@@ -1815,3 +1817,187 @@ class FuzzyDedupTests(CandidatesBaseTestCase):
         self.assertFalse(
             self._has_message(r, 'fuzzy duplicate')
         )
+
+
+class MailTriggerTests(CandidatesBaseTestCase):
+    """Feature 4 candidate-facing emails: confirmation, interview invitation.
+
+    Pipeline/jobs triggers (rejection/acceptance/closure batch) live in
+    their own apps' tests.py.
+    """
+
+    def _docx_file(self, name='cv.docx', email='jane@example.com'):
+        from docx import Document
+        doc = Document()
+        doc.add_paragraph('Jane Smith')
+        doc.add_paragraph(f'Email: {email}')
+        doc.add_paragraph('Skills: Python, Django')
+        bio = BytesIO()
+        doc.save(bio)
+        return SimpleUploadedFile(
+            name, bio.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        )
+
+    def _import(self, **overrides):
+        from unittest.mock import patch
+        parsed = {
+            'first_name': 'Jane', 'last_name': 'Smith',
+            'email': 'jane@example.com', 'phone': '', 'skills': ['React'],
+        }
+        parsed.update(overrides)
+        with patch('candidates.views.parse_cv', return_value=parsed):
+            return self.client.post(reverse('candidates:import'), {
+                'job': self.job.pk,
+                'source': 'LinkedIn',
+                'profile_text': 'Jane Smith\nEmail: jane@example.com',
+            })
+
+    # -- Confirmation email (upload path) ---------------------------------
+
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+    def test_upload_new_candidate_sends_confirmation(self):
+        self.login('hr')
+        self.client.post(reverse('candidates:upload'), {
+            'job': self.job.pk,
+            'files': [self._docx_file()],
+        })
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ['jane@example.com'])
+        self.assertIn('Backend', mail.outbox[0].body)
+
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+    def test_reupload_existing_candidate_same_job_no_duplicate_confirmation(self):
+        # A re-upload means the candidate+job application already exists:
+        # get_or_create returns app_created=False -> no second confirmation.
+        jane = Candidate.objects.create(email='jane@example.com', first_name='Jane')
+        JobApplication.objects.create(candidate=jane, job=self.job)
+        self.login('hr')
+        self.client.post(reverse('candidates:upload'), {
+            'job': self.job.pk,
+            'files': [self._docx_file()],
+        })
+        self.assertEqual(len(mail.outbox), 0)
+
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+    def test_upload_same_candidate_twice_in_one_batch_sends_once(self):
+        self.login('hr')
+        self.client.post(reverse('candidates:upload'), {
+            'job': self.job.pk,
+            'files': [self._docx_file('cv1.docx'), self._docx_file('cv2.docx')],
+        })
+        self.assertEqual(len(mail.outbox), 1)
+
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+    def test_upload_candidate_without_email_sends_nothing_and_does_not_crash(self):
+        from unittest.mock import patch
+        # parse_cv returns no email: candidate is created email-less.
+        with patch('candidates.views.parse_cv', return_value={
+            'first_name': 'No', 'last_name': 'Mail',
+            'email': '', 'phone': '', 'skills': ['Python'],
+        }):
+            self.login('hr')
+            r = self.client.post(reverse('candidates:upload'), {
+                'job': self.job.pk,
+                'files': [self._docx_file()],
+            })
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(len(mail.outbox), 0)
+        self.assertTrue(Candidate.objects.filter(email__isnull=True, first_name='No').exists())
+
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+    def test_import_new_candidate_sends_confirmation(self):
+        self.login('hr')
+        self._import()
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ['jane@example.com'])
+
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+    def test_import_existing_application_no_confirmation(self):
+        jane = Candidate.objects.create(email='jane@example.com', first_name='Jane')
+        JobApplication.objects.create(candidate=jane, job=self.job)
+        self.login('hr')
+        self._import()
+        self.assertEqual(len(mail.outbox), 0)
+
+    # -- Interview invitation email ---------------------------------------
+
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+    def test_schedule_set_sends_invitation_with_datetime(self):
+        self.login('hr')
+        r = self.client.post(
+            reverse('candidates:interview_details', args=[self.application.pk]),
+            {'interview_at': '2030-01-07 09:00', 'interview_details': 'meet link https://meet.example.com/x'},
+        )
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(len(mail.outbox), 1)
+        body = mail.outbox[0].body
+        self.assertEqual(mail.outbox[0].to, ['ada@example.com'])
+        self.assertIn('2030-01-07', body)
+        self.assertIn('09:00', body)
+        self.assertIn('https://meet.example.com/x', body)
+
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+    def test_schedule_clear_sends_no_invitation(self):
+        self.application.interview_at = datetime(2030, 1, 7, 9, 0, tzinfo=dt_timezone.utc)
+        self.application.save(update_fields=['interview_at'])
+        self.login('hr')
+        self.client.post(
+            reverse('candidates:interview_details', args=[self.application.pk]),
+            {'interview_at': ''},
+        )
+        self.assertEqual(len(mail.outbox), 0)
+
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+    def test_schedule_change_sends_updated_invitation(self):
+        self.application.interview_at = datetime(2030, 1, 7, 9, 0, tzinfo=dt_timezone.utc)
+        self.application.save(update_fields=['interview_at'])
+        mail.outbox.clear()
+        self.login('hr')
+        self.client.post(
+            reverse('candidates:interview_details', args=[self.application.pk]),
+            {'interview_at': '2030-01-08 10:00'},
+        )
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn('2030-01-08', mail.outbox[0].body)
+
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+    def test_invitation_candidate_without_email_no_crash(self):
+        self.candidate.email = None
+        self.candidate.save()
+        self.login('hr')
+        r = self.client.post(
+            reverse('candidates:interview_details', args=[self.application.pk]),
+            {'interview_at': '2030-01-07 09:00'},
+        )
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(len(mail.outbox), 0)
+
+    # -- Mail outage must never break the HR action ------------------------
+
+    def _with_smtp_down(self):
+        # Patch the low-level send_mail: a real backend outage is what
+        # send_candidate_email's try/except must absorb, NOT a replaced
+        # helper (that would just re-raise by construction).
+        return patch('notifications.mail.send_mail', side_effect=Exception('SMTP down'))
+
+    def test_upload_succeeds_when_mail_backend_raises(self):
+        self.login('hr')
+        with self._with_smtp_down():
+            r = self.client.post(reverse('candidates:upload'), {
+                'job': self.job.pk,
+                'files': [self._docx_file()],
+            })
+        self.assertEqual(r.status_code, 302)
+        self.assertTrue(Candidate.objects.filter(email='jane@example.com').exists())
+
+    def test_schedule_succeeds_when_mail_backend_raises(self):
+        self.login('hr')
+        with self._with_smtp_down():
+            r = self.client.post(
+                reverse('candidates:interview_details', args=[self.application.pk]),
+                {'interview_at': '2030-01-07 09:00'},
+            )
+        self.assertEqual(r.status_code, 302)
+        self.application.refresh_from_db()
+        self.assertIsNotNone(self.application.interview_at)

@@ -1,0 +1,11 @@
+{% extends "email_templates/base.txt" %}
+{% block greeting %}Hello {{ interviewer_name|default:"there" }},{% endblock %}
+{% block content %}
+The following candidate(s) are waiting on your interview feedback:
+
+{% for item in items %}
+- {{ item.candidate_name }} — {{ item.job_title }} ({{ item.round_name }}), pending {{ item.days_pending }} day{{ item.days_pending|pluralize }}
+{% endfor %}
+
+Please submit your feedback in the Altrium Hiring Tracker so the hiring team can move these candidates to the next step.
+{% endblock %}

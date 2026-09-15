@@ -1,19 +1,23 @@
+import logging
+
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import IntegrityError, models
-from django.http import HttpResponse, HttpResponseForbidden
+from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views import View
 from django.views.generic import DetailView, ListView
 
-from ai.services import polish_notes
+from ai.services import general_feedback_summary, polish_notes, suggest_scores
 from candidates.models import JobApplication
 from jobs.models import InterviewRound
 from notifications.models import Notification
 
 from .forms import FeedbackForm
 from .models import FeedbackEditHistory, InterviewFeedback
+
+logger = logging.getLogger(__name__)
 
 
 def _feedback_queryset(user):
@@ -136,12 +140,24 @@ class FeedbackFormView(LoginRequiredMixin, View):
             interviewer=request.user,
         ).first()
 
+        prefill = {}
+        if existing and existing.criteria_scores:
+            prefill = {
+                entry.get('criterion'): entry.get('score')
+                for entry in existing.criteria_scores
+                if isinstance(entry, dict)
+            }
+        criteria_rows = [
+            {'index': i, 'name': name, 'value': prefill.get(name)}
+            for i, name in enumerate(InterviewFeedback.DEFAULT_CRITERIA)
+        ]
         form = FeedbackForm(instance=existing)
         return render(request, 'feedback/feedback_form.html', {
             'form': form,
             'application': self.application,
             'round': self.round_obj,
             'is_edit': existing is not None,
+            'criteria_rows': criteria_rows,
         })
 
     def post(self, request, *args, **kwargs):
@@ -165,6 +181,7 @@ class FeedbackFormView(LoginRequiredMixin, View):
             })
 
         feedback = form.save(commit=False)
+        feedback.criteria_scores = form.cleaned_data.get('criteria_scores') or []
         if existing:
             # Edit path: snapshot BEFORE mutating. form.save(commit=False)
             # mutates `existing` in place (form.instance IS existing), so the
@@ -175,6 +192,7 @@ class FeedbackFormView(LoginRequiredMixin, View):
                 feedback.score != pristine.score
                 or feedback.notes != pristine.notes
                 or (feedback.raw_notes or '') != (pristine.raw_notes or '')
+                or feedback.criteria_scores != pristine.criteria_scores
             )
             if data_changed:
                 FeedbackEditHistory.objects.create(
@@ -217,6 +235,28 @@ class FeedbackFormView(LoginRequiredMixin, View):
         if self.round_obj.pk == self.application.current_round_id:
             self.application.feedback_submitted = True
             self.application.save(update_fields=['feedback_submitted', 'updated_at'])
+
+        # General Feedback (AI): once 2+ rounds have feedback, consolidate
+        # every round's ratings/notes into one narrative cached on the
+        # application; regenerated on each subsequent submission. An AI or
+        # persistence failure must never break the submission itself.
+        feedback_count = InterviewFeedback.objects.filter(
+            application=self.application,
+        ).count()
+        if feedback_count >= 2:
+            try:
+                self.application.general_feedback = general_feedback_summary(
+                    self.application,
+                )
+                self.application.save(
+                    update_fields=['general_feedback', 'updated_at'],
+                )
+            except Exception:
+                logger.exception(
+                    'General feedback generation failed for application %s; '
+                    'submission continues without it.',
+                    self.application.pk,
+                )
 
         action = 'updated' if existing else 'submitted'
         # Notify HR (job creator) so they know an evaluation landed.
@@ -263,7 +303,13 @@ class FeedbackHistoryView(LoginRequiredMixin, DetailView):
 
 
 class AIPolishView(LoginRequiredMixin, View):
-    """HTMX endpoint: polish raw notes and return the summary."""
+    """HTMX endpoints for AI assistance on the feedback form.
+
+    - ``feedback:ai_polish`` — returns the polished summary (text/plain).
+    - ``feedback:ai_suggest`` — returns JSON: suggested per-criterion
+      scores plus a drafted summary. The interviewer always reviews and
+      edits before submitting; AI never auto-submits.
+    """
 
     def post(self, request):
         if not request.user.is_interviewer():
@@ -280,3 +326,18 @@ class AIPolishView(LoginRequiredMixin, View):
             )
 
         return HttpResponse(polished, content_type='text/plain')
+
+
+class AISuggestView(LoginRequiredMixin, View):
+    """HTMX JSON endpoint: AI-suggested scorecard ratings from raw notes."""
+
+    def post(self, request):
+        if not request.user.is_interviewer():
+            return HttpResponse('Only interviewers can use the AI assistant.', status=403)
+
+        raw = request.POST.get('raw_notes', '').strip()
+        if not raw:
+            return HttpResponse('No notes provided.', status=400)
+
+        suggestions = suggest_scores(raw)
+        return JsonResponse(suggestions)

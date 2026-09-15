@@ -1,3 +1,4 @@
+import os
 from uuid import uuid4
 
 from django.conf import settings
@@ -59,8 +60,22 @@ class Candidate(models.Model):
 
     def save(self, *args, **kwargs):
         if self.resume_file and hasattr(self.resume_file, 'name') and self.resume_file.name:
-            ext = self.resume_file.name.rsplit('.', 1)[-1].lower()
-            self.resume_file.name = f'{uuid4().hex}.{ext}'
+            # UUID-rename a NEWLY UPLOADED file while preserving the storage
+            # subdirectory from upload_to ('cvs/'). The original version
+            # stripped the prefix on EVERY save ('<uuid>.pdf'), re-pointing
+            # the record at a non-existent key -> resume links 404.
+            #
+            # Two rules:
+            # 1. A committed, stored file (FileField._committed) is left
+            #    alone - re-renaming it on later save() calls would point
+            #    the record at a key that was never written.
+            # 2. A fresh upload keeps its 'cvs/' directory (never stripped,
+            #    never compounded) and gets a UUID basename.
+            if not self.resume_file._committed:
+                directory, basename = os.path.split(self.resume_file.name)
+                ext = basename.rsplit('.', 1)[-1].lower()
+                subdir = directory or 'cvs'
+                self.resume_file.name = f'{subdir}/{uuid4().hex}.{ext}'
         super().save(*args, **kwargs)
 
     @property
@@ -170,6 +185,12 @@ class JobApplication(models.Model):
         null=True,
         blank=True,
         help_text='Score computed against this specific job (0-100), used for auto-reject.',
+    )
+    general_feedback = models.TextField(
+        blank=True,
+        help_text='AI-generated consolidated narrative across all of this '
+                  "application's round feedbacks (regenerated on each new "
+                  'feedback submission).',
     )
     interview_at = models.DateTimeField(
         null=True,

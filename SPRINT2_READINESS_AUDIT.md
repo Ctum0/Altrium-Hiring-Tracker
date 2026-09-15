@@ -447,3 +447,51 @@ Solid arrows are hard blockers; dotted arrows are soft/beneficial-not-blocking. 
 - Test suite: `python manage.py test` → **Ran 168 tests … OK** (121s).
 - Artifacts left in dev DB from testing: closed job "Audit Probe Role" (+4 rounds), candidates Jane Auditwalk (id 196) / Bob Dupcheck (197) + 3 applications + 1 feedback (+1 history row), 3 CV PDFs in `scratch/cvs/`, Elena/Jane bookings with Ivan. Remove via admin or re-seed with `clean_and_seed_db` (dev only).
 - Dev server still running at `http://127.0.0.1:8100` (supervised process `django-dev`) for your own verification; port 8000 is occupied by an unrelated FastAPI service.
+
+---
+
+## Phase 6 & 7: Structured Scorecard + General Feedback + Email Triggers + Reminders (2026-09-15)
+
+**Date:** 2026-09-15 · **Status:** ✅ COMPLETED  
+**Method:** Parallel agent execution (4 agents: AgentScorecard, AgentGeneralFeedback, AgentMailTriggers, AgentScheduling + AgentRegressionSweep) + live browser verification + full test suite (334/334 passing).
+
+### Phase 6 Deliverables (Scorecard & Feedback)
+
+| Feature | Status | Evidence |
+|---------|--------|----------|
+| **Structured Scorecard Form** | ✅ Complete | 3 criterion inputs (0–100 slider), "Suggest ratings" HTMX button, overall score auto-computed as mean, criteria_scores JSON stored |
+| **AI Suggest Ratings** | ✅ Complete | Groq fallback to local keyword engine; rates filled from raw notes; interviewer reviews/edits before submit |
+| **General Feedback Synthesis** | ✅ Complete | Multi-round narrative (2+ feedbacks) synthesized via AI; panel consensus + strongest-round flagging; template fallback; generated on 2nd feedback submit |
+| **General Feedback Card Rendering** | ✅ Fixed & Complete | Template fix: using `app.feedbacks.all|length` (not bare `.feedbacks`) to hit prefetch cache; displays round count correctly |
+| **Feedback Validation Gate** | ✅ Carried forward | Blocks stage advancement until feedback submitted (HTTP 409 if missing); terminal-state bypass intentional (handles reject-from-resume case) |
+| **Full Test Coverage** | ✅ Complete | 334/334 tests pass (ScoreCard tests + Feedback tests in `feedback/tests.py` + regression suite) |
+
+### Phase 7 Deliverables (Email Triggers & Automation)
+
+| Feature | Status | Evidence |
+|---------|--------|----------|
+| **Confirmation Email (Apply)** | ✅ Complete | `CandidateUploadView.post` → `send_candidate_email(application, 'confirmation.txt')` triggered on new application; deduped per candidate per batch |
+| **Interview Invitation Email** | ✅ Complete | `InterviewDetailsView.post` → triggers on schedule set; includes date, time, round name, meeting link, candidate name personalization |
+| **Rejection Email (Move to Rejected)** | ✅ Complete | `PipelineMoveView.post` (to_status=rejected) → AI-draft via `draft_rejection_notes` (fallback: template); personalized per candidate |
+| **Acceptance Email (Move to Hired)** | ✅ Complete | `PipelineMoveView.post` (to_status=hired) → `send_candidate_email(app, 'acceptance.txt')` |
+| **Job Closure Rejection Emails** | ✅ Complete | `JobCloseView.post` → batch sends rejection to all active applicants (hired/already-rejected excluded); in-request dedup per candidate |
+| **Automated Reminders (7-day)** | ✅ Complete | Management command + scheduler wiring; 7-day flat threshold on feedback submission date; management dashboard escalation view + deep-links |
+| **Email Infrastructure** | ✅ Complete | `notifications/mail.py` centralized; `send_candidate_email` helper; `draft_rejection_notes` AI integration (Groq with fallback); all paths wrapped in try/except (mail failures never break HR action) |
+| **Test Coverage (Email)** | ✅ Complete | MailTriggerTests (12) + JobClosureMailTests (5) + CandidateEmailHelperTests (7) + PipelineMailTriggerTests (7) = 31 new tests, all passing |
+
+### Cross-Cutting Fixes
+
+1. **Resume File Storage Prefix Bug (P1)**: `Candidate.save()` was stripping the `cvs/` upload_to prefix on every save, causing resume 404s. Fixed by checking `FileField._committed` and only UUID-renaming newly-uploaded files, never re-renamed ones.
+2. **General Feedback Template Filter (UI)**: Template used `{{ app.feedbacks|length }}` which didn't hit prefetch cache; fixed to `{{ app.feedbacks.all|length }}`.
+3. **Integrity**: Both fixes verified live in browser and covered by regression tests.
+
+### Final Metrics
+
+- **Build Status:** 334/334 tests passing (baseline 168 + Phase 1 fixes 24 + Phases 6–7 extensions 142 new).
+- **Server Status:** Running at `http://127.0.0.1:8100/` (local dev), all auth + RBAC gates verified.
+- **Deliverables:** All 30 functional requirements (11 from original spec + 19 Sprint 2 additions) are implemented, tested, and live-verified.
+
+### Sign-Off
+
+✅ **Phase 6 & 7 Certification:** All structured scorecard, AI feedback synthesis, and email automation features ready for production deployment. Sprint 2 readiness audit **CLOSED**.
+

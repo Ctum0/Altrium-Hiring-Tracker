@@ -1,8 +1,11 @@
 from datetime import datetime
 
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
+from django.core import mail
 from django.db.models import Count
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -646,3 +649,73 @@ class JobDetailEnrichmentTests(JobsBaseTestCase):
         self.assertContains(r, 'suggested re-engagements')
         self.assertContains(r, 'Wes')
         self.assertContains(r, 'Add to this job')
+
+
+class JobClosureMailTests(JobsBaseTestCase):
+    """Feature 4: closing a job batch-emails rejection to every applicant
+    who is not hired and not already rejected. A mail failure must never
+    fail the closure."""
+
+
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+    def test_close_sends_rejection_to_active_applicants(self):
+        job = Job.objects.create(title='Dev', created_by=self.hr)
+        c1 = Candidate.objects.create(email='a@example.com', first_name='A')
+        c2 = Candidate.objects.create(email='b@example.com', first_name='B')
+        JobApplication.objects.create(candidate=c1, job=job, status=JobApplication.Status.NEW)
+        JobApplication.objects.create(candidate=c2, job=job, status=JobApplication.Status.IN_PROGRESS)
+        r = self._close_for(job)
+        self.assertEqual(r.status_code, 302)
+        recipients = sorted(m.to[0] for m in mail.outbox)
+        self.assertEqual(recipients, ['a@example.com', 'b@example.com'])
+        for m in mail.outbox:
+            self.assertIn('decided not to move forward', m.body)
+
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+    def test_close_excludes_hired_and_already_rejected(self):
+        job = Job.objects.create(title='Dev', created_by=self.hr)
+        hired = Candidate.objects.create(email='hired@example.com', first_name='H')
+        rejected = Candidate.objects.create(email='rej@example.com', first_name='R')
+        active = Candidate.objects.create(email='act@example.com', first_name='A')
+        JobApplication.objects.create(candidate=hired, job=job, status=JobApplication.Status.HIRED)
+        JobApplication.objects.create(candidate=rejected, job=job, status=JobApplication.Status.REJECTED)
+        JobApplication.objects.create(candidate=active, job=job, status=JobApplication.Status.NEW)
+        self._close_for(job)
+        recipients = [m.to[0] for m in mail.outbox]
+        self.assertEqual(recipients, ['act@example.com'])
+
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+    def test_close_sends_once_per_candidate_even_with_multiple_applications(self):
+        # Same candidate appears twice (e.g. two apps for the same job is
+        # impossible, but the batch dedups defensively per request).
+        job = Job.objects.create(title='Dev', created_by=self.hr)
+        cand = Candidate.objects.create(email='dup@example.com', first_name='D')
+        JobApplication.objects.create(candidate=cand, job=job, status=JobApplication.Status.NEW)
+        self._close_for(job)
+        self.assertEqual(len([m for m in mail.outbox if m.to == ['dup@example.com']]), 1)
+
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+    def test_close_skips_candidates_without_email(self):
+        job = Job.objects.create(title='Dev', created_by=self.hr)
+        c1 = Candidate.objects.create(email=None, first_name='N')
+        c2 = Candidate.objects.create(email='x@example.com', first_name='X')
+        JobApplication.objects.create(candidate=c1, job=job, status=JobApplication.Status.NEW)
+        JobApplication.objects.create(candidate=c2, job=job, status=JobApplication.Status.NEW)
+        r = self._close_for(job)
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual([m.to[0] for m in mail.outbox], ['x@example.com'])
+
+    def test_close_succeeds_when_mail_backend_raises(self):
+        # A full mail outage must not block the closure.
+        job = Job.objects.create(title='Dev', created_by=self.hr)
+        cand = Candidate.objects.create(email='y@example.com', first_name='Y')
+        JobApplication.objects.create(candidate=cand, job=job, status=JobApplication.Status.NEW)
+        with patch('notifications.mail.send_mail', side_effect=Exception('SMTP down')):
+            r = self._close_for(job)
+        self.assertEqual(r.status_code, 302)
+        job.refresh_from_db()
+        self.assertFalse(job.is_active)
+
+    def _close_for(self, job):
+        self.login('hr')
+        return self.client.post(reverse('jobs:close', args=[job.pk]))

@@ -109,3 +109,90 @@ def send_templated_email_async(template_name, context, recipient_list, subject=N
     caller — the signature is already the async-shaped one.
     """
     return send_templated_email(template_name, context, recipient_list, subject=subject)
+
+
+def send_candidate_email(template_name, context, candidate):
+    """Feature 4 trigger helper for candidate-facing milestone emails.
+
+    Guarantee: this function NEVER raises. A mail outage must not break
+    the HR action that triggered the email (see :func:`send_templated_email`
+    for the delivery strategy).
+
+    - ``Candidate.email`` may be None (candidates can exist without an
+      address): the send is skipped and logged, not an error.
+    - ``candidate_name`` is injected into the context from the record so
+      trigger sites stay minimal.
+
+    Returns the message count on success, or None when skipped/failed.
+    """
+    recipient = (candidate.email or '').strip()
+    if not recipient:
+        logger.info(
+            '%s: candidate %s has no email on file; skipping send',
+            template_name, candidate.pk,
+        )
+        return None
+    context = {'candidate_name': candidate.full_name, **context}
+    try:
+        return send_templated_email(template_name, context, [recipient])
+    except Exception:
+        logger.exception(
+            '%s: send to candidate %s failed; the triggering HR action is unaffected',
+            template_name, candidate.pk,
+        )
+        return None
+
+
+def draft_rejection_notes(candidate_name, job_title):
+    """Draft 2-3 constructive rejection sentences via the shared Groq client.
+
+    Follows the ai.services fallback philosophy (parse_cv / polish_notes):
+    any failure — missing API key, network, timeout, malformed output —
+    yields '' and the caller falls back to the template's default wording.
+    Never raises.
+    """
+    try:
+        from ai.services import _chat  # deferred: keeps mail.py import-light
+    except Exception:
+        logger.exception('draft_rejection_notes: could not load the AI client.')
+        return ''
+    system = (
+        'You are a hiring coordinator writing a short rejection note to a job '
+        'candidate. Write 2-3 kind, constructive, plain-text sentences. Be '
+        'warm and specific to the role; never mention scores, other '
+        'candidates, or internal reasons. End with encouragement to apply '
+        'for future openings.'
+    )
+    user = (
+        f'Candidate name: {candidate_name or "there"}\n'
+        f'Position: {job_title or "the position they applied for"}'
+    )
+    try:
+        return _chat(system, user, temperature=0.4)[:700]
+    except Exception:
+        logger.exception('draft_rejection_notes: AI draft failed; using template default.')
+        return ''
+
+
+def send_rejection_email(candidate, job_title, ai_draft=True):
+    """Rejection trigger (Feature 4): AI-personalized with a clean fallback.
+
+    When ``ai_draft`` is true the personal notes are drafted on the fly and
+    an AI outage degrades to the template's default closing. Closure batches
+    pass ``ai_draft=False`` (a 100+ email batch must not fire 100 LLM calls
+    synchronously — Phase 7+ async swap point).
+
+    Returns the message count on success, or None when skipped/failed.
+    """
+    if not (candidate.email or '').strip():
+        logger.info(
+            'rejection.txt: candidate %s has no email on file; skipping send',
+            candidate.pk,
+        )
+        return None
+    notes = draft_rejection_notes(candidate.full_name, job_title) if ai_draft else ''
+    return send_candidate_email(
+        'rejection.txt',
+        {'job_title': job_title, 'rejection_notes': notes},
+        candidate,
+    )

@@ -1,10 +1,13 @@
+import logging
+
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, render
 from django.views import View
 
 from candidates.models import JobApplication
-from candidates.views import workload_context
+from candidates.views import workload_context  # noqa: F401 (re-exported import kept)
+from notifications.mail import send_candidate_email, send_rejection_email
 from jobs.models import InterviewRound
 
 from .models import PipelineMove
@@ -105,6 +108,33 @@ class PipelineMoveView(LoginRequiredMixin, View):
             to_status=app.status,
             moved_by=request.user,
         )
+
+        # Candidate-facing milestone emails (Feature 4). Fire AFTER the
+        # status change, audit log, and in-app notifications above: email
+        # is an auxiliary side effect and must never break (or precede) the
+        # HR action. send_rejection_email drafts AI-personalized notes and
+        # falls back to the template's default wording when the AI is down;
+        # every send is try/except-wrapped inside the mail helpers.
+        if to_status == JobApplication.Status.REJECTED:
+            try:
+                send_rejection_email(app.candidate, app.job.title)
+            except Exception:
+                logging.getLogger(__name__).exception(
+                    'Rejection email failed for application %s; move succeeded.',
+                    app.pk,
+                )
+        elif to_status == JobApplication.Status.HIRED:
+            try:
+                send_candidate_email(
+                    'acceptance.txt',
+                    {'job_title': app.job.title},
+                    app.candidate,
+                )
+            except Exception:
+                logging.getLogger(__name__).exception(
+                    'Acceptance email failed for application %s; move succeeded.',
+                    app.pk,
+                )
 
         # Return the updated row so HTMX can swap it in place.
         app.refresh_from_db()

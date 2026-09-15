@@ -1,3 +1,5 @@
+import logging
+
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Count, Max
@@ -9,6 +11,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views import View
 from django.views.generic import CreateView, DeleteView, DetailView, ListView, TemplateView, UpdateView
 
+from notifications.mail import send_candidate_email
 from ai.matching import auto_apply
 from candidates.models import JobApplication
 from feedback.models import InterviewFeedback
@@ -108,10 +111,40 @@ class JobCloseView(LoginRequiredMixin, View):
                 request,
                 f'Job "{job.title}" closed. Existing candidates are unchanged.',
             )
+            # Closure batch (Feature 4): every active applicant learns the
+            # job is not moving forward. Excluded: already hired (they get
+            # the acceptance track) and already rejected (they were told in
+            # the individual pipeline move — no double-send). Sent
+            # synchronously, one try/except per email; a mail outage must
+            # not fail the closure. NOTE (Phase 7+ swap point): at scale
+            # this loop should move to the async wrapper
+            # (send_templated_email_async) / a queue.
+            emailed = set()
+            for app in (
+                job.applications.select_related('candidate')
+                .exclude(status=JobApplication.Status.HIRED)
+                .exclude(status=JobApplication.Status.REJECTED)
+            ):
+                candidate = app.candidate
+                if candidate.pk in emailed or not candidate.email:
+                    continue  # in-request dedup / no address on file
+                emailed.add(candidate.pk)
+                try:
+                    send_candidate_email(
+                        'rejection.txt',
+                        {'job_title': job.title},
+                        candidate,
+                    )
+                except Exception:
+                    logging.getLogger(__name__).exception(
+                        'Closure rejection email failed for candidate %s '
+                        '(job %s); closure succeeded.',
+                        candidate.pk, job.pk,
+                    )
+            return redirect('jobs:detail', pk=job.pk)
         else:
             messages.info(request, f'Job "{job.title}" is already closed.')
-        return redirect('jobs:detail', pk=job.pk)
-
+            return redirect('jobs:detail', pk=job.pk)
 
 class JobReopenView(LoginRequiredMixin, View):
     """Reopen a closed job: accepts CVs again and clears the closure stamp."""

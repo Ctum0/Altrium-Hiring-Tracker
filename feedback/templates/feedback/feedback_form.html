@@ -21,10 +21,34 @@
   <div class="form-card">
 
     <div class="form-field">
-      <label class="form-label" for="{{ form.score.id_for_label }}">Score</label>
-      {{ form.score }}
-      {% if form.score.errors %}<p class="form-error">{{ form.score.errors.0 }}</p>{% endif %}
-      <p class="form-help">Score from 0 to 100 (e.g. 75 for strong Python skills).</p>
+      <span class="form-label">Scorecard</span>
+      <p class="form-help">Rate each criterion from 0 to 100; the overall score is their average.</p>
+      <div id="scorecard-fields" style="display:grid;gap:var(--sp-2);margin-top:var(--sp-2)">
+        {% for row in criteria_rows %}
+        <div class="flex items-center" style="gap:var(--sp-3)">
+          <label class="form-label" style="min-width:140px;margin:0" for="criterion_{{ row.index }}">{{ row.name }}</label>
+          <input class="form-input mono" type="number" id="criterion_{{ row.index }}"
+                 name="criterion_{{ row.index }}" min="0" max="100" step="1"
+                 value="{{ row.value|default_if_none:'' }}"
+                 placeholder="0-100" style="width:90px">
+        </div>
+        {% endfor %}
+      </div>
+      {% if form.non_field_errors %}<p class="form-error">{{ form.non_field_errors.0 }}</p>{% endif %}
+
+      <div style="margin-top:var(--sp-2)">
+        <button type="button" id="ai-suggest-btn" class="btn btn-secondary btn-sm"
+                hx-post="{% url 'feedback:ai_suggest' %}"
+                hx-include="[name='raw_notes']"
+                hx-indicator="#ai-suggest-btn"
+                hx-swap="none"
+                hx-on::after-request="if(event.detail.successful){const d=JSON.parse(event.detail.xhr.responseText);const sc=document.querySelectorAll('#scorecard-fields input[type=number]');sc.forEach((inp,i)=>{const e=d.criteria_scores&&d.criteria_scores[i];if(e&&e.score!==null&&e.score!==undefined){inp.value=e.score;}});const n=document.getElementById('{{ form.notes.id_for_label }}');if(d.summary&&n&&!n.value.trim()){n.value=d.summary;n.dispatchEvent(new Event('input',{bubbles:true}));}}">
+          Suggest ratings
+        </button>
+        <span class="text-xs text-muted" style="margin-left:var(--sp-2)">
+          AI proposes ratings from your raw notes below &mdash; review and edit before submitting.
+        </span>
+      </div>
     </div>
 
     <div class="form-field">
@@ -52,6 +76,16 @@
       {{ form.notes }}
       {% if form.notes.errors %}<p class="form-error">{{ form.notes.errors.0 }}</p>{% endif %}
       <p class="form-help">Your polished feedback for the recruitment record.</p>
+    </div>
+
+    <div class="form-field">
+      <label class="form-label" for="{{ form.score.id_for_label }}">Overall score</label>
+      {{ form.score }}
+      {% if form.score.errors %}<p class="form-error">{{ form.score.errors.0 }}</p>{% endif %}
+      <p class="form-help">
+        Optional when the scorecard above is filled &mdash; it is computed as the criteria average.
+        Required otherwise.
+      </p>
     </div>
 
     <div class="form-actions">

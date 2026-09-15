@@ -1,12 +1,14 @@
+from unittest.mock import patch
+
 from django.conf import settings
 from datetime import timedelta
 from io import StringIO
 from contextlib import redirect_stdout
 from django.contrib.auth import get_user_model
-from django.core import mail
+from django.test import TestCase, override_settings
 from django.core.management import call_command
+from django.core import mail
 from django.template.loader import render_to_string
-from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
@@ -14,8 +16,13 @@ from accounts.models import Role
 from candidates.models import Candidate, JobApplication
 from jobs.models import Job
 from notifications import tasks
-from notifications.mail import send_templated_email, send_templated_email_async
 from notifications.models import Notification
+from notifications.mail import (
+    send_candidate_email,
+    send_rejection_email,
+    send_templated_email,
+    send_templated_email_async,
+)
 
 User = get_user_model()
 
@@ -276,3 +283,327 @@ class MailAndSchedulerTests(TestCase):
         with self.settings(MANAGERS=[('Ops', 'ops@example.com')]):
             result = tasks.dispatch_escalations()
         self.assertEqual(result['would_send'][0]['to'], 'ops@example.com')
+
+
+class SchedulerSendTests(TestCase):
+    """Phase 7 real-send mode (``send=True``): one digest email per
+    recipient, 24h sent-markers as anti-spam, terminal statuses excluded.
+    Dry-run behavior (send=False) is pinned by MailAndSchedulerTests."""
+
+    REMINDER_PREFIX = 'Email sent: Feedback reminder: application #'
+    ESCALATION_PREFIX = 'Email sent: Escalation: application #'
+
+    def setUp(self):
+        self.hr1 = User.objects.create_user(
+            username='send_hr1', password='pass12345', role=Role.HR,
+            email='hr1@example.com', first_name='Hilda', last_name='Reyes',
+        )
+        self.hr2 = User.objects.create_user(
+            username='send_hr2', password='pass12345', role=Role.HR,
+            email='hr2@example.com', first_name='Hugo', last_name='Reyes',
+        )
+        self.interviewer = User.objects.create_user(
+            username='send_iv', password='pass12345', role=Role.INTERVIEWER,
+            email='send_iv@example.com', first_name='Iris', last_name='Vance',
+        )
+        self.job = Job.objects.create(title='Platform Engineer', created_by=self.hr1)
+
+    def _make_application(self, first_name, status=None, assigned_to=None, **kwargs):
+        """Each application needs its own candidate: (candidate, job) is
+        unique. Distinct emails avoid the unique candidate email too."""
+        cand = Candidate.objects.create(
+            email=f'send_{first_name.lower()}@example.com', first_name=first_name
+        )
+        return JobApplication.objects.create(
+            candidate=cand, job=self.job,
+            status=status or JobApplication.Status.IN_PROGRESS,
+            assigned_to=assigned_to,
+            **kwargs,
+        )
+
+    def _age_stage(self, app, days):
+        JobApplication.objects.filter(pk=app.pk).update(
+            stage_entered_at=timezone.now() - timedelta(days=days)
+        )
+
+    # ------------------------------------------------------------------
+    # send_feedback_reminders(send=True)
+    # ------------------------------------------------------------------
+
+    def test_reminders_send_one_digest_per_interviewer(self):
+        rae = self._make_application(
+            'Rae', assigned_to=self.interviewer, feedback_submitted=False,
+        )
+        self._age_stage(rae, days=4)
+        finn = self._make_application(
+            'Finn', assigned_to=self.interviewer, feedback_submitted=False,
+        )
+        self._age_stage(finn, days=9)
+        fresh = self._make_application(
+            'Nia', assigned_to=self.interviewer, feedback_submitted=False,
+        )
+        self._age_stage(fresh, days=1)  # below threshold: never emailed
+
+        result = tasks.send_feedback_reminders(send=True)
+
+        self.assertEqual(result['count'], 1)
+        self.assertEqual(len(mail.outbox), 1)
+        msg = mail.outbox[0]
+        self.assertEqual(msg.to, ['send_iv@example.com'])
+        # One digest listing both overdue candidates, not one per candidate.
+        self.assertIn('Rae', msg.body)
+        self.assertIn('Finn', msg.body)
+        self.assertNotIn('Nia', msg.body)
+        self.assertEqual(result['would_send'][0]['status'], 'sent')
+        self.assertEqual(result['would_send'][0]['candidates'], ['Finn', 'Rae'])
+        # Anti-spam markers double as in-app notifications.
+        markers = Notification.objects.filter(recipient=self.interviewer)
+        self.assertEqual(markers.count(), 2)
+        for marker in markers:
+            self.assertTrue(marker.message.startswith(self.REMINDER_PREFIX))
+
+    def test_reminders_dedupe_marker_blocks_resend_within_24h(self):
+        rae = self._make_application(
+            'Rae', assigned_to=self.interviewer, feedback_submitted=False,
+        )
+        self._age_stage(rae, days=4)
+        first = tasks.send_feedback_reminders(send=True)
+        self.assertEqual(first['count'], 1)
+
+        # Second run immediately after: same candidates are suppressed...
+        second = tasks.send_feedback_reminders(send=True)
+        self.assertEqual(second['count'], 0)
+        self.assertEqual(second['skipped_recent'], 1)
+        self.assertEqual(len(mail.outbox), 1)  # nothing new sent
+
+        # ...but a NEWLY overdue candidate still gets a digest — the
+        # suppression is per candidate, not per recipient.
+        nia = self._make_application(
+            'Nia', assigned_to=self.interviewer, feedback_submitted=False,
+        )
+        self._age_stage(nia, days=6)
+        third = tasks.send_feedback_reminders(send=True)
+        self.assertEqual(third['count'], 1)
+        self.assertEqual(len(mail.outbox), 2)
+        self.assertIn('Nia', mail.outbox[1].body)
+        self.assertNotIn('Rae', mail.outbox[1].body)
+
+    def test_reminders_send_excludes_terminal_statuses(self):
+        for status in (JobApplication.Status.HIRED, JobApplication.Status.REJECTED):
+            app = self._make_application(
+                f'Term{status}', status=status,
+                assigned_to=self.interviewer, feedback_submitted=False,
+            )
+            self._age_stage(app, days=10)
+        tess = self._make_application(
+            'Tess', assigned_to=self.interviewer, feedback_submitted=False,
+        )
+        self._age_stage(tess, days=5)
+
+        result = tasks.send_feedback_reminders(send=True)
+
+        self.assertEqual(result['count'], 1)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn('Tess', mail.outbox[0].body)
+        self.assertNotIn('hired', mail.outbox[0].body)
+        self.assertNotIn('rejected', mail.outbox[0].body)
+        self.assertEqual(
+            Notification.objects.filter(recipient=self.interviewer).count(), 1,
+        )
+
+    def test_reminders_send_skips_interviewer_without_email(self):
+        mute = User.objects.create_user(
+            username='send_mute_iv', password='pass12345', role=Role.INTERVIEWER,
+        )  # no email address
+        rae = self._make_application(
+            'Rae', assigned_to=mute, feedback_submitted=False,
+        )
+        self._age_stage(rae, days=4)
+
+        result = tasks.send_feedback_reminders(send=True)
+
+        self.assertEqual(result['count'], 0)
+        self.assertEqual(result['no_email'], 1)
+        self.assertEqual(result['would_send'][0]['status'], 'no_email')
+        self.assertEqual(len(mail.outbox), 0)
+        self.assertFalse(Notification.objects.filter(recipient=mute).exists())
+
+    # ------------------------------------------------------------------
+    # dispatch_escalations(send=True)
+    # ------------------------------------------------------------------
+
+    def _stalled_pair(self):
+        rae = self._make_application(
+            'Rae', status=JobApplication.Status.SHORTLISTED,
+            assigned_to=self.interviewer,
+        )
+        self._age_stage(rae, days=8)
+        finn = self._make_application(
+            'Finn', status=JobApplication.Status.SHORTLISTED,
+            assigned_to=self.interviewer,
+        )
+        self._age_stage(finn, days=12)
+        return rae, finn
+
+    def test_escalations_send_one_digest_per_hr(self):
+        self._stalled_pair()
+        fresh = self._make_application('Nia')  # 0 days old: below threshold
+
+        result = tasks.dispatch_escalations(send=True)
+
+        self.assertEqual(result['count'], 2)
+        self.assertEqual(len(mail.outbox), 2)
+        self.assertEqual(
+            sorted(m.to[0] for m in mail.outbox), ['hr1@example.com', 'hr2@example.com'],
+        )
+        for msg in mail.outbox:
+            # One digest listing both stalled candidates, not one per candidate.
+            self.assertIn('Rae', msg.body)
+            self.assertIn('Finn', msg.body)
+            self.assertNotIn('Nia', msg.body)
+            self.assertEqual(result['would_send'][0]['status'], 'sent')
+        for hr in (self.hr1, self.hr2):
+            markers = Notification.objects.filter(recipient=hr)
+            self.assertEqual(markers.count(), 2)
+            for marker in markers:
+                self.assertTrue(marker.message.startswith(self.ESCALATION_PREFIX))
+
+    def test_escalations_dedupe_marker_blocks_resend_within_24h(self):
+        self._stalled_pair()
+        first = tasks.dispatch_escalations(send=True)
+        self.assertEqual(first['count'], 2)
+
+        # Immediate second run: both HRs have both candidates suppressed
+        # (2 applications x 2 recipients).
+        second = tasks.dispatch_escalations(send=True)
+        self.assertEqual(second['count'], 0)
+        self.assertEqual(second['skipped_recent'], 4)
+        self.assertEqual(len(mail.outbox), 2)
+
+        # A newly stalled candidate still escalates, to every HR.
+        nia = self._make_application('Nia')
+        self._age_stage(nia, days=9)
+        third = tasks.dispatch_escalations(send=True)
+        self.assertEqual(third['count'], 2)
+        self.assertEqual(len(mail.outbox), 4)
+        for msg in mail.outbox[2:]:
+            self.assertIn('Nia', msg.body)
+            self.assertNotIn('Rae', msg.body)
+
+    def test_escalations_send_excludes_terminal_statuses(self):
+        for status in (JobApplication.Status.HIRED, JobApplication.Status.REJECTED):
+            app = self._make_application(f'Term{status}', status=status)
+            self._age_stage(app, days=10)
+        tess = self._make_application('Tess')
+        self._age_stage(tess, days=9)
+
+        result = tasks.dispatch_escalations(send=True)
+
+        self.assertEqual(result['count'], 2)  # one digest per HR
+        self.assertEqual(len(mail.outbox), 2)
+        for msg in mail.outbox:
+            self.assertIn('Tess', msg.body)
+            self.assertNotIn('hired', msg.body)
+            self.assertNotIn('rejected', msg.body)
+        for hr in (self.hr1, self.hr2):
+            self.assertEqual(
+                Notification.objects.filter(recipient=hr).count(), 1,
+            )
+
+    def test_escalations_send_falls_back_to_managers_without_hr(self):
+        self._stalled_pair()
+        User.objects.filter(role=Role.HR).update(is_active=False)
+
+        with self.settings(MANAGERS=[('Ops', 'ops@example.com')]):
+            first = tasks.dispatch_escalations(send=True)
+            self.assertEqual(first['count'], 1)
+            self.assertEqual(mail.outbox[0].to, ['ops@example.com'])
+            self.assertEqual(first['would_send'][0]['recipient'], 'MANAGERS')
+            # Virtual recipient: no marker possible, re-sends every run.
+            second = tasks.dispatch_escalations(send=True)
+            self.assertEqual(second['count'], 1)
+        self.assertEqual(len(mail.outbox), 2)
+        self.assertFalse(Notification.objects.exists())
+
+    def test_escalations_send_without_hr_or_managers_sends_nothing(self):
+        self._stalled_pair()
+        User.objects.filter(role=Role.HR).update(is_active=False)
+
+        result = tasks.dispatch_escalations(send=True)  # settings.MANAGERS unset
+
+        self.assertEqual(result['count'], 0)
+        self.assertEqual(len(mail.outbox), 0)
+        self.assertEqual(result['would_send'][0]['status'], 'no_recipients')
+
+
+class CandidateEmailHelperTests(TestCase):
+    """Feature 4 helpers: send_candidate_email, draft_rejection_notes,
+    send_rejection_email (AI-personalized rejection with template fallback)."""
+
+    def setUp(self):
+        self.hr = User.objects.create_user(
+            username='mailhr', password='pass12345', role=Role.HR,
+        )
+        self.cand = Candidate.objects.create(
+            email='c@example.com', first_name='Cara',
+        )
+        self.job = Job.objects.create(title='Dev', created_by=self.hr)
+
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+    def test_send_candidate_email_renders_candidate_and_job(self):
+        sent = send_candidate_email(
+            'confirmation.txt', {'job_title': self.job.title}, self.cand,
+        )
+        self.assertEqual(sent, 1)
+        self.assertEqual(mail.outbox[0].to, ['c@example.com'])
+        self.assertIn('Cara', mail.outbox[0].body)
+        self.assertIn('Dev', mail.outbox[0].body)
+
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+    def test_send_candidate_email_skips_missing_email(self):
+        self.cand.email = None
+        self.cand.save()
+        sent = send_candidate_email('confirmation.txt', {'job_title': 'X'}, self.cand)
+        self.assertIsNone(sent)
+        self.assertEqual(len(mail.outbox), 0)
+
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+    def test_send_candidate_email_absorbs_backend_failure(self):
+        with patch('notifications.mail.send_mail', side_effect=Exception('SMTP down')):
+            sent = send_candidate_email(
+                'confirmation.txt', {'job_title': 'X'}, self.cand,
+            )
+        self.assertIsNone(sent)  # None, NOT raised
+
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend', GROQ_API_KEY='test-key')
+    @patch('ai.services._chat', return_value='Your backend work was genuinely strong.')
+    def test_rejection_email_uses_ai_draft(self, mock_chat):
+        sent = send_rejection_email(self.cand, self.job.title)
+        self.assertEqual(sent, 1)
+        mock_chat.assert_called_once()
+        self.assertIn('Your backend work was genuinely strong.', mail.outbox[0].body)
+        self.assertIn('Dev', mail.outbox[0].body)
+
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend', GROQ_API_KEY='test-key')
+    @patch('ai.services._chat', return_value='')
+    def test_rejection_email_falls_back_to_template_when_ai_down(self, mock_chat):
+        sent = send_rejection_email(self.cand, self.job.title)
+        self.assertEqual(sent, 1)
+        # Template default closing is used verbatim.
+        self.assertIn(
+            'We encourage you to apply again', mail.outbox[0].body,
+        )
+
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend', GROQ_API_KEY='')
+    def test_rejection_email_without_api_key_skips_ai(self):
+        sent = send_rejection_email(self.cand, self.job.title)
+        self.assertEqual(sent, 1)
+        self.assertIn('We encourage you to apply again', mail.outbox[0].body)
+
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+    def test_rejection_email_no_recipient_is_noop(self):
+        self.cand.email = None
+        self.cand.save()
+        sent = send_rejection_email(self.cand, self.job.title)
+        self.assertIsNone(sent)
+        self.assertEqual(len(mail.outbox), 0)

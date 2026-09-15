@@ -172,8 +172,12 @@
     {% endif %}
   </div>
 
-  <!-- Applications Column (only area that scrolls on desktop) -->
+  <!-- General Feedback (AI) + Applications Column (only area that scrolls on desktop) -->
   <div class="candidate-detail-apps">
+    {% for app in applications %}
+      {% include 'feedback/_general_feedback.html' %}
+    {% endfor %}
+
     <div class="flex items-center justify-between" style="margin-bottom:8px">
       <h3 style="font-size:1.05rem;font-weight:800;color:var(--ink)">Applications ({{ applications|length }})</h3>
       {% if is_hr %}

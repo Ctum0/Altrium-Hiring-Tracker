@@ -1,4 +1,6 @@
-from django.contrib.messages import get_messages
+import json
+from unittest.mock import patch
+
 from django.db import IntegrityError
 from django.test import TestCase, RequestFactory
 
@@ -464,4 +466,275 @@ class TestFeedbackListHeading(FeedbackBaseTestCase):
         self.client.login(username='hr_user', password='testpass123')
         resp = self.client.get('/feedback/')
         self.assertContains(resp, 'All Submitted Feedback')
+
+
+# ---------------------------------------------------------------------------
+# 11. Structured Scorecard (criteria mean, fallback, AI suggest)
+# ---------------------------------------------------------------------------
+class TestScorecardComputation(FeedbackBaseTestCase):
+    """Criteria-mean calculation and manual-score fallback."""
+
+    def test_criteria_mean_calculated_as_overall(self):
+        """Submitting criteria computes overall score = rounded mean."""
+        self.client.login(username='interviewer1', password='testpass123')
+        resp = self.client.post(
+            f'/feedback/{self.app.pk}/{self.round1.pk}/',
+            data={
+                'criterion_0': 80, 'criterion_1': 70, 'criterion_2': 90,
+                'notes': 'Solid all round.', 'raw_notes': '',
+            },
+        )
+        self.assertEqual(resp.status_code, 302)
+        fb = InterviewFeedback.objects.get(
+            application=self.app, round=self.round1, interviewer=self.interviewer,
+        )
+        self.assertEqual(fb.score, 80)  # mean(80, 70, 90) = 80
+        self.assertEqual(
+            fb.criteria_scores,
+            [
+                {'criterion': 'Technical Skill', 'score': 80},
+                {'criterion': 'Communication', 'score': 70},
+                {'criterion': 'Culture Fit', 'score': 90},
+            ],
+        )
+
+    def test_mean_rounding(self):
+        """Non-integer means round to nearest int (banker's rounding on .5)."""
+        self.assertEqual(
+            InterviewFeedback.compute_overall([
+                {'criterion': 'Technical Skill', 'score': 85},
+                {'criterion': 'Communication', 'score': 84},
+                {'criterion': 'Culture Fit', 'score': 85},
+            ]),
+            85,
+        )
+
+    def test_manual_score_fallback_without_criteria(self):
+        """No criterion inputs -> manual score path keeps working."""
+        self.client.login(username='interviewer1', password='testpass123')
+        resp = self.client.post(
+            f'/feedback/{self.app.pk}/{self.round1.pk}/',
+            data={'score': 75, 'notes': 'Legacy path.', 'raw_notes': ''},
+        )
+        self.assertEqual(resp.status_code, 302)
+        fb = InterviewFeedback.objects.get(
+            application=self.app, round=self.round1, interviewer=self.interviewer,
+        )
+        self.assertEqual(fb.score, 75)
+        self.assertEqual(fb.criteria_scores, [])
+
+    def test_partial_criteria_rejected(self):
+        """Filling only some criteria is an error, not a silent partial."""
+        self.client.login(username='interviewer1', password='testpass123')
+        resp = self.client.post(
+            f'/feedback/{self.app.pk}/{self.round1.pk}/',
+            data={
+                'criterion_0': 80, 'criterion_1': '', 'criterion_2': 90,
+                'notes': 'Incomplete scorecard.', 'raw_notes': '',
+            },
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(
+            InterviewFeedback.objects.filter(
+                application=self.app, round=self.round1,
+            ).exists(),
+        )
+
+    def test_criteria_out_of_range_rejected(self):
+        """Criterion value outside 0-100 is rejected."""
+        form = FeedbackForm(data={
+            'criterion_0': 150, 'criterion_1': 70, 'criterion_2': 90,
+            'notes': 'Bad range.', 'raw_notes': '',
+        })
+        self.assertFalse(form.is_valid())
+
+    def test_overall_score_property_matches_mean(self):
+        """overall_score property returns the mean of stored criteria."""
+        fb = InterviewFeedback.objects.create(
+            application=self.app, round=self.round1, interviewer=self.interviewer,
+            score=83,
+            criteria_scores=[
+                {'criterion': 'Technical Skill', 'score': 90},
+                {'criterion': 'Communication', 'score': 75},
+                {'criterion': 'Culture Fit', 'score': 85},
+            ],
+            notes='Property check.',
+        )
+        self.assertEqual(fb.overall_score, 83)
+
+
+class TestAISuggestEndpoint(FeedbackBaseTestCase):
+    """feedback:ai_suggest returns suggested criterion scores + summary."""
+
+    def test_suggest_returns_three_criteria_scores(self):
+        """The endpoint suggests a score for each default criterion."""
+        self.client.login(username='interviewer1', password='testpass123')
+        resp = self.client.post(
+            '/feedback/ai-suggest/',
+            data={'raw_notes': 'strong python, good communication, great team fit'},
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = json.loads(resp.content)
+        self.assertEqual(
+            [entry['criterion'] for entry in data['criteria_scores']],
+            list(InterviewFeedback.DEFAULT_CRITERIA),
+        )
+        for entry in data['criteria_scores']:
+            self.assertIsInstance(entry['score'], int)
+            self.assertTrue(0 <= entry['score'] <= 100)
+        self.assertTrue(data['summary'])
+
+    def test_suggest_non_interviewer_403(self):
+        self.client.login(username='hr_user', password='testpass123')
+        resp = self.client.post('/feedback/ai-suggest/', data={'raw_notes': 'x'})
+        self.assertEqual(resp.status_code, 403)
+
+    def test_suggest_empty_notes_400(self):
+        self.client.login(username='interviewer1', password='testpass123')
+        resp = self.client.post('/feedback/ai-suggest/', data={'raw_notes': ''})
+        self.assertEqual(resp.status_code, 400)
+
+
+# ---------------------------------------------------------------------------
+# 12. General Feedback (AI): generated on 2nd submission, regenerated on 3rd
+# ---------------------------------------------------------------------------
+class TestGeneralFeedback(FeedbackBaseTestCase):
+
+    def _submit(self, app, rnd, interviewer_user, score, notes, criteria=True):
+        """Submit one feedback as a logged-in client; returns the response."""
+        self.client.force_login(interviewer_user)
+        data = {'notes': notes, 'raw_notes': ''}
+        if criteria:
+            data.update({
+                'criterion_0': score, 'criterion_1': score, 'criterion_2': score,
+            })
+        else:
+            data['score'] = score
+        return self.client.post(f'/feedback/{app.pk}/{rnd.pk}/', data=data)
+
+    def test_generated_on_second_submission(self):
+        """general_feedback is empty after round 1, populated after round 2."""
+        self._submit(self.app, self.round1, self.interviewer, 80, 'Strong technical round.')
+        self.app.refresh_from_db()
+        self.assertEqual(self.app.general_feedback, '')
+
+        self._submit(self.app, self.round2, self.interviewer, 90, 'Excellent design round.')
+        self.app.refresh_from_db()
+        self.assertIn('Strong technical round', self.app.general_feedback)
+        self.assertIn('Excellent design round', self.app.general_feedback)
+        self.assertIn('Technical Screen', self.app.general_feedback)
+        self.assertIn('System Design', self.app.general_feedback)
+
+    def test_regeneration_reflects_new_round(self):
+        """Third feedback on a new round of the same job updates the summary."""
+        round3 = InterviewRound.objects.create(job=self.job, name='Culture Round', order=3)
+        self.app.panel_interviewers.add(self.interviewer2)
+        self._submit(self.app, self.round1, self.interviewer, 80, 'Alpha round.')
+        self._submit(self.app, self.round2, self.interviewer, 90, 'Beta round.')
+        self.app.refresh_from_db()
+        self.assertNotIn('Culture Round', self.app.general_feedback)
+
+        self._submit(self.app, round3, self.interviewer2, 60, 'Gamma round.')
+        self.app.refresh_from_db()
+        self.assertIn('Gamma round', self.app.general_feedback)
+        self.assertIn('Culture Round', self.app.general_feedback)
+
+    def test_general_feedback_works_when_ai_down(self):
+        """Local fallback synthesizes the narrative when the AI is unreachable."""
+        self._submit(self.app, self.round1, self.interviewer, 80, 'Alpha round.')
+        self._submit(self.app, self.round2, self.interviewer, 90, 'Beta round.')
+        self.app.refresh_from_db()
+        # Local fallback always fills the field with round data.
+        self.assertTrue(self.app.general_feedback)
+        self.assertIn('Alpha round', self.app.general_feedback)
+        self.assertIn('overall 80/100', self.app.general_feedback)
+
+    def test_single_round_no_general_feedback(self):
+        """One round of feedback never triggers the consolidated narrative."""
+        self._submit(self.app, self.round1, self.interviewer, 70, 'Only round.')
+        self.app.refresh_from_db()
+        self.assertEqual(self.app.general_feedback, '')
+
+    def test_submission_survives_general_feedback_failure(self):
+        """A general-feedback crash never breaks the HR action (submission)."""
+        self._submit(self.app, self.round1, self.interviewer, 80, 'Alpha round.')
+        with patch('feedback.views.general_feedback_summary', side_effect=RuntimeError('AI down')):
+            resp = self._submit(self.app, self.round2, self.interviewer, 90, 'Beta round.')
+        self.assertEqual(resp.status_code, 302)  # submission succeeded
+        self.assertTrue(
+            InterviewFeedback.objects.filter(
+                application=self.app, round=self.round2,
+            ).exists(),
+        )
+        self.app.refresh_from_db()
+        self.assertEqual(self.app.general_feedback, '')  # unchanged, no crash
+
+
+# ---------------------------------------------------------------------------
+# 13. Model properties and display
+# ---------------------------------------------------------------------------
+class TestScorecardDisplay(FeedbackBaseTestCase):
+
+    def test_criteria_display_sanitizes_invalid_entries(self):
+        """Malformed JSON entries are dropped from the display."""
+        fb = InterviewFeedback.objects.create(
+            application=self.app, round=self.round1, interviewer=self.interviewer,
+            score=70,
+            criteria_scores=[
+                {'criterion': 'Technical Skill', 'score': 70},
+                {'criterion': 'Communication', 'score': 'high'},  # invalid
+                {'criterion': 'Culture Fit', 'score': 999},        # out of range
+                'garbage',                                          # not a dict
+            ],
+            notes='Sanitize check.',
+        )
+        self.assertEqual(
+            fb.criteria_display,
+            [{'criterion': 'Technical Skill', 'score': 70}],
+        )
+
+    def test_criteria_display_defaults_when_empty(self):
+        """No criteria stored -> default criteria with empty scores."""
+        fb = InterviewFeedback.objects.create(
+            application=self.app, round=self.round1, interviewer=self.interviewer,
+            score=70, notes='Defaults check.',
+        )
+        self.assertEqual(
+            fb.criteria_display,
+            [{'criterion': name, 'score': None} for name in InterviewFeedback.DEFAULT_CRITERIA],
+        )
+
+    def test_feedback_form_page_shows_criteria_inputs(self):
+        """The form template renders the fixed criteria inputs."""
+        self.client.login(username='interviewer1', password='testpass123')
+        resp = self.client.get(f'/feedback/{self.app.pk}/{self.round1.pk}/')
+        self.assertEqual(resp.status_code, 200)
+        content = resp.content.decode()
+        self.assertIn('name="criterion_0"', content)
+        self.assertIn('name="criterion_1"', content)
+        self.assertIn('name="criterion_2"', content)
+        self.assertIn('Technical Skill', content)
+        self.assertIn('Suggest ratings', content)
+
+    def test_feedback_detail_shows_scorecard(self):
+        """Detail page renders the scorecard rows from stored criteria."""
+        InterviewFeedback.objects.create(
+            application=self.app, round=self.round1, interviewer=self.interviewer,
+            score=80,
+            criteria_scores=[
+                {'criterion': 'Technical Skill', 'score': 90},
+                {'criterion': 'Communication', 'score': 70},
+                {'criterion': 'Culture Fit', 'score': 80},
+            ],
+            notes='Detail page check.',
+        )
+        self.client.login(username='interviewer1', password='testpass123')
+        fb = InterviewFeedback.objects.get(
+            application=self.app, round=self.round1, interviewer=self.interviewer,
+        )
+        resp = self.client.get(f'/feedback/{fb.pk}/')
+        self.assertEqual(resp.status_code, 200)
+        content = resp.content.decode()
+        self.assertIn('Scorecard', content)
+        self.assertIn('Technical Skill', content)
 

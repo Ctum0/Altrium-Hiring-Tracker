@@ -1,3 +1,5 @@
+import re
+
 from datetime import datetime, timedelta
 
 from django.conf import settings
@@ -15,8 +17,10 @@ from django.views import View
 from django.views.generic import DetailView, ListView
 
 from ai.cv_parser import extract_text
-from ai.matching import auto_apply, job_fit
 from ai.services import fit_summary, parse_cv
+from ai.matching import auto_apply, job_fit
+
+from notifications.mail import send_candidate_email
 
 from .dedup import find_fuzzy_match
 from .intake_rules import (
@@ -242,6 +246,10 @@ class CandidateUploadView(LoginRequiredMixin, View):
             )
             return self._render(request, jobs)
 
+        # Confirmation email is sent once per NEW candidate in this batch
+        # (not per file): a re-upload of the same person must not email
+        # them twice, and multiple new candidates may share one batch.
+        confirmation_sent_for = set()
         created = 0
         linked = 0
         duplicates = 0
@@ -344,6 +352,18 @@ class CandidateUploadView(LoginRequiredMixin, View):
 
             if app_created:
                 linked += 1
+                # Confirmation email (Feature 4): fires on every NEW
+                # application (audit Phase 0 decision). Once per candidate
+                # per batch; a new application for a candidate we already
+                # emailed in this same upload is skipped. candidate.email
+                # may be None — send_candidate_email logs and skips.
+                if candidate.email and candidate.pk not in confirmation_sent_for:
+                    send_candidate_email(
+                        'confirmation.txt',
+                        {'job_title': job.title},
+                        candidate,
+                    )
+                    confirmation_sent_for.add(candidate.pk)
 
             # Auto-score against this specific job and auto-reject when the
             # job defines a baseline and the candidate falls short. Only
@@ -488,6 +508,11 @@ class CandidateImportView(LoginRequiredMixin, View):
             job=job,
             defaults={'status': JobApplication.Status.NEW},
         )
+        # Confirmation email (Feature 4): fires on every NEW application,
+        # HR-uploaded or imported (audit Phase 0 decision). candidate.email
+        # may be None — send_candidate_email logs and skips.
+        if app_created:
+            send_candidate_email('confirmation.txt', {'job_title': job.title}, candidate)
 
         # Auto-score against this specific job and auto-reject when
         # the job defines a baseline and the candidate falls short.
@@ -904,6 +929,26 @@ class InterviewDetailsView(LoginRequiredMixin, View):
                     ),
                     link=reverse('candidates:detail', kwargs={'pk': app.candidate_id}),
                 )
+
+        # Interview invitation email (Feature 4): fire on a NEW or UPDATED
+        # schedule only — a clear (or a save that changes only the notes)
+        # must not re-invite the candidate. Scheduled time was already
+        # validated above (well-formed, not in the past, interviewer
+        # availability/clash when assigned). Never breaks the HR action.
+        if scheduled and scheduled_changed:
+            link_match = re.search(r'https?://\S+', app.interview_details or '')
+            send_candidate_email(
+                'interview_invitation.txt',
+                {
+                    'job_title': app.job.title,
+                    'interview_date': f'{app.interview_at:%Y-%m-%d}',
+                    'interview_time': f'{app.interview_at:%H:%M} UTC',
+                    'round_name': app.current_round.name if app.current_round else '',
+                    'interview_details': app.interview_details or '',
+                    'interview_link': link_match.group(0) if link_match else '',
+                },
+                app.candidate,
+            )
 
         return redirect('candidates:detail', pk=app.candidate_id)
 

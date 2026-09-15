@@ -23,9 +23,25 @@
 <div class="panel panel-pad">
   <div class="flex items-center justify-between" style="margin-bottom:var(--sp-3)">
     <span class="text-sm text-muted">
-      Score: <span class="score-ring {{ feedback.score|score_ring_class }}">{{ feedback.score }}</span>
+      Overall: <span class="score-ring {{ feedback.score|score_ring_class }}">{{ feedback.score }}</span>
       &middot; Interviewer: {{ feedback.interviewer.get_full_name|default:feedback.interviewer.username }}
     </span>
+  </div>
+
+  <div style="margin-bottom:var(--sp-3)">
+    <h3 class="section-label" style="margin-bottom:var(--sp-2)">Scorecard</h3>
+    <div style="display:grid;gap:var(--sp-2)">
+      {% for entry in feedback.criteria_display %}
+      <div class="flex items-center justify-between" style="gap:var(--sp-3)">
+        <span class="text-sm">{{ entry.criterion }}</span>
+        {% if entry.score is not None %}
+        <span class="score-ring {{ entry.score|score_ring_class }}">{{ entry.score }}</span>
+        {% else %}
+        <span class="text-xs text-muted">&mdash;</span>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
   </div>
 
   <div style="white-space:pre-line;line-height:1.6;max-width:72ch">{{ feedback.notes }}</div>

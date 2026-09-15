@@ -10,4 +10,5 @@ urlpatterns = [
     path('<int:pk>/', views.FeedbackDetailView.as_view(), name='detail'),
     path('<int:pk>/history/', views.FeedbackHistoryView.as_view(), name='history'),
     path('ai-polish/', views.AIPolishView.as_view(), name='ai_polish'),
+    path('ai-suggest/', views.AISuggestView.as_view(), name='ai_suggest'),
 ]

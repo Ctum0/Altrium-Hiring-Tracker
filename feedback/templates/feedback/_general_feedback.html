@@ -1,0 +1,20 @@
+{% comment %}
+General Feedback (AI) card — consolidated cross-round narrative for one
+application. Include with an `app` in context:
+  {% include 'feedback/_general_feedback.html' %}
+{% endcomment %}
+{% if app.general_feedback %}
+<div class="panel panel-pad" style="margin-bottom:var(--sp-3)">
+  <div class="flex items-center justify-between" style="margin-bottom:var(--sp-2)">
+    <h3 class="section-label" style="margin:0">General Feedback</h3>
+    <span class="text-xs text-muted">
+      AI consolidation of {{ app.feedbacks.all|length }} interview round{{ app.feedbacks.all|length|pluralize }}
+    </span>
+  </div>
+  <div style="white-space:pre-line;line-height:1.6;font-size:var(--text-sm);color:var(--ink-secondary)">{{ app.general_feedback }}</div>
+  <p class="text-xs text-muted" style="margin-top:var(--sp-2)">
+    Regenerated automatically whenever a new round's feedback is submitted.
+    Each round's feedback remains individually visible below.
+  </p>
+</div>
+{% endif %}
