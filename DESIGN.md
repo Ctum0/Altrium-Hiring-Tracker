@@ -8,7 +8,7 @@ Vision UI: a deep-navy frosted-glass dashboard language with ambient glow, gradi
 
 ## Palette (OKLCH)
 - Brand: oklch(0.72 0.15 195) bright cyan (#22D3EE) for dark surfaces; oklch(0.55 0.15 230) deep azure blue (#036fa8) for light surfaces. Hover states step darker within the same hue. (NOTE: an earlier revision of this document specified indigo-cobalt oklch(0.55 0.22 270); the implemented palette is the source of truth and has been updated here to match reality.)
-- bg: dark navy gradient (deep canvas default) / oklch(0.97 0.005 270) slate-tinted light canvas (opt-in)
+- bg: near-black gradient (#0a0a0c -> #020203, body #050507 — true black, not navy) dark canvas / oklch(0.97 0.005 270) slate-tinted light canvas (opt-in)
 - surface: rgba(255,255,255,0.05-0.15) dark glass / rgba(255,255,255,0.85) light glass
 - border: rgba(255,255,255,0.14) dark / rgba(226,232,240,0.5) light
 - ink: oklch(0.20 0.02 270) dark / white; secondary oklch(0.35 0.02 270); muted oklch(0.50 0.03 270)
