@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% block title %}Add round | Altrium Tracker{% endblock %}
+{% block breadcrumb %}<a class="breadcrumb-link" href="{% url 'jobs:list' %}">Jobs</a><span class="breadcrumb-sep">/</span><a class="breadcrumb-link" href="{% url 'jobs:detail' job.pk %}">{{ job.title }}</a><span class="breadcrumb-sep">/</span>Add round{% endblock %}
 {% block page_title %}Add round{% endblock %}
 {% block content %}
 <form method="post" novalidate>

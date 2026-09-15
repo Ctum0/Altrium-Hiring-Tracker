@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% block title %}Review: {{ candidate.full_name }} | Altrium Tracker{% endblock %}
+{% block breadcrumb %}<a class="breadcrumb-link" href="{% url 'candidates:list' %}">Candidates</a><span class="breadcrumb-sep">/</span>{{ candidate.full_name }}{% endblock %}
 {% block page_title %}Review Candidate{% endblock %}
 
 {% block content %}
@@ -9,17 +10,17 @@
 </div>
 
 <div class="panel panel-pad glass-panel" style="max-width:700px;box-shadow:var(--shadow-md)">
-  <div style="margin-bottom:var(--sp-4);padding:var(--sp-3);border-radius:8px;background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.2)">
-    <div style="font-weight:600;color:#f59e0b;margin-bottom:4px">Needs Review</div>
+  <div style="margin-bottom:var(--sp-4);padding:var(--sp-3);border-radius:8px;background:var(--status-pending-bg);border:1px solid var(--status-pending)">
+    <div style="font-weight:600;color:var(--status-pending);margin-bottom:4px">Needs Review</div>
     {% if latest_job %}
     <div class="text-xs" style="color:var(--vui-text-muted);margin-bottom:6px">Uploaded for: <strong>{{ latest_job.title }}</strong></div>
     {% endif %}
     <div class="text-xs text-muted">
       {% for reason in reasons_list %}
         {% if reason == 'no_email' %}No email was extracted from the CV.{% endif %}
-        {% if reason == 'low_text_volume' %}Very little text was extracted — the file may be corrupted or image-based.{% endif %}
+        {% if reason == 'low_text_volume' %}Very little text was extracted. The file may be corrupted or image-based.{% endif %}
         {% if reason == 'name_is_skill_word' %}The extracted "name" matches a technical skill, not a person's name.{% endif %}
-        {% if reason == 'single_word_name' %}Only one name word was extracted — likely incomplete.{% endif %}
+        {% if reason == 'single_word_name' %}Only one name word was extracted, likely incomplete.{% endif %}
       {% endfor %}
     </div>
   </div>
@@ -52,7 +53,7 @@
     <div style="margin-top:var(--sp-4)">
       <details>
         <summary class="text-sm" style="cursor:pointer;font-weight:600">View extracted CV text</summary>
-        <pre style="margin-top:var(--sp-2);padding:var(--sp-3);background:rgba(255,255,255,0.04);border-radius:8px;font-size:var(--text-xs);max-height:300px;overflow:auto;white-space:pre-wrap">{{ candidate.resume_text }}</pre>
+        <pre style="margin-top:var(--sp-2);padding:var(--sp-3);background:var(--surface-2);border-radius:8px;font-size:var(--text-xs);max-height:300px;overflow:auto;white-space:pre-wrap">{{ candidate.resume_text }}</pre>
       </details>
     </div>
     {% endif %}

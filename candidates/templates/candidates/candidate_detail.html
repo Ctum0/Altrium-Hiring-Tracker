@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 {% block title %}{{ candidate.full_name }} | Altrium Tracker{% endblock %}
+{% block breadcrumb %}<a class="breadcrumb-link" href="{% url 'candidates:list' %}">Candidates</a><span class="breadcrumb-sep">/</span>{{ candidate.full_name }}{% endblock %}
 {% block page_title %}{{ candidate.full_name }}{% endblock %}
 {% block content_class %}candidate-detail{% endblock %}
 {% block content %}
@@ -9,7 +10,7 @@
     <div>
       <h1 class="page-title" style="font-size:1.3rem;font-weight:800;color:var(--ink);letter-spacing:-0.02em;margin:0">{{ candidate.full_name }}</h1>
       {% if candidate.needs_review %}
-      <a href="{% url 'candidates:review' candidate.pk %}" class="badge" style="background:rgba(251,191,36,0.15);color:#f59e0b;font-size:11px;padding:2px 8px;border-radius:999px;text-decoration:none;display:inline-block;margin-top:4px">⚠ Needs Review — {{ candidate.needs_review_reasons }}</a>
+      <a href="{% url 'candidates:review' candidate.pk %}" class="badge" style="background:var(--status-pending-bg);color:var(--status-pending);font-size:11px;padding:2px 8px;border-radius:999px;text-decoration:none;display:inline-block;margin-top:4px">⚠ Needs Review: {{ candidate.needs_review_reasons }}</a>
       {% endif %}
       <p class="page-sub" style="font-size:var(--text-xs);color:var(--muted);margin-top:1px">
         {% if candidate.email %}{{ candidate.email }}{% endif %}

@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% block title %}{{ job.title }} | Altrium Tracker{% endblock %}
+{% block breadcrumb %}<a class="breadcrumb-link" href="{% url 'jobs:list' %}">Jobs</a><span class="breadcrumb-sep">/</span>{{ job.title }}{% endblock %}
 {% block page_title %}{{ job.title }}{% endblock %}
 {% block content %}
 <div class="page-header">
@@ -136,7 +137,7 @@
 </div>
 {% if talent_pool_suggestions %}
 <div class="panel panel-pad" style="margin-top:var(--sp-6)">
-  <h3 style="font-size:var(--text-base);font-weight:700;margin-bottom:var(--sp-1)">Talent pool &mdash; suggested re-engagements</h3>
+  <h3 style="font-size:var(--text-base);font-weight:700;margin-bottom:var(--sp-1)">Talent pool: suggested re-engagements</h3>
   <p class="text-sm text-muted" style="margin-bottom:var(--sp-4)">Past candidates from closed jobs who scored well and match this job's domain. Add them to this posting to reopen the conversation.</p>
   <div class="table-wrap">
     <table class="table">

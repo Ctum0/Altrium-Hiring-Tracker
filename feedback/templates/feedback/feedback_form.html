@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% block title %}Feedback: {{ application.candidate.full_name }} | Altrium Tracker{% endblock %}
+{% block breadcrumb %}<a class="breadcrumb-link" href="{% url 'feedback:list' %}">Feedback</a><span class="breadcrumb-sep">/</span>{{ application.candidate.full_name }}{% endblock %}
 {% block page_title %}
   Feedback: {{ application.candidate.full_name }} &middot; {{ round.name }}
 {% endblock %}
@@ -46,7 +47,7 @@
           Suggest ratings
         </button>
         <span class="text-xs text-muted" style="margin-left:var(--sp-2)">
-          AI proposes ratings from your raw notes below &mdash; review and edit before submitting.
+          AI proposes ratings from your raw notes below. Review and edit before submitting.
         </span>
       </div>
     </div>
@@ -83,7 +84,7 @@
       {{ form.score }}
       {% if form.score.errors %}<p class="form-error">{{ form.score.errors.0 }}</p>{% endif %}
       <p class="form-help">
-        Optional when the scorecard above is filled &mdash; it is computed as the criteria average.
+        Optional when the scorecard above is filled: it is computed as the criteria average.
         Required otherwise.
       </p>
     </div>

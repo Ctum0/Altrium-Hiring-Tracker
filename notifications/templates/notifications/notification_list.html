@@ -21,7 +21,7 @@
 {% if notifications %}
 <div class="panel glass-panel" style="overflow:hidden">
   {% for n in notifications %}
-  <div class="flex items-center justify-between gap-4 notification-row" style="{% if not forloop.last %}border-bottom:1px solid var(--border);{% endif %}padding:var(--sp-4) var(--sp-5);{% if not n.is_read %}background:rgba(0,117,255,0.04){% endif %}">
+  <div class="flex items-center justify-between gap-4 notification-row" style="{% if not forloop.last %}border-bottom:1px solid var(--border);{% endif %}padding:var(--sp-4) var(--sp-5);{% if not n.is_read %}background:var(--brand-soft){% endif %}">
     <div class="flex items-center gap-3">
       <div class="activity-dot" style="width:8px;height:8px;{% if n.is_read %}background:var(--muted);box-shadow:none{% endif %}" aria-hidden="true"></div>
       <div>

@@ -30,15 +30,15 @@
   {% if needs_review_count > 0 %}
   <a href="?needs_review=1&{{ tab_extra }}"
      class="btn btn-sm {% if filter_needs_review %}btn-primary{% else %}btn-secondary{% endif %}"
-     style="{% if not filter_needs_review %}border-color:rgba(251,191,36,0.4);color:#f59e0b{% endif %}">
+     style="{% if not filter_needs_review %}border-color:var(--status-pending);color:var(--status-pending){% endif %}">
     ⚠ Needs Review
-    <span class="badge" style="background:#f59e0b;color:#000;margin-left:4px;font-size:10px">{{ needs_review_count }}</span>
+    <span class="badge" style="background:var(--status-pending);color:#000;margin-left:4px;font-size:11px">{{ needs_review_count }}</span>
   </a>
   {% if filter_needs_review and user.is_hr %}
   <form method="post" action="{% url 'candidates:bulk_review' %}" style="display:inline"
         onsubmit="return confirm('Mark all {{ needs_review_count }} flagged candidate{{ needs_review_count|pluralize }} as reviewed?')">
     {% csrf_token %}
-    <button type="submit" class="btn btn-sm btn-secondary" style="border-color:rgba(52,211,153,0.4);color:#34d399">✓ Mark all reviewed</button>
+    <button type="submit" class="btn btn-sm btn-secondary" style="border-color:var(--status-hired);color:var(--status-hired)">✓ Mark all reviewed</button>
   </form>
   {% endif %}
   {% endif %}
@@ -56,7 +56,7 @@
       <div class="form-field filter-search" style="margin-bottom:0">
         <label class="form-label" for="q" style="display:flex;align-items:center;justify-content:space-between">
           <span>Search candidate</span>
-          <kbd style="font-size:10px;padding:1px 5px;border-radius:4px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);color:var(--vui-text-muted);font-family:monospace" title="Press / to focus search">/</kbd>
+        <kbd style="font-size:10px;padding:1px 5px;border-radius:4px;background:var(--surface-2);border:1px solid var(--border);color:var(--muted);font-family:monospace" title="Press / to focus search">/</kbd>
         </label>
         <input class="form-input" type="search" id="q" name="q" value="{{ filter_q }}" placeholder="Name, email, skill, or role">
       </div>
@@ -118,7 +118,7 @@
             <div class="cand-name-info">
               <a href="{% url 'candidates:detail' app.candidate.pk %}" class="cand-name-main" style="text-decoration:none;color:inherit">{{ app.candidate.full_name }}</a>
               {% if app.candidate.needs_review %}
-              <a href="{% url 'candidates:review' app.candidate.pk %}" class="btn btn-xs" style="background:rgba(251,191,36,0.15);color:#f59e0b;border:1px solid rgba(251,191,36,0.3);font-size:10px;padding:2px 8px;border-radius:999px;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-left:6px" title="Needs review: {{ app.candidate.needs_review_reasons }}">⚠ Review</a>
+              <a href="{% url 'candidates:review' app.candidate.pk %}" class="btn btn-xs" style="background:var(--status-pending-bg);color:var(--status-pending);border:1px solid var(--status-pending);font-size:11px;padding:2px 8px;border-radius:999px;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-left:6px" title="Needs review: {{ app.candidate.needs_review_reasons }}">⚠ Review</a>
               {% endif %}
               <span class="cand-name-email">{{ app.candidate.email }}</span>
             </div>

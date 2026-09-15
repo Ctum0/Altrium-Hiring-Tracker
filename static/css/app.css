@@ -216,7 +216,9 @@
   color-scheme: dark;
 }
 
-/* ===== Light theme — Pure White SaaS (sober, premium, Stripe/Notion) ===== */
+/* ===== Light theme — Modern SaaS: solid elevated cards, soft tinted shadows,
+   crisp borders. No blur-glass here; that language stays in dark mode. This
+   is the flagship default theme (see DESIGN.md "SaaS-grade" direction). ===== */
 :root[data-theme='light'] {
   color-scheme: light;
 
@@ -225,17 +227,18 @@
   --vui-primary-blue-gradient: linear-gradient(135deg, #036fa8 0%, #0369A1 100%);
   --vui-primary-blue-glow: 0 4px 14px rgba(2, 132, 199, 0.20);
 
-  /* Sober frost: slate mist canvas (Linear/Gray) — not blue, white perceives but blur has depth */
-  --vui-bg-page-gradient: radial-gradient(ellipse at 60% 0%, oklch(0.98 0.008 260) 0%, oklch(0.985 0.005 260) 42%, oklch(1.000 0.000 0) 100%);
-  --vui-bg-body: oklch(0.985 0.005 260);
-  --vui-bg-surface-dark: oklch(0.985 0.005 260);
-  --vui-bg-surface-darker: oklch(0.978 0.007 260);
+  /* Soft lavender-grey ambient canvas behind the elevated surfaces (matches
+     the "floating card on a tinted background" reference), not a flat white. */
+  --vui-bg-page-gradient: radial-gradient(ellipse at 20% -10%, oklch(0.94 0.020 275) 0%, oklch(0.96 0.014 265) 38%, oklch(0.975 0.008 255) 100%);
+  --vui-bg-body: oklch(0.96 0.012 265);
+  --vui-bg-surface-dark: oklch(1.000 0.000 0);
+  --vui-bg-surface-darker: oklch(0.99 0.004 260);
 
-  /* Sober milk-glass on slate mist — translucent milk + blur, edge reads */
-  --vui-glass-card-bg: rgba(255, 255, 255, 0.68);
-  --vui-glass-card-bg-alt: rgba(255, 255, 255, 0.74);
-  --vui-glass-panel-light: rgba(255, 255, 255, 0.72);
-  --vui-glass-hover-bg: rgba(255, 255, 255, 0.82);
+  /* Solid near-white cards — opaque, no translucency, no blur needed to read. */
+  --vui-glass-card-bg: oklch(1.000 0.000 0);
+  --vui-glass-card-bg-alt: oklch(0.99 0.004 260);
+  --vui-glass-panel-light: oklch(1.000 0.000 0);
+  --vui-glass-hover-bg: oklch(0.985 0.006 260);
 
   /* Active / Highlight Surface */
   --vui-active-item-bg: rgba(2, 132, 199, 0.10);
@@ -261,15 +264,15 @@
   --accent-amber: #D97706;
   --accent-amber-soft: rgba(217, 119, 6, 0.14);
 
-  --bg: oklch(0.985 0.005 260);
+  --bg: oklch(0.96 0.012 265);
   --bg-1: oklch(1.000 0.000 0);
-  --bg-2: oklch(0.980 0.007 260);
-  --bg-gradient: radial-gradient(ellipse at 60% 0%, oklch(0.98 0.008 260) 0%, oklch(0.985 0.005 260) 42%, oklch(1.000 0.000 0) 100%);
-  --surface: rgba(255, 255, 255, 0.82);
-  --surface-2: oklch(0.985 0.005 260);
-  --surface-hover: rgba(255, 255, 255, 0.96);
-  --border: oklch(0.92 0.010 260);
-  --border-strong: oklch(0.88 0.012 260);
+  --bg-2: oklch(0.99 0.004 260);
+  --bg-gradient: radial-gradient(ellipse at 20% -10%, oklch(0.94 0.020 275) 0%, oklch(0.96 0.014 265) 38%, oklch(0.975 0.008 255) 100%);
+  --surface: oklch(1.000 0.000 0);
+  --surface-2: oklch(0.99 0.004 260);
+  --surface-hover: oklch(0.985 0.006 260);
+  --border: oklch(0.90 0.012 260);
+  --border-strong: oklch(0.85 0.014 260);
 
   /* Crisp Slate Ink typography */
   --ink: #081A2C;
@@ -280,7 +283,7 @@
   --vui-text-white: #081A2C;
   --vui-text-muted: #132E48;
   --vui-text-subtle: #334D66;
-  --vui-border-glass-subtle: oklch(0.92 0.010 260);
+  --vui-border-glass-subtle: oklch(0.90 0.012 260);
   --vui-border-glass-highlight: linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0) 100%);
 
   --status-new: #036fa8;
@@ -304,19 +307,21 @@
   --danger-solid: #DC2626;
   --danger-solid-hover: #B91C1C;
 
-  --shadow-sm: 0 1px 2px rgba(16,24,40,0.06), 0 4px 12px rgba(16,24,40,0.06);
-  --shadow-md: 0 1px 3px rgba(16,24,40,0.08), 0 8px 24px rgba(16,24,40,0.08);
-  --shadow-lg: 0 4px 16px rgba(16,24,40,0.10), 0 16px 40px rgba(16,24,40,0.10);
-  --shadow-xl: 0 8px 32px rgba(16,24,40,0.12), 0 24px 48px rgba(16,24,40,0.12);
-  --shadow-dashboard: 0 1px 3px rgba(16,24,40,0.06), 0 12px 32px rgba(16,24,40,0.08);
+  /* Soft tinted elevation — offset + blur, tinted toward the cool canvas
+     hue rather than pure black, per craft-floor shadow guidance. */
+  --shadow-sm: 0 1px 2px rgba(30,41,59,0.05), 0 2px 8px rgba(30,41,59,0.06);
+  --shadow-md: 0 2px 4px rgba(30,41,59,0.06), 0 8px 20px rgba(30,41,59,0.08);
+  --shadow-lg: 0 4px 10px rgba(30,41,59,0.07), 0 18px 40px rgba(30,41,59,0.11);
+  --shadow-xl: 0 8px 20px rgba(30,41,59,0.08), 0 28px 56px rgba(30,41,59,0.14);
+  --shadow-dashboard: 0 2px 4px rgba(30,41,59,0.05), 0 12px 28px rgba(30,41,59,0.07);
 
-  --glass-bg: rgba(255, 255, 255, 0.68);
-  --glass-border: oklch(0.92 0.010 260);
-  --glass-shadow: 0 1px 2px rgba(16,24,40,0.06), 0 8px 24px rgba(16,24,40,0.08);
+  --glass-bg: oklch(1.000 0.000 0);
+  --glass-border: oklch(0.90 0.012 260);
+  --glass-shadow: 0 2px 4px rgba(30,41,59,0.06), 0 8px 20px rgba(30,41,59,0.08);
   --glass-highlight: linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0) 100%);
 
   --fg: var(--ink);
-  --border-subtle: rgba(10, 33, 56, 0.10);
+  --border-subtle: rgba(10, 33, 56, 0.08);
   --accent-border: rgba(2, 132, 199, 0.28);
 
   --transition: 200ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -360,39 +365,39 @@ body {
 }
 :root[data-theme='light'] .vui-ambient-glow { display: none; }
 
-/* Light: Level 2 glassier — milk translucency ↑, edge wetter, frost visible */
+/* Light: solid elevated cards — no translucency, no blur. Crisp borders +
+   soft tinted shadow do the elevation work (matches the SaaS reference:
+   opaque white card floating on a tinted canvas, not frosted glass). */
 :root[data-theme='light'] {
-  --vui-blur-card: blur(24px) saturate(180%);
-  --vui-blur-nav: blur(16px) saturate(170%);
+  --vui-blur-card: none;
+  --vui-blur-nav: none;
 }
 :root[data-theme='light'] .glass-panel,
 :root[data-theme='light'] .glass-card,
 :root[data-theme='light'] .vui-card,
 :root[data-theme='light'] .ai-insight-card {
-  background: rgba(255, 255, 255, 0.58) !important;
-  backdrop-filter: blur(24px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
-  border-color: rgba(255, 255, 255, 0.70) !important;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.94), 0 12px 40px rgba(16,24,40,0.11), 0 1px 3px rgba(16,24,40,0.07) !important;
+  background: var(--vui-glass-card-bg) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border-color: var(--border) !important;
+  box-shadow: var(--shadow-md) !important;
 }
 :root[data-theme='light'] .glass-panel::before,
 :root[data-theme='light'] .glass-card::before,
 :root[data-theme='light'] .vui-card::before,
 :root[data-theme='light'] .ai-insight-card::before {
-  background: linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(255,255,255,0) 72%) !important;
-  opacity: 1 !important;
+  display: none !important;
 }
 :root[data-theme='light'] .glass-topbar,
 :root[data-theme='light'] .glass-sidebar {
-  background: rgba(255, 255, 255, 0.74) !important;
-  backdrop-filter: blur(16px) saturate(170%) !important;
-  -webkit-backdrop-filter: blur(16px) saturate(170%) !important;
-  border-color: rgba(255,255,255,0.70) !important;
-  box-shadow: 0 1px 18px rgba(16,24,40,0.09) !important;
+  background: var(--vui-glass-card-bg) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border-color: var(--border) !important;
+  box-shadow: 0 1px 2px rgba(30,41,59,0.04) !important;
 }
 :root[data-theme='light'] .app-shell {
-  outline: 1px solid oklch(0.93 0.008 260);
-  outline-offset: -1px;
+  outline: none;
 }
 
 .vui-glow-blue {
@@ -1433,17 +1438,42 @@ a:hover {
   box-shadow: var(--shadow-sm);
 }
 
-.nav-link .nav-icon {
-  width: 18px;
-  height: 18px;
+.nav-link .nav-icon-tile {
+  width: 26px;
+  height: 26px;
   flex-shrink: 0;
-  opacity: 0.75;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  transition: background-color 200ms ease, opacity 200ms ease, transform 200ms ease;
+}
+
+.nav-link .nav-icon {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  opacity: 0.85;
   transition: opacity 200ms ease;
 }
 
-.nav-link.active .nav-icon,
-.nav-link:hover .nav-icon {
+/* Each workspace section carries its own icon-tile hue, reused nowhere else,
+   so the sidebar reads as a set of distinct destinations rather than one
+   flat list (matches the colored-icon-per-category SaaS reference). */
+.nav-icon-tile-blue   { background: var(--brand-gradient); color: #ffffff; }
+.nav-icon-tile-violet { background: var(--grad-violet); color: #ffffff; }
+.nav-icon-tile-teal   { background: var(--grad-teal); color: #062b29; }
+.nav-icon-tile-cyan   { background: var(--grad-emerald); color: #04371f; }
+.nav-icon-tile-amber  { background: var(--grad-amber); color: #3b2a00; }
+.nav-icon-tile-rose   { background: var(--grad-danger); color: #ffffff; }
+
+.nav-link .nav-icon-tile {
+  opacity: 0.9;
+  transform: scale(0.96);
+}
+.nav-link.active .nav-icon-tile,
+.nav-link:hover .nav-icon-tile {
   opacity: 1;
+  transform: scale(1);
 }
 
 /* Sidebar footer (user) */
@@ -1519,6 +1549,19 @@ a:hover {
   letter-spacing: 0.05em;
   text-transform: uppercase;
   margin-bottom: 1px;
+}
+
+.breadcrumb-link {
+  color: var(--muted);
+  text-decoration: none;
+}
+.breadcrumb-link:hover {
+  color: var(--brand);
+  text-decoration: underline;
+}
+.breadcrumb-sep {
+  margin: 0 var(--sp-1);
+  color: var(--border-strong);
 }
 
 .topbar-title {

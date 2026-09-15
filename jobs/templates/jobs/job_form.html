@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% block title %}{% if is_edit %}Edit{% else %}New{% endif %} job | Altrium Tracker{% endblock %}
+{% block breadcrumb %}<a class="breadcrumb-link" href="{% url 'jobs:list' %}">Jobs</a><span class="breadcrumb-sep">/</span>{% if is_edit %}{{ form.instance.title|default:'Edit job' }}{% else %}New job{% endif %}{% endblock %}
 {% block page_title %}{% if is_edit %}Edit job{% else %}New job{% endif %}{% endblock %}
 {% block content %}
 <div class="page-header">

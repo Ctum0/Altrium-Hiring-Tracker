@@ -24,7 +24,7 @@
 
 {% if not has_availability %}
 <!-- Availability Warning -->
-<div class="glass-panel" style="padding:var(--sp-4);margin-bottom:var(--sp-5);border-left:3px solid #eab308">
+<div class="glass-panel" style="padding:var(--sp-4);margin-bottom:var(--sp-5);background:var(--status-pending-bg);border:1px solid var(--status-pending)">
   <p class="text-xs" style="margin:0"><strong>No availability declared.</strong> HR cannot schedule interviews for you until you have at least one weekly window. Ask an administrator to record your weekly availability.</p>
 </div>
 {% endif %}

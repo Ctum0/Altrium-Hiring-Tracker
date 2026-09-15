@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 {% load accounts_extras %}
 {% block title %}{{ interviewer.get_full_name|default:interviewer.username }} | Altrium Tracker{% endblock %}
+{% block breadcrumb %}<a class="breadcrumb-link" href="{% url 'accounts:interviewer_roster' %}">Interviewers</a><span class="breadcrumb-sep">/</span>{{ interviewer.get_full_name|default:interviewer.username }}{% endblock %}
 {% block page_title %}Interviewer Profile{% endblock %}
 {% block content %}
 
@@ -74,8 +75,8 @@
       </div>
       {% endfor %}
     {% else %}
-      <div style="padding:var(--sp-3);border-radius:8px;background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.2)">
-        <span class="text-xs" style="color:#f59e0b"><strong>Not yet available.</strong> No weekly windows declared &mdash; scheduling is blocked until at least one window exists.</span>
+      <div style="padding:var(--sp-4);border-radius:8px;background:var(--status-pending-bg);border:1px solid var(--status-pending)">
+        <span class="text-xs" style="color:var(--status-pending)"><strong>Not yet available.</strong> No weekly windows declared. Scheduling is blocked until at least one window exists.</span>
       </div>
     {% endif %}
   </div>

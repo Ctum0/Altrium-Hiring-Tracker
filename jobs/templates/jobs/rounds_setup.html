@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% block title %}Set up rounds: {{ job.title }} | Altrium Tracker{% endblock %}
+{% block breadcrumb %}<a class="breadcrumb-link" href="{% url 'jobs:list' %}">Jobs</a><span class="breadcrumb-sep">/</span><a class="breadcrumb-link" href="{% url 'jobs:detail' job.pk %}">{{ job.title }}</a><span class="breadcrumb-sep">/</span>Set up rounds{% endblock %}
 {% block page_title %}Set up interview rounds{% endblock %}
 {% block content %}
 <div class="page-header">
@@ -79,7 +80,7 @@
   </form>
 
   <div class="form-actions" style="margin-top:var(--sp-6)">
-    <a href="{% url 'jobs:detail' job.pk %}" class="btn btn-primary">Done &mdash; go to job</a>
+    <a href="{% url 'jobs:detail' job.pk %}" class="btn btn-primary">Done, go to job</a>
   </div>
 </div>
 {% endblock %}

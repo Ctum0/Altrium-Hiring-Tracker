@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 {% load feedback_extras %}
 {% block title %}Feedback: {{ feedback.application.candidate.full_name }} | Altrium Tracker{% endblock %}
+{% block breadcrumb %}<a class="breadcrumb-link" href="{% url 'feedback:list' %}">Feedback</a><span class="breadcrumb-sep">/</span>{{ feedback.application.candidate.full_name }}{% endblock %}
 {% block page_title %}Feedback detail{% endblock %}
 {% block content %}
 <div class="page-header">
