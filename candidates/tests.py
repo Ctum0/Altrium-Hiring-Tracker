@@ -1892,7 +1892,7 @@ class MailTriggerTests(CandidatesBaseTestCase):
     def test_upload_candidate_without_email_sends_nothing_and_does_not_crash(self):
         from unittest.mock import patch
         # parse_cv returns no email: candidate is created email-less.
-        with patch('candidates.views.parse_cv', return_value={
+        with patch('candidates.intake.parse_cv', return_value={
             'first_name': 'No', 'last_name': 'Mail',
             'email': '', 'phone': '', 'skills': ['Python'],
         }):
@@ -2001,3 +2001,249 @@ class MailTriggerTests(CandidatesBaseTestCase):
         self.assertEqual(r.status_code, 302)
         self.application.refresh_from_db()
         self.assertIsNotNone(self.application.interview_at)
+
+
+class PublicApplyTests(CandidatesBaseTestCase):
+    """Phase 8: unauthenticated self-apply must produce the identical
+    Candidate/JobApplication state an HR upload of the same CV would."""
+
+    def _docx_file(self, name='cv.docx', full_name='Jane Smith',
+                    email='jane@example.com', skills='Python, Django'):
+        from docx import Document
+        doc = Document()
+        doc.add_paragraph(full_name)
+        doc.add_paragraph(f'Email: {email}')
+        doc.add_paragraph(f'Skills: {skills}')
+        # >=50 words so assess_confidence does not flag the parse: the
+        # unflagged (auto-score / auto-reject) path is under test here.
+        doc.add_paragraph('Experienced backend engineer with production experience. ' * 10)
+        bio = BytesIO()
+        doc.save(bio)
+        return SimpleUploadedFile(
+            name, bio.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        )
+
+    def test_get_renders_form_for_active_job(self):
+        r = self.client.get(reverse('candidates:public_apply', args=[self.job.pk]))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, self.job.title)
+        self.assertContains(r, 'consent')
+
+    def test_get_closed_job_404(self):
+        self.job.is_active = False
+        self.job.save(update_fields=['is_active'])
+        r = self.client.get(reverse('candidates:public_apply', args=[self.job.pk]))
+        self.assertEqual(r.status_code, 404)
+
+    def test_get_nonexistent_job_404(self):
+        r = self.client.get(reverse('candidates:public_apply', args=[999999]))
+        self.assertEqual(r.status_code, 404)
+
+    def test_post_closed_job_404_no_record_created(self):
+        self.job.is_active = False
+        self.job.save(update_fields=['is_active'])
+        r = self.client.post(reverse('candidates:public_apply', args=[self.job.pk]), {
+            'cv': self._docx_file(),
+            'consent': 'on',
+        })
+        self.assertEqual(r.status_code, 404)
+        self.assertFalse(Candidate.objects.filter(email='jane@example.com').exists())
+
+    def test_post_without_consent_rejected_no_record(self):
+        r = self.client.post(reverse('candidates:public_apply', args=[self.job.pk]), {
+            'cv': self._docx_file(),
+        })
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'consent')
+        self.assertFalse(Candidate.objects.filter(email='jane@example.com').exists())
+
+    def test_post_unsupported_file_type_rejected_no_record(self):
+        bad = SimpleUploadedFile(
+            'virus.exe', b'MZ\x90\x00', content_type='application/octet-stream'
+        )
+        r = self.client.post(reverse('candidates:public_apply', args=[self.job.pk]), {
+            'cv': bad,
+            'consent': 'on',
+        })
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'Unsupported file type')
+        self.assertFalse(Candidate.objects.filter(source='portal').exists())
+
+    def test_post_without_file_rejected(self):
+        r = self.client.post(reverse('candidates:public_apply', args=[self.job.pk]), {
+            'consent': 'on',
+        })
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'Choose a CV file')
+
+    def test_post_redirects_to_thanks_page(self):
+        r = self.client.post(reverse('candidates:public_apply', args=[self.job.pk]), {
+            'cv': self._docx_file(),
+            'consent': 'on',
+        }, follow=True)
+        self.assertContains(r, 'Application received')
+
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+    def test_post_sends_confirmation_email(self):
+        self.client.post(reverse('candidates:public_apply', args=[self.job.pk]), {
+            'cv': self._docx_file(),
+            'consent': 'on',
+        })
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ['jane@example.com'])
+
+    def test_portal_and_hr_upload_produce_equivalent_records(self):
+        """Same CV shape submitted by two different people through the two
+        different intake paths must land in the identical shape: same
+        parsed fields, same score, and (with a baseline that rejects a
+        2-of-5 skill match) the same auto-reject outcome."""
+        self.job.requirements = 'Python, Django, Kubernetes, Docker, Redis'
+        self.job.auto_reject_score = 50
+        self.job.save()
+
+        r = self.client.post(reverse('candidates:public_apply', args=[self.job.pk]), {
+            'cv': self._docx_file(full_name='Jane Smith', email='jane.portal@example.com'),
+            'consent': 'on',
+        })
+        self.assertEqual(r.status_code, 302)
+
+        self.login('hr')
+        self.client.post(reverse('candidates:upload'), {
+            'job': self.job.pk,
+            'files': [self._docx_file(full_name='Jane Smith', email='jane.hr@example.com')],
+        })
+
+        portal_candidate = Candidate.objects.get(email='jane.portal@example.com')
+        hr_candidate = Candidate.objects.get(email='jane.hr@example.com')
+        portal_app = JobApplication.objects.get(candidate=portal_candidate, job=self.job)
+        hr_app = JobApplication.objects.get(candidate=hr_candidate, job=self.job)
+
+        self.assertEqual(portal_candidate.first_name, hr_candidate.first_name)
+        self.assertEqual(portal_candidate.last_name, hr_candidate.last_name)
+        self.assertEqual(portal_candidate.skills, hr_candidate.skills)
+        self.assertEqual(portal_candidate.needs_review, hr_candidate.needs_review)
+        self.assertEqual(portal_app.shortlist_score, hr_app.shortlist_score)
+        self.assertIsNotNone(portal_app.shortlist_score)
+        self.assertLess(portal_app.shortlist_score, 50)
+        self.assertEqual(portal_app.status, JobApplication.Status.REJECTED)
+        self.assertEqual(portal_app.status, hr_app.status)
+        # source is the one field that legitimately differs between paths.
+        self.assertEqual(portal_candidate.source, 'portal')
+        self.assertEqual(hr_candidate.source, 'upload')
+
+    def test_portal_then_hr_same_email_dedupes_to_one_candidate(self):
+        """Same person applying through the portal, later re-uploaded by
+        HR under the same email, must dedupe exactly like two HR uploads
+        would (email-exact match, one JobApplication)."""
+        self.client.post(reverse('candidates:public_apply', args=[self.job.pk]), {
+            'cv': self._docx_file(),
+            'consent': 'on',
+        })
+        self.login('hr')
+        self.client.post(reverse('candidates:upload'), {
+            'job': self.job.pk,
+            'files': [self._docx_file()],
+        })
+        self.assertEqual(Candidate.objects.filter(email='jane@example.com').count(), 1)
+        self.assertEqual(
+            JobApplication.objects.filter(
+                candidate__email='jane@example.com', job=self.job
+            ).count(),
+            1,
+        )
+        candidate = Candidate.objects.get(email='jane@example.com')
+        # The HR re-upload is treated as a duplicate refresh (source stays
+        # whatever it was set to on first creation, matching the dedupe
+        # rule already covered by UploadTests.test_upload_duplicate_email_dedupes).
+        self.assertEqual(candidate.source, 'portal')
+
+    def test_fallback_contact_fills_missing_email_only(self):
+        with patch('candidates.intake.parse_cv', return_value={
+            'first_name': 'Sam', 'last_name': 'Rivera',
+            'email': '', 'phone': '', 'skills': ['Python'],
+        }):
+            r = self.client.post(reverse('candidates:public_apply', args=[self.job.pk]), {
+                'cv': self._docx_file(name='cv.docx'),
+                'email': 'sam.rivera@example.com',
+                'consent': 'on',
+            })
+        self.assertEqual(r.status_code, 302)
+        candidate = Candidate.objects.get(first_name='Sam', last_name='Rivera')
+        self.assertEqual(candidate.email, 'sam.rivera@example.com')
+
+    def test_fallback_contact_never_overwrites_parsed_email(self):
+        with patch('candidates.intake.parse_cv', return_value={
+            'first_name': 'Sam', 'last_name': 'Rivera',
+            'email': 'parsed@example.com', 'phone': '', 'skills': ['Python'],
+        }):
+            self.client.post(reverse('candidates:public_apply', args=[self.job.pk]), {
+                'cv': self._docx_file(name='cv.docx'),
+                'email': 'typed@example.com',
+                'consent': 'on',
+            })
+        candidate = Candidate.objects.get(first_name='Sam', last_name='Rivera')
+        self.assertEqual(candidate.email, 'parsed@example.com')
+
+    def test_fallback_contact_fills_missing_name_and_phone(self):
+        with patch('candidates.intake.parse_cv', return_value={
+            'first_name': '', 'last_name': '',
+            'email': 'anon@example.com', 'phone': '', 'skills': ['Python'],
+        }):
+            self.client.post(reverse('candidates:public_apply', args=[self.job.pk]), {
+                'cv': self._docx_file(name='cv.docx'),
+                'full_name': 'Alex Rivera',
+                'phone': '555-9999',
+                'consent': 'on',
+            })
+        candidate = Candidate.objects.get(email='anon@example.com')
+        self.assertEqual(candidate.first_name, 'Alex')
+        self.assertEqual(candidate.last_name, 'Rivera')
+        self.assertEqual(candidate.phone, '555-9999')
+
+
+class IntakeHelperTests(CandidatesBaseTestCase):
+    """Unit coverage for the shared candidates.intake.ingest_cv pipeline
+    used by both CandidateUploadView and PublicApplyView."""
+
+    def _docx_file(self, name='cv.docx', full_name='Jane Smith', email='jane@example.com'):
+        from docx import Document
+        doc = Document()
+        doc.add_paragraph(full_name)
+        doc.add_paragraph(f'Email: {email}')
+        doc.add_paragraph('Skills: Python, Django')
+        bio = BytesIO()
+        doc.save(bio)
+        return SimpleUploadedFile(
+            name, bio.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        )
+
+    def test_ingest_cv_creates_candidate_and_application(self):
+        from candidates.intake import ingest_cv
+        outcome = ingest_cv(self._docx_file(), self.job, source='portal')
+        self.assertIsNone(outcome['failed'])
+        self.assertTrue(outcome['created'])
+        self.assertTrue(outcome['app_created'])
+        self.assertEqual(outcome['candidate'].email, 'jane@example.com')
+        self.assertEqual(outcome['candidate'].source, 'portal')
+        self.assertEqual(outcome['application'].job, self.job)
+
+    def test_ingest_cv_unreadable_file_reports_failure_no_crash(self):
+        from candidates.intake import ingest_cv
+        garbage = SimpleUploadedFile(
+            'bad.pdf', b'\x89PNG\r\n\x1a\nnot really a pdf' * 100,
+            content_type='application/pdf',
+        )
+        outcome = ingest_cv(garbage, self.job, source='upload')
+        self.assertIsNotNone(outcome['failed'])
+        self.assertIsNone(outcome['candidate'])
+        self.assertFalse(Candidate.objects.filter(source='upload').exists())
+
+    def test_ingest_cv_duplicate_email_reuses_candidate(self):
+        from candidates.intake import ingest_cv
+        existing = Candidate.objects.create(email='jane@example.com', first_name='Jane')
+        outcome = ingest_cv(self._docx_file(), self.job, source='upload')
+        self.assertTrue(outcome['duplicate'])
+        self.assertFalse(outcome['created'])
+        self.assertEqual(outcome['candidate'].pk, existing.pk)

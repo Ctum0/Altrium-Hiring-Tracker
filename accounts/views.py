@@ -1,3 +1,4 @@
+import csv
 from itertools import groupby
 
 from django.contrib import messages
@@ -17,10 +18,122 @@ from accounts.forms import AvailabilityWindowForm, OnboardUserForm
 from accounts.models import InterviewerAvailability, Role
 
 from candidates.models import Candidate, JobApplication
-from jobs.models import Job
+from jobs.models import InterviewRound, Job
 from pipeline.models import PipelineMove
 
 User = get_user_model()
+
+
+def compute_avg_days_to_hire(job_id=None):
+    """Average days from application creation to first hire.
+
+    Uses the earliest PipelineMove(to_status='hired') per hired
+    application (time-to-hire), not the most recent one (which would
+    just measure time-since-hire). Falls back to stage_entered_at for
+    hires with no move history (e.g. seeded/legacy data predating
+    pipeline move logging).
+
+    Pass job_id to scope the calculation to one job's hires (used by
+    the per-job pipeline report); omit it for the global dashboard
+    metric. Shared by HRDashboardView and ReportExportView so both
+    stay in sync with the same audited formula.
+    """
+    hired_qs = JobApplication.objects.filter(status='hired')
+    if job_id is not None:
+        hired_qs = hired_qs.filter(job_id=job_id)
+    hired_apps = list(hired_qs.values_list('id', 'created_at'))
+    if not hired_apps:
+        return None
+
+    hired_ids = [app_id for app_id, _ in hired_apps]
+    first_hire_move = {}
+    for move in (
+        PipelineMove.objects.filter(application_id__in=hired_ids, to_status='hired')
+        .order_by('application_id', 'moved_at')
+    ):
+        if move.application_id not in first_hire_move:
+            first_hire_move[move.application_id] = move.moved_at
+
+    durations = []
+    for app_id, created_at in hired_apps:
+        hired_at = first_hire_move.get(app_id)
+        if hired_at is None:
+            # No move history — fall back to stage_entered_at.
+            hired_at = (
+                JobApplication.objects.filter(id=app_id)
+                .values_list('stage_entered_at', flat=True)
+                .first()
+            )
+        if hired_at and created_at:
+            durations.append((hired_at - created_at).total_seconds() / 86400.0)
+
+    return round(sum(durations) / len(durations), 1) if durations else None
+
+
+# Threshold for flagging a round's fail rate as abnormal: more than 1.5x
+# the mean fail rate across every round with move data. Kept as a simple,
+# explainable multiplier (not a statistical z-score or black-box model)
+# so HR can reason about why a round got flagged.
+ABNORMAL_FAIL_RATE_MULTIPLIER = 1.5
+# Minimum total outbound moves a round needs before it is eligible to be
+# flagged, so a single rejection out of one candidate can't flag a round
+# that simply has no real volume yet.
+MIN_MOVES_FOR_ABNORMAL_FLAG = 3
+
+
+def compute_stage_performance():
+    """Per-InterviewRound pass/fail rates derived from PipelineMove history.
+
+    For every round with at least one outbound PipelineMove
+    (from_round=<round>): fail_count counts moves rejected out of that
+    round; advance_count counts every other outbound move (advance to
+    another round, or placed into hired/on_hold) — i.e. everything
+    that isn't a rejection. Rounds with zero outbound moves are
+    skipped (no data yet).
+
+    Returns a list of dicts (round, fail_count, advance_count, total,
+    pass_rate_pct, fail_rate_pct, is_abnormal), sorted by fail rate
+    descending. Empty list means no round has move history yet.
+    """
+    rounds_with_moves = (
+        InterviewRound.objects.filter(moves_from__isnull=False)
+        .distinct()
+        .select_related('job')
+    )
+
+    stats = []
+    for round_obj in rounds_with_moves:
+        moves = PipelineMove.objects.filter(from_round=round_obj)
+        fail_count = moves.filter(to_status='rejected').count()
+        advance_count = moves.filter(
+            Q(to_round__isnull=False) | Q(to_status__in=['hired', 'on_hold'])
+        ).count()
+        total = fail_count + advance_count
+        if total == 0:
+            continue
+        stats.append({
+            'round': round_obj,
+            'fail_count': fail_count,
+            'advance_count': advance_count,
+            'total': total,
+            'fail_rate': fail_count / total,
+        })
+
+    if not stats:
+        return []
+
+    mean_fail_rate = sum(s['fail_rate'] for s in stats) / len(stats)
+    for s in stats:
+        s['pass_rate_pct'] = round((1 - s['fail_rate']) * 100, 1)
+        s['fail_rate_pct'] = round(s['fail_rate'] * 100, 1)
+        s['is_abnormal'] = (
+            mean_fail_rate > 0
+            and s['total'] >= MIN_MOVES_FOR_ABNORMAL_FLAG
+            and s['fail_rate'] > mean_fail_rate * ABNORMAL_FAIL_RATE_MULTIPLIER
+        )
+
+    stats.sort(key=lambda s: s['fail_rate'], reverse=True)
+    return stats
 
 
 class LoginView(auth_views.LoginView):
@@ -413,55 +526,56 @@ class HRDashboardView(LoginRequiredMixin, ListView):
 
             return round(sum(ages) / len(ages), 1) if ages else None
 
-        def _avg_days_to_hire():
-            """Average days from application creation to first hire.
-
-            Uses the earliest PipelineMove(to_status='hired') per hired
-            application (time-to-hire), not the most recent one (which
-            would just measure time-since-hire). Falls back to
-            stage_entered_at for hires with no move history (e.g.
-            seeded/legacy data predating pipeline move logging).
-            """
-            hired_apps = list(
-                JobApplication.objects.filter(status='hired')
-                .values_list('id', 'created_at')
-            )
-            if not hired_apps:
-                return None
-
-            hired_ids = [app_id for app_id, _ in hired_apps]
-            first_hire_move = {}
-            for move in (
-                PipelineMove.objects.filter(application_id__in=hired_ids, to_status='hired')
-                .order_by('application_id', 'moved_at')
-            ):
-                if move.application_id not in first_hire_move:
-                    first_hire_move[move.application_id] = move.moved_at
-
-            durations = []
-            for app_id, created_at in hired_apps:
-                hired_at = first_hire_move.get(app_id)
-                if hired_at is None:
-                    # No move history — fall back to stage_entered_at.
-                    hired_at = (
-                        JobApplication.objects.filter(id=app_id)
-                        .values_list('stage_entered_at', flat=True)
-                        .first()
-                    )
-                if hired_at and created_at:
-                    durations.append((hired_at - created_at).total_seconds() / 86400.0)
-
-            return round(sum(durations) / len(durations), 1) if durations else None
-
         context['velocity_screening'] = _avg_days_in_status('shortlisted')
         context['velocity_interview'] = _avg_days_in_status('in_progress')
-        context['velocity_offer'] = _avg_days_to_hire()
+        context['velocity_offer'] = compute_avg_days_to_hire()
         context['has_velocity_data'] = any(
             context[k] is not None
             for k in ('velocity_screening', 'velocity_interview', 'velocity_offer')
         )
 
+        context['stage_performance'] = compute_stage_performance()
+
         return context
+
+
+class ReportExportView(LoginRequiredMixin, View):
+    """HR/Management: CSV export, one row per job (Feature 7: Pipeline
+    Reporting). Covers every job — active and closed."""
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
+        if not (request.user.is_hr() or request.user.is_management()):
+            return redirect('accounts:home')
+        return super().dispatch(request, *args, **kwargs)
+
+    def get(self, request, *args, **kwargs):
+        jobs = (
+            Job.objects.annotate(app_count=Count('applications'))
+            .order_by('-created_at')
+        )
+
+        filename = f'pipeline_report_{timezone.now().date().isoformat()}.csv'
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+        writer = csv.writer(response)
+        writer.writerow([
+            'Job Title', 'Department', 'Candidate Count',
+            'Avg Time to Hire (days)', 'Status',
+        ])
+        for job in jobs:
+            avg_days = compute_avg_days_to_hire(job_id=job.pk)
+            writer.writerow([
+                job.title,
+                job.department or '',
+                job.app_count,
+                avg_days if avg_days is not None else 'N/A',
+                'Active' if job.is_active else 'Closed',
+            ])
+
+        return response
 
 
 class InterviewerDashboardView(LoginRequiredMixin, TemplateView):

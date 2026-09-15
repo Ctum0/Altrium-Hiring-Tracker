@@ -220,6 +220,10 @@ class JobDetailView(LoginRequiredMixin, DetailView):
         context['requirements_list'] = [
             s.strip() for s in job.requirements.split(',') if s.strip()
         ]
+        if job.is_active:
+            context['public_apply_url'] = self.request.build_absolute_uri(
+                reverse('candidates:public_apply', args=[job.pk])
+            )
         if self.request.user.is_hr():
             context['talent_pool_suggestions'] = find_suggestions(job)
         return context

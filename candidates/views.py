@@ -12,17 +12,16 @@ from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
-from django.utils.text import get_valid_filename
 from django.views import View
 from django.views.generic import DetailView, ListView
 
-from ai.cv_parser import extract_text
 from ai.services import fit_summary, parse_cv
 from ai.matching import auto_apply, job_fit
 
 from notifications.mail import send_candidate_email
 
 from .dedup import find_fuzzy_match
+from .intake import ingest_cv
 from .intake_rules import (
     apply_auto_reject,
     recompute_after_review,
@@ -246,10 +245,6 @@ class CandidateUploadView(LoginRequiredMixin, View):
             )
             return self._render(request, jobs)
 
-        # Confirmation email is sent once per NEW candidate in this batch
-        # (not per file): a re-upload of the same person must not email
-        # them twice, and multiple new candidates may share one batch.
-        confirmation_sent_for = set()
         created = 0
         linked = 0
         duplicates = 0
@@ -260,124 +255,23 @@ class CandidateUploadView(LoginRequiredMixin, View):
         failed = []  # (filename, reason)
 
         for f in files:
-            # Sanitize filename before saving.
-            f.name = get_valid_filename(f.name)
-            try:
-                text = extract_text(f)
-                parsed = parse_cv(text)
-            except Exception:
-                failed.append((f.name, 'could not read the file'))
+            outcome = ingest_cv(f, job, source='upload')
+            if outcome['failed']:
+                failed.append((outcome['filename'], outcome['failed']))
                 continue
-            needs_review, review_reasons = should_hold_for_review(parsed, text)
-            if len(text.strip()) < 10:
-                failed.append((f.name, 'file contains no readable text'))
-                continue
-            email = (parsed.get('email') or '').strip().lower()
-
-            if email:
-                candidate, was_created = Candidate.objects.get_or_create(
-                    email=email,
-                    defaults={
-                        'first_name': parsed.get('first_name', ''),
-                        'last_name': parsed.get('last_name', ''),
-                        'phone': parsed.get('phone', ''),
-                        'skills': ', '.join(parsed.get('skills', [])),
-                        'resume_file': f,
-                        'resume_text': text[:50000],
-                        'source': 'upload',
-                    },
-                )
-                if was_created or needs_review:
-                    candidate.needs_review = needs_review
-                    candidate.needs_review_reasons = ', '.join(review_reasons) if review_reasons else ''
-                    candidate.save(update_fields=['needs_review', 'needs_review_reasons', 'updated_at'])
-                if was_created:
-                    # Email-exact get_or_create made a new record, but the
-                    # same person may already exist under a different
-                    # email: check name+phone before keeping the fresh row.
-                    match = find_fuzzy_match(parsed, exclude_pk=candidate.pk)
-                    if match is not None:
-                        fuzzy_duplicates += 1
-                        if candidate.resume_file:
-                            candidate.resume_file.delete(save=False)
-                        candidate.delete()  # cascades the just-created application
-                        candidate = match
-                        if needs_review:
-                            candidate.needs_review = True
-                            candidate.needs_review_reasons = ', '.join(review_reasons) if review_reasons else ''
-                            candidate.save(update_fields=['needs_review', 'needs_review_reasons', 'updated_at'])
-                    else:
-                        created += 1
-                else:
-                    duplicates += 1
-                    # Refresh the stored CV and skills with the newer upload.
-                    candidate.resume_file = f
-                    candidate.resume_text = text[:50000]
-                    if parsed.get('skills'):
-                        candidate.skills = ', '.join(parsed.get('skills', []))
-                    candidate.save(update_fields=['resume_file', 'resume_text', 'skills', 'updated_at'])
-                    refreshed += 1
-            else:
-                # No email extracted: match name+phone first so an email-less
-                # re-upload links to the existing person instead of creating
-                # an orphan duplicate. Still store the CV so it is not lost.
-                candidate = find_fuzzy_match(parsed)
-                if candidate is not None:
-                    fuzzy_duplicates += 1
-                    candidate.resume_file = f
-                    candidate.resume_text = text[:50000]
-                    if parsed.get('skills'):
-                        candidate.skills = ', '.join(parsed.get('skills', []))
-                    candidate.save(update_fields=['resume_file', 'resume_text', 'skills', 'updated_at'])
-                else:
-                    candidate = Candidate.objects.create(
-                        email=None,
-                        first_name=parsed.get('first_name', ''),
-                        last_name=parsed.get('last_name', ''),
-                        phone=parsed.get('phone', ''),
-                        resume_file=f,
-                        resume_text=text[:50000],
-                        source='upload',
-                    )
-                if needs_review:
-                    candidate.needs_review = True
-                    candidate.needs_review_reasons = ', '.join(review_reasons) if review_reasons else ''
-                    candidate.save(update_fields=['needs_review', 'needs_review_reasons', 'updated_at'])
-                unparsed.append(f.name)
-            app, app_created = JobApplication.objects.get_or_create(
-                candidate=candidate,
-                job=job,
-                defaults={'status': JobApplication.Status.NEW},
-            )
-
-            if app_created:
+            if outcome['created']:
+                created += 1
+            if outcome['duplicate']:
+                duplicates += 1
+                refreshed += 1
+            if outcome['fuzzy_duplicate']:
+                fuzzy_duplicates += 1
+            if not (outcome['parsed'] or {}).get('email'):
+                unparsed.append(outcome['filename'])
+            if outcome['app_created']:
                 linked += 1
-                # Confirmation email (Feature 4): fires on every NEW
-                # application (audit Phase 0 decision). Once per candidate
-                # per batch; a new application for a candidate we already
-                # emailed in this same upload is skipped. candidate.email
-                # may be None — send_candidate_email logs and skips.
-                if candidate.email and candidate.pk not in confirmation_sent_for:
-                    send_candidate_email(
-                        'confirmation.txt',
-                        {'job_title': job.title},
-                        candidate,
-                    )
-                    confirmation_sent_for.add(candidate.pk)
-
-            # Auto-score against this specific job and auto-reject when the
-            # job defines a baseline and the candidate falls short. Only
-            # applied to newly created applications so re-uploads never
-            # clobber an existing application's state. CVs flagged for human
-            # review are held (never auto-rejected) until a human confirms.
-            if app_created:
-                if job.requirements.strip() and candidate.skills.strip():
-                    app.shortlist_score = auto_apply(candidate, job)
-
-                if apply_auto_reject(app, job, needs_review):
-                    auto_rejected += 1
-
-                app.save(update_fields=['shortlist_score', 'status', 'updated_at'])
+            if outcome['auto_rejected']:
+                auto_rejected += 1
 
         summary = f'{created} candidate(s) created, {linked} linked to "{job.title}".'
         if auto_rejected:
@@ -397,7 +291,7 @@ class CandidateUploadView(LoginRequiredMixin, View):
             failed_names = ', '.join(name for name, _ in failed[:3])
             messages.error(
                 request,
-                f'{len(failed)} file(s) failed: {failed_names} — '
+                f'{len(failed)} file(s) failed: {failed_names}, '
                 'unreadable or corrupted; the rest were processed.',
             )
         messages.success(request, summary)
@@ -409,6 +303,106 @@ class CandidateUploadView(LoginRequiredMixin, View):
             'jobs': jobs,
             'selected_job': request.POST.get('job', ''),
         })
+
+
+class PublicApplyView(View):
+    """Public, unauthenticated: apply to one active job with a single CV.
+
+    Runs the exact same intake pipeline (candidates.intake.ingest_cv) as
+    the HR bulk-upload path, so an external application produces the
+    identical Candidate/JobApplication row an HR upload of the same CV
+    would produce (same dedup, same needs_review gate, same auto-reject,
+    same confirmation email trigger).
+    """
+
+    ALLOWED_EXTENSIONS = CandidateUploadView.ALLOWED_EXTENSIONS
+
+    def get(self, request, job_pk):
+        job = get_object_or_404(Job, pk=job_pk, is_active=True)
+        return self._render(request, job)
+
+    def post(self, request, job_pk):
+        job = get_object_or_404(Job, pk=job_pk, is_active=True)
+        f = request.FILES.get('cv')
+        full_name = (request.POST.get('full_name') or '').strip()
+        email = (request.POST.get('email') or '').strip()
+        phone = (request.POST.get('phone') or '').strip()
+        consent = request.POST.get('consent') == 'on'
+        form_values = {'full_name': full_name, 'email': email, 'phone': phone}
+
+        if not consent:
+            return self._render(
+                request, job,
+                error='Please check the consent box to submit your application.',
+                **form_values,
+            )
+        if not f:
+            return self._render(
+                request, job, error='Choose a CV file to upload.', **form_values,
+            )
+
+        allowed = {ext.lstrip('.').lower() for ext in self.ALLOWED_EXTENSIONS}
+        ext = (f.name or '').lower().rsplit('.', 1)
+        if len(ext) != 2 or ext[1] not in allowed:
+            return self._render(
+                request, job,
+                error='Unsupported file type. Please upload a PDF or DOCX.',
+                **form_values,
+            )
+
+        outcome = ingest_cv(f, job, source='portal')
+        if outcome['failed']:
+            return self._render(
+                request, job,
+                error='We could not read that file. Please try a different PDF or DOCX.',
+                **form_values,
+            )
+
+        self._merge_fallback_contact(outcome['candidate'], outcome['parsed'] or {}, full_name, email, phone)
+        return redirect('candidates:public_apply_thanks', job_pk=job.pk)
+
+    def _merge_fallback_contact(self, candidate, parsed, full_name, email, phone):
+        """Fill in contact fields the parse missed from the visitor's typed
+        fallback fields. Parsed data always wins when present; the fallback
+        is only used to fill a genuine gap, never to overwrite a parsed
+        value."""
+        if not (parsed.get('email') or '').strip() and email and not candidate.email:
+            try:
+                candidate.email = email
+                candidate.save(update_fields=['email', 'updated_at'])
+            except IntegrityError:
+                # Another candidate already owns this address; leave as parsed.
+                candidate.email = None
+
+        update_fields = []
+        if not (parsed.get('first_name') or '').strip() and not (parsed.get('last_name') or '').strip() and full_name:
+            parts = full_name.split(None, 1)
+            candidate.first_name = parts[0]
+            candidate.last_name = parts[1] if len(parts) > 1 else ''
+            update_fields += ['first_name', 'last_name']
+        if not (parsed.get('phone') or '').strip() and phone and not candidate.phone:
+            candidate.phone = phone
+            update_fields.append('phone')
+        if update_fields:
+            update_fields.append('updated_at')
+            candidate.save(update_fields=update_fields)
+
+    def _render(self, request, job, error=None, full_name='', email='', phone=''):
+        return render(request, 'candidates/public_apply.html', {
+            'job': job,
+            'error': error,
+            'full_name': full_name,
+            'email': email,
+            'phone': phone,
+        })
+
+
+class PublicApplyThanksView(View):
+    """Public, unauthenticated: confirmation page after a successful application."""
+
+    def get(self, request, job_pk):
+        job = get_object_or_404(Job, pk=job_pk)
+        return render(request, 'candidates/public_apply_thanks.html', {'job': job})
 
 
 class CandidateImportView(LoginRequiredMixin, View):
@@ -754,7 +748,7 @@ class AssignApplicationView(LoginRequiredMixin, View):
         if app.interview_at:
             return (
                 f' An interview is already booked for '
-                f'{AssignApplicationView._fmt(app.interview_at)} — check it '
+                f'{AssignApplicationView._fmt(app.interview_at)}, check it '
                 f'fits your availability.'
             )
         return ' No interview is scheduled yet.'
@@ -899,7 +893,7 @@ class InterviewDetailsView(LoginRequiredMixin, View):
             if scheduled:
                 messages.success(
                     request,
-                    f'Interview details updated for {app.candidate.full_name} — '
+                    f'Interview details updated for {app.candidate.full_name}, '
                     f'scheduled at {scheduled:%Y-%m-%d %H:%M} UTC.',
                 )
             elif details:

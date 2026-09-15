@@ -9,6 +9,7 @@ urlpatterns = [
     path('logout/', views.LogoutView.as_view(), name='logout'),
     path('', views.HomeView.as_view(), name='home'),
     path('hr-dashboard/', views.HRDashboardView.as_view(), name='hr_dashboard'),
+    path('reports/export/', views.ReportExportView.as_view(), name='report_export'),
     path(
         'interviewer-dashboard/',
         views.InterviewerDashboardView.as_view(),

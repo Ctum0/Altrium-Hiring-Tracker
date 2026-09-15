@@ -1,3 +1,4 @@
+import csv
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model
@@ -7,6 +8,7 @@ from django.utils import timezone
 
 from accounts.models import InterviewerAvailability, Role
 from candidates.models import Candidate, JobApplication
+from pipeline.models import PipelineMove
 
 User = get_user_model()
 
@@ -686,3 +688,174 @@ class SeniorityEligibilityTests(AuthAndRoleTestBase):
         self.interviewer.save()
         self.assertTrue(self.interviewer.is_fully_eligible_for(eng_job))
         self.assertFalse(self.interviewer.is_fully_eligible_for(design_job))
+
+
+class ReportExportCSVTest(AuthAndRoleTestBase):
+    """CSV pipeline report export (Feature 7: Pipeline Reporting)."""
+
+    def _login_hr(self):
+        c = Client()
+        c.login(username='hr', password='pass12345')
+        return c
+
+    def _rows(self, response):
+        text = response.content.decode('utf-8')
+        header, *data_rows = list(csv.reader(text.splitlines()))
+        return header, data_rows
+
+    def test_avg_time_to_hire_matches_known_span(self):
+        """A job with one hire moved to 'hired' exactly N days after the
+        application was created must report N (rounded to 1 decimal, same
+        convention as the audited dashboard velocity_offer figure)."""
+        job = _make_job(self.hr, title='CSV Role')
+        candidate = Candidate.objects.create(
+            first_name='Cara', last_name='Sun', email='cara@example.com',
+        )
+        app = JobApplication.objects.create(
+            candidate=candidate, job=job, status='hired',
+        )
+        created_at = timezone.now() - timedelta(days=12)
+        hired_at = timezone.now()
+        JobApplication.objects.filter(id=app.id).update(created_at=created_at)
+        PipelineMove.objects.create(
+            application=app, from_status='in_progress', to_status='hired',
+            moved_by=self.hr,
+        )
+        PipelineMove.objects.filter(application=app).update(moved_at=hired_at)
+
+        c = self._login_hr()
+        r = c.get(reverse('accounts:report_export'))
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r['Content-Type'], 'text/csv')
+        self.assertIn('attachment; filename="pipeline_report_', r['Content-Disposition'])
+        header, data_rows = self._rows(r)
+        self.assertEqual(
+            header,
+            ['Job Title', 'Department', 'Candidate Count', 'Avg Time to Hire (days)', 'Status'],
+        )
+        row = next(row for row in data_rows if row[0] == 'CSV Role')
+        self.assertAlmostEqual(float(row[3]), 12.0, delta=0.1)
+        self.assertEqual(row[2], '1')
+        self.assertEqual(row[4], 'Active')
+
+    def test_zero_hires_shows_na_not_zero(self):
+        job = _make_job(self.hr, title='No Hires Role')
+        candidate = Candidate.objects.create(
+            first_name='Zed', last_name='Zero', email='zed@example.com',
+        )
+        JobApplication.objects.create(candidate=candidate, job=job, status='new')
+
+        c = self._login_hr()
+        r = c.get(reverse('accounts:report_export'))
+        _, data_rows = self._rows(r)
+        row = next(row for row in data_rows if row[0] == 'No Hires Role')
+        self.assertEqual(row[3], 'N/A')
+        self.assertEqual(row[2], '1')
+
+    def test_covers_active_and_closed_jobs(self):
+        _make_job(self.hr, title='Active Role')
+        closed_job = _make_job(self.hr, title='Closed Role')
+        closed_job.is_active = False
+        closed_job.save()
+
+        c = self._login_hr()
+        r = c.get(reverse('accounts:report_export'))
+        _, data_rows = self._rows(r)
+        titles_to_status = {row[0]: row[4] for row in data_rows}
+        self.assertEqual(titles_to_status['Active Role'], 'Active')
+        self.assertEqual(titles_to_status['Closed Role'], 'Closed')
+
+
+class ReportExportAccessTest(AuthAndRoleTestBase):
+    """Only HR/Management may reach the CSV export."""
+
+    def test_interviewer_redirected(self):
+        c = Client()
+        assert c.login(username='iv', password='pass12345')
+        r = c.get(reverse('accounts:report_export'))
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(r.url, reverse('accounts:home'))
+
+    def test_anonymous_redirected_to_login(self):
+        r = Client().get(reverse('accounts:report_export'))
+        self.assertEqual(r.status_code, 302)
+        self.assertIn('/login/', r.url)
+
+    def test_management_can_export(self):
+        c = Client()
+        assert c.login(username='mgmt', password='pass12345')
+        r = c.get(reverse('accounts:report_export'))
+        self.assertEqual(r.status_code, 200)
+
+    def test_hr_can_export(self):
+        c = Client()
+        assert c.login(username='hr', password='pass12345')
+        r = c.get(reverse('accounts:report_export'))
+        self.assertEqual(r.status_code, 200)
+
+
+class StagePerformanceTest(AuthAndRoleTestBase):
+    """Per-round pass/fail analytics on the HR dashboard (Feature 7)."""
+
+    def _login_hr(self):
+        c = Client()
+        c.login(username='hr', password='pass12345')
+        return c
+
+    def _make_app(self, job, first_name):
+        candidate = Candidate.objects.create(
+            first_name=first_name, last_name='Test',
+            email=f'{first_name.lower()}@example.com',
+        )
+        return JobApplication.objects.create(candidate=candidate, job=job, status='in_progress')
+
+    def test_high_rejection_round_flagged_abnormal_low_rejection_round_not(self):
+        from jobs.models import InterviewRound
+
+        job = _make_job(self.hr, title='Stage Role')
+        screening = InterviewRound.objects.get(job=job, name='Screening')
+        interview = InterviewRound.objects.get(job=job, name='Interview')
+
+        # Screening: 4 rejections, 1 advance -> 80% fail rate (high).
+        for i in range(4):
+            app = self._make_app(job, f'Reject{i}')
+            PipelineMove.objects.create(
+                application=app, from_round=screening, to_status='rejected',
+                moved_by=self.hr,
+            )
+        pass_app = self._make_app(job, 'Passer')
+        PipelineMove.objects.create(
+            application=pass_app, from_round=screening, to_round=interview,
+            moved_by=self.hr,
+        )
+
+        # Interview: 1 rejection, 4 advances (hired) -> 20% fail rate (normal).
+        for i in range(4):
+            app = self._make_app(job, f'Advance{i}')
+            PipelineMove.objects.create(
+                application=app, from_round=interview, to_status='hired',
+                moved_by=self.hr,
+            )
+        reject_app = self._make_app(job, 'InterviewReject')
+        PipelineMove.objects.create(
+            application=reject_app, from_round=interview, to_status='rejected',
+            moved_by=self.hr,
+        )
+
+        c = self._login_hr()
+        r = c.get(reverse('accounts:hr_dashboard'))
+        self.assertEqual(r.status_code, 200)
+        stats = {s['round'].name: s for s in r.context['stage_performance']}
+        self.assertIn('Screening', stats)
+        self.assertIn('Interview', stats)
+        self.assertTrue(stats['Screening']['is_abnormal'])
+        self.assertFalse(stats['Interview']['is_abnormal'])
+        self.assertContains(r, 'Stage Performance')
+
+    def test_no_move_history_yields_empty_list_not_crash(self):
+        _make_job(self.hr, title='No History Role')
+        c = self._login_hr()
+        r = c.get(reverse('accounts:hr_dashboard'))
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.context['stage_performance'], [])
+        self.assertContains(r, 'Not enough data yet')

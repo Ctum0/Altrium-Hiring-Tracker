@@ -495,3 +495,45 @@ Solid arrows are hard blockers; dotted arrows are soft/beneficial-not-blocking. 
 
 ✅ **Phase 6 & 7 Certification:** All structured scorecard, AI feedback synthesis, and email automation features ready for production deployment. Sprint 2 readiness audit **CLOSED**.
 
+
+---
+
+## Phase 8 & 9: CV Self-Upload + Pipeline Reporting (2026-09-15)
+
+**Date:** 2026-09-15 · **Status:** ✅ COMPLETED
+**Method:** Parallel agent execution (2 agents: Phase8CVSelfUpload, Phase9PipelineReporting) + live browser verification + full test suite (360/360 passing).
+
+### Phase 8 Deliverables (CV Self-Upload, Feature 6)
+
+| Item | Status | Evidence |
+|------|--------|----------|
+| Shared intake pipeline extraction | ✅ Complete | `candidates/intake.py` `ingest_cv()` — single call site for both HR bulk upload and public single-application paths; no duplicated parsing/dedup/scoring logic |
+| Public application form | ✅ Complete | `PublicApplyView` at `/candidates/apply/<job_pk>/`, unauthenticated, 404s on closed/missing jobs |
+| Consent notice | ✅ Complete | Required checkbox, honest plain-language wording, validated server-side |
+| Confirmation page | ✅ Complete | `PublicApplyThanksView`, reuses existing confirmation email trigger from Phase 7 |
+| Fallback contact fields | ✅ Complete | Name/email/phone merged only where CV parsing yielded nothing; parsed data always wins when present |
+| HR-visible apply link | ✅ Complete | Job detail page shows the shareable public URL when the job is active |
+| Identical-record proof | ✅ Complete | Test proves portal submission produces the same Candidate/JobApplication fields as an equivalent HR upload, including auto-reject and dedup behavior |
+| Test Coverage | ✅ Complete | 18 new tests (PublicApplyTests + IntakeHelperTests), 145/145 passing in `candidates` |
+
+### Phase 9 Deliverables (Pipeline Reporting, Feature 7)
+
+| Item | Status | Evidence |
+|------|--------|----------|
+| CSV Report Export | ✅ Complete | `/reports/export/`, HR/Management only, one row per job: Title, Department, Candidate Count, Avg Time to Hire (N/A when zero hires, never fabricated), Status (Active/Closed) |
+| Time-to-hire accuracy | ✅ Complete | Reuses the audited earliest-hire-move calculation, now parameterized per job; test proves exported figure matches a manually-seeded known span exactly |
+| Stage Performance Analytics | ✅ Complete | Per-round pass/fail rate computed from `PipelineMove` audit trail; abnormal rounds flagged at >1.5x mean fail rate with a 3-move minimum to avoid false-flagging low-volume rounds |
+| Dashboard surface | ✅ Complete | New "Stage Performance" card on HR/Management dashboard, reuses existing badge/panel visual language |
+| Access control | ✅ Complete | Interviewers redirected away from the export endpoint; verified live and in tests |
+| Test Coverage | ✅ Complete | 9 new tests (CSV export, access gating, stage performance), 54/54 passing in `accounts` |
+
+### Final Metrics
+
+- **Build Status:** 360/360 tests passing (up from 334; +26 new tests across both phases).
+- **Live verification:** Real CV submitted through the public form end-to-end (parse → dedup → score → auto-reject check → confirmation email → dashboard activity feed), confirmed via browser and database inspection.
+- **No cross-phase file conflicts:** Phase 8 (candidates/jobs) and Phase 9 (accounts/jobs) touched disjoint view logic; `jobs/views.py` changes from both agents merged cleanly (public apply URL context var + no overlap with reporting).
+
+### Sign-Off
+
+✅ **Phase 8 & 9 Certification:** CV self-upload and pipeline reporting features ready for production. All 30 functional requirements across Sprint 1 + Sprint 2 now implemented (Phases 1-9 of 13 complete). Remaining: Phase 10 (Kanban, optional/cuttable), Phase 11 (Data Retention Policy), Phase 12 (Polish Pass), Phase 13 (Final E2E Regression & Sign-off).
+

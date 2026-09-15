@@ -19,6 +19,9 @@
     </a>
     <a href="{% url 'candidates:upload' %}" class="btn btn-secondary btn-sm">Upload CVs</a>
     {% endif %}
+    {% if user.is_hr or user.is_management %}
+    <a href="{% url 'accounts:report_export' %}" class="btn btn-secondary btn-sm">Export report</a>
+    {% endif %}
   </div>
 </div>
 
@@ -475,6 +478,35 @@
       </div>
       {% else %}
       <p class="text-xs text-muted">No active jobs.</p>
+      {% endif %}
+    </div>
+
+    <!-- Stage Performance: per-round pass/fail rates (Feature 7: Pipeline Reporting) -->
+    <div class="panel panel-pad ref-card">
+      <div class="ref-card-header">
+        <h2 class="ref-card-title">Stage Performance</h2>
+        <span class="text-xs text-muted">pass rate by round</span>
+      </div>
+      {% if stage_performance %}
+      <div class="ref-jobs-list">
+        {% for stat in stage_performance %}
+        <div class="ref-job-item">
+          <div class="ref-job-main">
+            <div class="ref-job-title">
+              {{ stat.round.name }} <span class="ref-job-dept">({{ stat.round.job.title }})</span>
+            </div>
+            <div class="ref-job-meta">{{ stat.pass_rate_pct }}% pass &middot; {{ stat.total }} move{{ stat.total|pluralize }} recorded</div>
+          </div>
+          {% if stat.is_abnormal %}
+          <span class="badge badge-rejected" title="Fail rate well above the average across all rounds">Abnormal</span>
+          {% else %}
+          <span class="badge badge-hired">Normal</span>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="text-xs text-muted">Not enough data yet. Stage performance appears once candidates start moving through interview rounds.</p>
       {% endif %}
     </div>
 
