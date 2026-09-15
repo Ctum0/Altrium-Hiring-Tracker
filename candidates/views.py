@@ -14,15 +14,22 @@ from django.utils.text import get_valid_filename
 from django.views import View
 from django.views.generic import DetailView, ListView
 
-from ai.confidence import assess_confidence
 from ai.cv_parser import extract_text
 from ai.matching import auto_apply, job_fit
 from ai.services import fit_summary, parse_cv
-from jobs.models import Job
-from notifications.models import Notification
+
+from .dedup import find_fuzzy_match
+from .intake_rules import (
+    apply_auto_reject,
+    recompute_after_review,
+    should_hold_for_review,
+)
 
 from .forms import CandidateImportForm
 from .models import Candidate, JobApplication
+from jobs.models import Job
+from notifications.models import Notification
+
 
 User = get_user_model()
 
@@ -240,6 +247,7 @@ class CandidateUploadView(LoginRequiredMixin, View):
         duplicates = 0
         auto_rejected = 0
         refreshed = 0
+        fuzzy_duplicates = 0
         unparsed = []
         failed = []  # (filename, reason)
 
@@ -252,7 +260,7 @@ class CandidateUploadView(LoginRequiredMixin, View):
             except Exception:
                 failed.append((f.name, 'could not read the file'))
                 continue
-            needs_review, review_reasons = assess_confidence(parsed, text)
+            needs_review, review_reasons = should_hold_for_review(parsed, text)
             if len(text.strip()) < 10:
                 failed.append((f.name, 'file contains no readable text'))
                 continue
@@ -276,7 +284,22 @@ class CandidateUploadView(LoginRequiredMixin, View):
                     candidate.needs_review_reasons = ', '.join(review_reasons) if review_reasons else ''
                     candidate.save(update_fields=['needs_review', 'needs_review_reasons', 'updated_at'])
                 if was_created:
-                    created += 1
+                    # Email-exact get_or_create made a new record, but the
+                    # same person may already exist under a different
+                    # email: check name+phone before keeping the fresh row.
+                    match = find_fuzzy_match(parsed, exclude_pk=candidate.pk)
+                    if match is not None:
+                        fuzzy_duplicates += 1
+                        if candidate.resume_file:
+                            candidate.resume_file.delete(save=False)
+                        candidate.delete()  # cascades the just-created application
+                        candidate = match
+                        if needs_review:
+                            candidate.needs_review = True
+                            candidate.needs_review_reasons = ', '.join(review_reasons) if review_reasons else ''
+                            candidate.save(update_fields=['needs_review', 'needs_review_reasons', 'updated_at'])
+                    else:
+                        created += 1
                 else:
                     duplicates += 1
                     # Refresh the stored CV and skills with the newer upload.
@@ -287,16 +310,31 @@ class CandidateUploadView(LoginRequiredMixin, View):
                     candidate.save(update_fields=['resume_file', 'resume_text', 'skills', 'updated_at'])
                     refreshed += 1
             else:
-                # No email extracted: still store the CV so it is not lost.
-                candidate = Candidate.objects.create(
-                    email=None,
-                    resume_file=f,
-                    resume_text=text[:50000],
-                    source='upload',
-                )
-                candidate.needs_review = needs_review
-                candidate.needs_review_reasons = ', '.join(review_reasons) if review_reasons else ''
-                candidate.save(update_fields=['needs_review', 'needs_review_reasons', 'updated_at'])
+                # No email extracted: match name+phone first so an email-less
+                # re-upload links to the existing person instead of creating
+                # an orphan duplicate. Still store the CV so it is not lost.
+                candidate = find_fuzzy_match(parsed)
+                if candidate is not None:
+                    fuzzy_duplicates += 1
+                    candidate.resume_file = f
+                    candidate.resume_text = text[:50000]
+                    if parsed.get('skills'):
+                        candidate.skills = ', '.join(parsed.get('skills', []))
+                    candidate.save(update_fields=['resume_file', 'resume_text', 'skills', 'updated_at'])
+                else:
+                    candidate = Candidate.objects.create(
+                        email=None,
+                        first_name=parsed.get('first_name', ''),
+                        last_name=parsed.get('last_name', ''),
+                        phone=parsed.get('phone', ''),
+                        resume_file=f,
+                        resume_text=text[:50000],
+                        source='upload',
+                    )
+                if needs_review:
+                    candidate.needs_review = True
+                    candidate.needs_review_reasons = ', '.join(review_reasons) if review_reasons else ''
+                    candidate.save(update_fields=['needs_review', 'needs_review_reasons', 'updated_at'])
                 unparsed.append(f.name)
             app, app_created = JobApplication.objects.get_or_create(
                 candidate=candidate,
@@ -310,18 +348,13 @@ class CandidateUploadView(LoginRequiredMixin, View):
             # Auto-score against this specific job and auto-reject when the
             # job defines a baseline and the candidate falls short. Only
             # applied to newly created applications so re-uploads never
-            # clobber an existing application's state.
+            # clobber an existing application's state. CVs flagged for human
+            # review are held (never auto-rejected) until a human confirms.
             if app_created:
                 if job.requirements.strip() and candidate.skills.strip():
                     app.shortlist_score = auto_apply(candidate, job)
 
-                if (
-                    job.auto_reject_score is not None
-                    and app.status == JobApplication.Status.NEW
-                    and app.shortlist_score is not None
-                    and app.shortlist_score < job.auto_reject_score
-                ):
-                    app.status = JobApplication.Status.REJECTED
+                if apply_auto_reject(app, job, needs_review):
                     auto_rejected += 1
 
                 app.save(update_fields=['shortlist_score', 'status', 'updated_at'])
@@ -336,6 +369,8 @@ class CandidateUploadView(LoginRequiredMixin, View):
             summary += f' {duplicates} duplicate(s) matched an existing profile.'
             if refreshed:
                 summary += f' {refreshed} updated with the newer CV.'
+        if fuzzy_duplicates:
+            summary += f' {fuzzy_duplicates} fuzzy duplicate(s) matched by name+phone.'
         if unparsed:
             summary += f' {len(unparsed)} file(s) could not be parsed: {", ".join(unparsed[:3])}.'
         if failed:
@@ -386,8 +421,9 @@ class CandidateImportView(LoginRequiredMixin, View):
         text = form.cleaned_data['profile_text']
 
         parsed = parse_cv(text)
-        needs_review, review_reasons = assess_confidence(parsed, text)
+        needs_review, review_reasons = should_hold_for_review(parsed, text)
         email = (parsed.get('email') or '').strip().lower()
+        fuzzy_duplicates = 0
 
         if email:
             candidate, was_created = Candidate.objects.get_or_create(
@@ -405,20 +441,47 @@ class CandidateImportView(LoginRequiredMixin, View):
                 candidate.needs_review = needs_review
                 candidate.needs_review_reasons = ', '.join(review_reasons) if review_reasons else ''
                 candidate.save(update_fields=['needs_review', 'needs_review_reasons', 'updated_at'])
+            if was_created:
+                # get_or_create matched only the exact email; the same
+                # person may already exist under a different address:
+                # check name+phone before keeping the fresh row.
+                match = find_fuzzy_match(parsed, exclude_pk=candidate.pk)
+                if match is not None:
+                    fuzzy_duplicates += 1
+                    candidate.delete()  # cascades the just-created application
+                    candidate = match
+                    was_created = False
+                    if needs_review:
+                        candidate.needs_review = True
+                        candidate.needs_review_reasons = ', '.join(review_reasons) if review_reasons else ''
+                        candidate.save(update_fields=['needs_review', 'needs_review_reasons', 'updated_at'])
         else:
-            candidate = Candidate.objects.create(
-                email=None,
-                first_name=parsed.get('first_name', ''),
-                last_name=parsed.get('last_name', ''),
-                phone=parsed.get('phone', ''),
-                skills=', '.join(parsed.get('skills', [])),
-                resume_text=text[:50000],
-                source=source,
-            )
-            candidate.needs_review = needs_review
-            candidate.needs_review_reasons = ', '.join(review_reasons) if review_reasons else ''
-            candidate.save(update_fields=['needs_review', 'needs_review_reasons', 'updated_at'])
-            was_created = True
+            # No email extracted: match name+phone first so an email-less
+            # re-import links to the existing person instead of creating
+            # an orphan duplicate.
+            candidate = find_fuzzy_match(parsed)
+            if candidate is not None:
+                fuzzy_duplicates += 1
+                candidate.resume_text = text[:50000]
+                if parsed.get('skills'):
+                    candidate.skills = ', '.join(parsed.get('skills', []))
+                candidate.save(update_fields=['resume_text', 'skills', 'updated_at'])
+                was_created = False
+            else:
+                candidate = Candidate.objects.create(
+                    email=None,
+                    first_name=parsed.get('first_name', ''),
+                    last_name=parsed.get('last_name', ''),
+                    phone=parsed.get('phone', ''),
+                    skills=', '.join(parsed.get('skills', [])),
+                    resume_text=text[:50000],
+                    source=source,
+                )
+                was_created = True
+            if needs_review:
+                candidate.needs_review = True
+                candidate.needs_review_reasons = ', '.join(review_reasons) if review_reasons else ''
+                candidate.save(update_fields=['needs_review', 'needs_review_reasons', 'updated_at'])
 
         app, app_created = JobApplication.objects.get_or_create(
             candidate=candidate,
@@ -428,20 +491,26 @@ class CandidateImportView(LoginRequiredMixin, View):
 
         # Auto-score against this specific job and auto-reject when
         # the job defines a baseline and the candidate falls short.
+        # CVs flagged for human review are held (never auto-rejected)
+        # until a human confirms the corrected data.
         if app_created:
             if job.requirements.strip() and candidate.skills.strip():
                 app.shortlist_score = auto_apply(candidate, job)
 
-            if (
-                job.auto_reject_score is not None
-                and app.status == JobApplication.Status.NEW
-                and app.shortlist_score is not None
-                and app.shortlist_score < job.auto_reject_score
-            ):
-                app.status = JobApplication.Status.REJECTED
+            if apply_auto_reject(app, job, needs_review):
+                messages.info(
+                    request,
+                    f'{candidate.full_name} was auto-rejected: score below '
+                    f'the baseline of {job.auto_reject_score}.',
+                )
 
             app.save(update_fields=['shortlist_score', 'status', 'updated_at'])
 
+        if fuzzy_duplicates:
+            messages.info(
+                request,
+                f'{fuzzy_duplicates} fuzzy duplicate(s) matched by name+phone.',
+            )
         if was_created and app_created:
             messages.success(request, f'Imported {candidate.full_name} for {job.title}.')
         elif not was_created:
@@ -1028,7 +1097,14 @@ class CandidateReviewView(LoginRequiredMixin, View):
                 'latest_job': latest_app.job if latest_app else None,
                 'active_nav': 'candidates',
             })
-        messages.success(request, f'Reviewed and corrected {candidate.full_name}.')
+        outcome = recompute_after_review(candidate)
+        summary = f'Reviewed and corrected {candidate.full_name}.'
+        if outcome['scored'] or outcome['rejected']:
+            summary += (
+                f' {outcome["scored"]} application(s) re-scored; '
+                f'{outcome["rejected"]} fell below an auto-reject baseline.'
+            )
+        messages.success(request, summary)
         return redirect('candidates:detail', pk=pk)
 
 

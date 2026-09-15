@@ -11,6 +11,7 @@ from django.utils import timezone as django_timezone
 
 from accounts.models import InterviewerAvailability, Role
 from candidates.models import Candidate, JobApplication
+from candidates.dedup import find_fuzzy_match
 from jobs.models import InterviewRound, Job
 from notifications.models import Notification
 
@@ -438,11 +439,14 @@ class AutoRejectBaselineTests(CandidatesBaseTestCase):
             'first_name': 'Jane', 'last_name': 'Smith',
             'email': email, 'phone': '', 'skills': skills.split(', '),
         }
+        # ≥50 words so assess_confidence does not flag the parse: the
+        # unflagged (auto-process) path is the behavior under test here.
+        filler = 'Experienced backend engineer with production experience. ' * 10
         with patch('candidates.views.parse_cv', return_value=parsed):
             return self.client.post(reverse('candidates:import'), {
                 'job': self.job.pk,
                 'source': 'LinkedIn',
-                'profile_text': f'Jane Smith\nEmail: {email}',
+                'profile_text': f'Jane Smith\nEmail: {email}\n{filler}',
             })
 
     def test_import_auto_rejects_below_baseline(self):
@@ -1328,3 +1332,486 @@ class StageSelectTerminalStateTests(CandidatesBaseTestCase):
         response = self.client.get(reverse('candidates:list') + '?all=1')
         self.assertNotContains(response, 'class="stage-select"')
         self.assertContains(response, 'Final state')
+
+
+class ReviewGateTests(CandidatesBaseTestCase):
+    """Review-gated auto-reject: CVs flagged needs_review are never
+    auto-rejected at intake; recompute_after_review re-scores and applies
+    the decision once a human confirms the corrected data."""
+
+    LOW_SKILLS = 'Python, Django'
+    HIGH_SKILLS = 'Python, Django, Kubernetes, Docker, Redis'
+
+    def setUp(self):
+        super().setUp()
+        self.login('hr')
+        self.job.auto_reject_score = 50
+        self.job.requirements = self.HIGH_SKILLS
+        self.job.save()
+
+    def _flag_candidate(self, email, skills=LOW_SKILLS):
+        """Create a flagged candidate with a NEW application to self.job."""
+        candidate = Candidate.objects.create(
+            first_name='Jane', last_name='Smith',
+            email=email, skills=skills,
+            needs_review=True, needs_review_reasons='low_text_volume',
+        )
+        JobApplication.objects.create(
+            candidate=candidate, job=self.job,
+            status=JobApplication.Status.NEW,
+            shortlist_score=None,
+        )
+        return candidate
+
+    def _review(self, candidate, skills=LOW_SKILLS):
+        return self.client.post(
+            reverse('candidates:review', args=[candidate.pk]),
+            {
+                'first_name': candidate.first_name,
+                'last_name': candidate.last_name,
+                'email': candidate.email,
+                'phone': candidate.phone,
+                'skills': skills,
+            },
+        )
+
+    def test_flagged_upload_below_baseline_stays_new(self):
+        """Flagged CV + below-baseline score: app stays NEW after upload."""
+        from unittest.mock import patch
+        parsed = {
+            'first_name': 'Rae', 'last_name': 'Flag',
+            'email': 'ui_audit_flag@example.com', 'phone': '',
+            'skills': self.LOW_SKILLS.split(', '),
+        }
+        # Force the flagged path; the confidence gate itself is covered by
+        # ConfidenceTests. Low-overlap skills => score below the baseline.
+        with patch('candidates.views.parse_cv', return_value=parsed), \
+                patch('candidates.views.should_hold_for_review',
+                      return_value=(True, ['low_text_volume'])):
+            r = self.client.post(reverse('candidates:import'), {
+                'job': self.job.pk,
+                'source': 'LinkedIn',
+                'profile_text': 'Rae Flag\nEmail: ui_audit_flag@example.com',
+            })
+        self.assertEqual(r.status_code, 302)
+        candidate = Candidate.objects.get(email='ui_audit_flag@example.com')
+        self.assertTrue(candidate.needs_review)
+        app = candidate.applications.get(job=self.job)
+        self.assertLess(app.shortlist_score, 50)
+        self.assertEqual(app.status, JobApplication.Status.NEW)
+
+
+    def test_unflagged_below_baseline_still_rejected(self):
+        """Regression guard: unflagged CV + below-baseline score rejects."""
+        self.job.auto_reject_score = 50
+        self.job.requirements = 'Python, Django, Kubernetes, Docker, Redis'
+        self.job.save()
+        from unittest.mock import patch
+        parsed = {
+            'first_name': 'Rob', 'last_name': 'Clear',
+            'email': 'ui_audit_clear@example.com', 'phone': '',
+            'skills': self.LOW_SKILLS.split(', '),
+        }
+        filler = 'Experienced backend engineer with production experience. ' * 10
+        with patch('candidates.views.parse_cv', return_value=parsed):
+            r = self.client.post(reverse('candidates:import'), {
+                'job': self.job.pk,
+                'source': 'LinkedIn',
+                'profile_text': f'Rob Clear\nEmail: ui_audit_clear@example.com\n{filler}',
+            })
+        self.assertEqual(r.status_code, 302)
+        candidate = Candidate.objects.get(email='ui_audit_clear@example.com')
+        self.assertFalse(candidate.needs_review)
+        app = candidate.applications.get(job=self.job)
+        self.assertLess(app.shortlist_score, 50)
+        self.assertEqual(app.status, JobApplication.Status.REJECTED)
+
+    def test_review_with_raised_skills_stays_new(self):
+        """Flagged CV reviewed + skills corrected above baseline: stays NEW."""
+        candidate = self._flag_candidate(
+            'ui_audit_fixed@example.com', skills=self.LOW_SKILLS)
+        self._review(candidate, skills=self.HIGH_SKILLS)
+        candidate.refresh_from_db()
+        self.assertFalse(candidate.needs_review)
+        app = candidate.applications.get(job=self.job)
+        self.assertEqual(app.shortlist_score, 100)
+        self.assertEqual(app.status, JobApplication.Status.NEW)
+
+    def test_review_with_still_low_skills_rejects(self):
+        """Flagged CV reviewed + skills still below baseline: REJECTED."""
+        candidate = self._flag_candidate(
+            'ui_audit_low@example.com', skills=self.LOW_SKILLS)
+        r = self._review(candidate, skills=self.LOW_SKILLS)
+        self.assertEqual(r.status_code, 302)
+        candidate.refresh_from_db()
+        self.assertFalse(candidate.needs_review)
+        app = candidate.applications.get(job=self.job)
+        self.assertEqual(app.shortlist_score, 40)
+        self.assertEqual(app.status, JobApplication.Status.REJECTED)
+
+    def test_review_message_mentions_rescore_and_reject_counts(self):
+        """Success message reports re-scored and rejected counts."""
+        candidate = self._flag_candidate(
+            'ui_audit_msg@example.com', skills=self.LOW_SKILLS)
+        response = self._review(candidate, skills=self.LOW_SKILLS)
+        self.assertEqual(response.status_code, 302)
+        # Follow the redirect: the message storage is read on the next GET.
+        response = self.client.get(reverse('candidates:detail', args=[candidate.pk]))
+        self.assertContains(response, '1 application(s) re-scored')
+        self.assertContains(response, '1 fell below an auto-reject baseline')
+
+    def test_recompute_ignores_hired_application(self):
+        """A hired application keeps its state even when the new score is low."""
+        candidate = self._flag_candidate(
+            'ui_audit_hired@example.com', skills=self.LOW_SKILLS)
+        app = candidate.applications.get(job=self.job)
+        app.status = JobApplication.Status.HIRED
+        app.save(update_fields=['status'])
+
+        self._review(candidate, skills=self.LOW_SKILLS)
+
+        app.refresh_from_db()
+        self.assertEqual(app.status, JobApplication.Status.HIRED)
+        self.assertIsNone(app.shortlist_score)  # never re-scored
+
+    def test_review_with_zero_applications_succeeds(self):
+        """Candidate with no applications: review succeeds, no crash."""
+        candidate = Candidate.objects.create(
+            first_name='No', last_name='Apps',
+            email='ui_audit_noapps@example.com', skills='Python',
+            needs_review=True, needs_review_reasons='no_email',
+        )
+        r = self._review(candidate)
+        self.assertEqual(r.status_code, 302)
+        candidate.refresh_from_db()
+        self.assertFalse(candidate.needs_review)
+
+
+class FuzzyDedupTests(CandidatesBaseTestCase):
+    """Fuzzy dedup: same person, different email, matched by name+phone.
+
+    Strict v1 matching rules (see candidates/dedup.py): normalized
+    first+last name equality (order matters) AND normalized phone
+    equality (digits only); both sides must have a phone — name alone or
+    an empty phone never matches.
+    """
+    def _has_message(self, response, substring):
+        return any(substring in str(m) for m in response.wsgi_request._messages)
+
+    def _import(self, parsed):
+        from unittest.mock import patch
+        self.login('hr')
+        with patch('candidates.views.parse_cv', return_value=parsed):
+            return self.client.post(reverse('candidates:import'), {
+                'job': self.job.pk,
+                'source': 'LinkedIn',
+                'profile_text': 'anything; the parser is mocked',
+            })
+
+    # --- dedup.find_fuzzy_match unit behavior -------------------------
+
+    def test_find_fuzzy_match_same_name_same_phone(self):
+        """Same name + same phone (different email) -> match found."""
+        existing = Candidate.objects.create(
+            first_name='Jane', last_name='Smith',
+            email='ui_audit_old@example.com', phone='5551234567',
+        )
+        match = find_fuzzy_match({
+            'first_name': 'jane', 'last_name': 'Smith',
+            'phone': '555.123.4567',
+        })
+        self.assertIsNotNone(match)
+        self.assertEqual(match, existing)
+
+    def test_find_fuzzy_match_no_phone_either_side_never_matches(self):
+        """Same name, no phone on either side -> too ambiguous, no match."""
+        Candidate.objects.create(
+            first_name='Jane', last_name='Smith',
+            email='ui_audit_a@example.com',
+        )
+        self.assertIsNone(find_fuzzy_match({
+            'first_name': 'Jane', 'last_name': 'Smith', 'phone': '',
+        }))
+
+    def test_find_fuzzy_match_no_phone_on_existing_side_never_matches(self):
+        """Existing candidate lacks a phone -> never matches, even on a
+        phone-bearing incoming CV (guards against same-name collisions)."""
+        Candidate.objects.create(
+            first_name='Jane', last_name='Smith',
+            email='ui_audit_a@example.com',
+        )
+        self.assertIsNone(find_fuzzy_match({
+            'first_name': 'Jane', 'last_name': 'Smith', 'phone': '5551234567',
+        }))
+
+    def test_find_fuzzy_match_different_phone_never_matches(self):
+        """Same name + different phone -> different person, no match."""
+        Candidate.objects.create(
+            first_name='Jane', last_name='Smith',
+            email='ui_audit_a@example.com', phone='5551234567',
+        )
+        self.assertIsNone(find_fuzzy_match({
+            'first_name': 'Jane', 'last_name': 'Smith', 'phone': '5559876543',
+        }))
+
+    def test_find_fuzzy_match_different_name_never_matches(self):
+        """Different name -> no match, even with identical phones."""
+        Candidate.objects.create(
+            first_name='Jane', last_name='Smith',
+            email='ui_audit_a@example.com', phone='5551234567',
+        )
+        self.assertIsNone(find_fuzzy_match({
+            'first_name': 'Janet', 'last_name': 'Smith', 'phone': '5551234567',
+        }))
+
+    def test_find_fuzzy_match_name_order_matters_strict_v1(self):
+        """Documented v1 limitation: swapped name order does NOT match.
+        Kept strict to avoid false positives; reverse/permuted-name pass
+        is a later optimization."""
+        existing = Candidate.objects.create(
+            first_name='Jane', last_name='Smith',
+            email='ui_audit_a@example.com', phone='5551234567',
+        )
+        self.assertNotEqual(find_fuzzy_match({
+            'first_name': 'Smith', 'last_name': 'Jane', 'phone': '5551234567',
+        }), existing)
+
+    def test_find_fuzzy_match_excludes_given_pk(self):
+        """exclude_pk keeps a record from matching itself (secondary check)."""
+        existing = Candidate.objects.create(
+            first_name='Jane', last_name='Smith',
+            email='ui_audit_a@example.com', phone='5551234567',
+        )
+        self.assertIsNone(
+            find_fuzzy_match(
+                {'first_name': 'Jane', 'last_name': 'Smith', 'phone': '5551234567'},
+                exclude_pk=existing.pk,
+            )
+        )
+
+    def test_find_fuzzy_match_nameless_parse_never_matches(self):
+        """A parse with no usable name can never be told apart."""
+        Candidate.objects.create(
+            first_name='Jane', last_name='Smith',
+            email='ui_audit_a@example.com', phone='5551234567',
+        )
+        self.assertIsNone(find_fuzzy_match({
+            'first_name': '', 'last_name': '', 'phone': '5551234567',
+        }))
+
+    # --- import path (CandidateImportView) ----------------------------
+
+    def test_import_fuzzy_match_secondary_link_and_recount(self):
+        """Different email, same name+phone: application linked to the
+        EXISTING candidate, no new record, fuzzy duplicate counted."""
+        existing = Candidate.objects.create(
+            first_name='Jane', last_name='Smith',
+            email='ui_audit_existing@example.com', phone='5551234567',
+        )
+        r = self._import({
+            'first_name': 'Jane', 'last_name': 'Smith',
+            'email': 'ui_audit_new@example.com', 'phone': '555-123-4567',
+            'skills': ['React'],
+        })
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(
+            Candidate.objects.filter(first_name='Jane', last_name='Smith').count(), 1
+        )
+        existing.refresh_from_db()
+        self.assertTrue(existing.applications.filter(job=self.job).exists())
+        self.assertFalse(Candidate.objects.filter(email='ui_audit_new@example.com').exists())
+        self.assertTrue(
+            self._has_message(r, '1 fuzzy duplicate(s) matched by name+phone')
+        )
+
+    def test_import_no_email_fuzzy_match_links_to_existing(self):
+        """Email-less re-import with same name+phone links to the existing
+        candidate instead of creating an orphan duplicate."""
+        existing = Candidate.objects.create(
+            first_name='Jane', last_name='Smith',
+            email=None, phone='5551234567',
+        )
+        r = self._import({
+            'first_name': 'Jane', 'last_name': 'Smith',
+            'email': '', 'phone': '5551234567', 'skills': ['React'],
+        })
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(
+            Candidate.objects.filter(first_name='Jane', last_name='Smith').count(), 1
+        )
+        self.assertTrue(existing.applications.filter(job=self.job).exists())
+        self.assertTrue(
+            self._has_message(r, '1 fuzzy duplicate(s) matched by name+phone')
+        )
+
+    def test_import_fuzzy_no_match_creates_emailless_record(self):
+        """No existing name+phone match: the email-less import still
+        creates a record (CV is never lost)."""
+        r = self._import({
+            'first_name': 'Nora', 'last_name': 'Vance',
+            'email': '', 'phone': '5550001111', 'skills': [],
+        })
+        self.assertEqual(r.status_code, 302)
+        self.assertTrue(
+            Candidate.objects.filter(first_name='Nora', last_name='Vance').exists()
+        )
+        self.assertFalse(
+            self._has_message(r, 'fuzzy duplicate')
+        )
+
+    def test_import_fuzzy_match_carries_review_flag(self):
+        """A fuzzy-matched CV flagged needs_review keeps the flag on the
+        EXISTING candidate, and the auto-reject decision is withheld
+        (needs_review is set BEFORE the decision)."""
+        existing = Candidate.objects.create(
+            first_name='Jane', last_name='Smith',
+            email='ui_audit_existing@example.com', phone='5551234567',
+        )
+        from unittest.mock import patch
+        self.login('hr')
+        with patch('candidates.views.parse_cv', return_value={
+            'first_name': 'Jane', 'last_name': 'Smith',
+            'email': 'ui_audit_new@example.com', 'phone': '5551234567',
+            'skills': ['React'],
+        }), patch('candidates.views.should_hold_for_review',
+                  return_value=(True, ['low_text_volume'])):
+            r = self.client.post(reverse('candidates:import'), {
+                'job': self.job.pk,
+                'source': 'LinkedIn',
+                'profile_text': 'anything; the parser is mocked',
+            })
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(
+            Candidate.objects.filter(first_name='Jane', last_name='Smith').count(), 1
+        )
+        existing.refresh_from_db()
+        self.assertTrue(existing.needs_review)
+        self.assertIn('low_text_volume', existing.needs_review_reasons)
+        app = existing.applications.get(job=self.job)
+        self.assertEqual(app.status, JobApplication.Status.NEW)  # held, not auto-rejected
+        self.assertTrue(
+            self._has_message(r, '1 fuzzy duplicate(s) matched by name+phone')
+        )
+
+    # --- upload path (CandidateUploadView) ----------------------------
+
+    def _upload_cv(self, email, phone, name='cv2.docx'):
+        """Build a DOCX whose parse yields Jane Smith with the given
+        contact details (regex-parses without AI)."""
+        from docx import Document
+        doc = Document()
+        doc.add_paragraph('Jane Smith')
+        doc.add_paragraph(f'Email: {email}')
+        doc.add_paragraph(f'Phone: {phone}')
+        doc.add_paragraph('Skills: Python, Django')
+        bio = BytesIO()
+        doc.save(bio)
+        return SimpleUploadedFile(
+            name, bio.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        )
+
+    def test_upload_fuzzy_match_secondary_links_to_existing(self):
+        """Upload path: different email, same name+phone -> the
+        application links to the existing candidate, no new record."""
+        existing = Candidate.objects.create(
+            first_name='Jane', last_name='Smith',
+            email='ui_audit_existing@example.com', phone='+1 555 123 4567',
+        )
+        self.login('hr')
+        r = self.client.post(reverse('candidates:upload'), {
+            'job': self.job.pk,
+            'files': [self._upload_cv('ui_audit_new@example.com', '+1 555 123 4567')],
+        })
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(
+            Candidate.objects.filter(first_name='Jane', last_name='Smith').count(), 1
+        )
+        self.assertFalse(Candidate.objects.filter(email='ui_audit_new@example.com').exists())
+        self.assertTrue(existing.applications.filter(job=self.job).exists())
+        self.assertTrue(
+            self._has_message(r, '1 fuzzy duplicate(s) matched by name+phone')
+        )
+
+    def test_upload_no_email_fuzzy_match_links_to_existing(self):
+        """Upload path without an email: same name+phone re-upload links
+        to the existing candidate and refreshes their CV."""
+        existing = Candidate.objects.create(
+            first_name='Jane', last_name='Smith',
+            email=None, phone='5551234567',
+        )
+        self.login('hr')
+        r = self.client.post(reverse('candidates:upload'), {
+            'job': self.job.pk,
+            'files': [self._upload_cv('', '5551234567')],
+        })
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(
+            Candidate.objects.filter(first_name='Jane', last_name='Smith').count(), 1
+        )
+        existing.refresh_from_db()
+        self.assertTrue(existing.resume_text)
+        self.assertTrue(existing.applications.filter(job=self.job).exists())
+        self.assertTrue(
+            self._has_message(r, '1 fuzzy duplicate(s) matched by name+phone')
+        )
+
+    def test_upload_no_email_no_match_creates_record(self):
+        """No fuzzy match on an email-less upload -> record still created
+        (CV is never lost) and no fuzzy message shown."""
+        self.login('hr')
+        r = self.client.post(reverse('candidates:upload'), {
+            'job': self.job.pk,
+            'files': [self._upload_cv('', '5557778888')],
+        })
+        self.assertEqual(r.status_code, 302)
+        self.assertTrue(
+            Candidate.objects.filter(phone='5557778888').exists()
+        )
+        self.assertFalse(
+            self._has_message(r, 'fuzzy duplicate')
+        )
+
+    # --- email-exact dedup regression ---------------------------------
+
+    def test_exact_email_still_dedupes_on_upload(self):
+        """Primary path untouched: identical email refreshes the existing
+        record via the exact-duplicate branch (no fuzzy message)."""
+        Candidate.objects.create(
+            first_name='Jane', last_name='Smith',
+            email='jane@example.com', phone='5551234567',
+        )
+        self.login('hr')
+        r = self.client.post(reverse('candidates:upload'), {
+            'job': self.job.pk,
+            'files': [self._upload_cv('jane@example.com', '5551234567')],
+        })
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(
+            Candidate.objects.filter(email='jane@example.com').count(), 1
+        )
+        self.assertTrue(
+            self._has_message(r, '1 duplicate(s) matched an existing profile')
+        )
+        self.assertFalse(
+            self._has_message(r, 'fuzzy duplicate')
+        )
+
+    def test_exact_email_still_dedupes_on_import(self):
+        """Import path: identical email keeps the existing single record."""
+        Candidate.objects.create(
+            first_name='Jane', last_name='Smith',
+            email='jane@example.com', phone='5551234567',
+        )
+        r = self._import({
+            'first_name': 'Jane', 'last_name': 'Smith',
+            'email': 'jane@example.com', 'phone': '5551234567',
+            'skills': ['React'],
+        })
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(
+            Candidate.objects.filter(email='jane@example.com').count(), 1
+        )
+        self.assertFalse(
+            self._has_message(r, 'fuzzy duplicate')
+        )
