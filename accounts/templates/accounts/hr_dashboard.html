@@ -21,6 +21,7 @@
     {% endif %}
     {% if user.is_hr or user.is_management %}
     <a href="{% url 'accounts:report_export' %}" class="btn btn-secondary btn-sm">Export report</a>
+    <a href="{% url 'accounts:retention_report' %}" class="btn btn-secondary btn-sm">Retention report</a>
     {% endif %}
   </div>
 </div>

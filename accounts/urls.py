@@ -10,6 +10,7 @@ urlpatterns = [
     path('', views.HomeView.as_view(), name='home'),
     path('hr-dashboard/', views.HRDashboardView.as_view(), name='hr_dashboard'),
     path('reports/export/', views.ReportExportView.as_view(), name='report_export'),
+    path('reports/retention/', views.RetentionReportView.as_view(), name='retention_report'),
     path(
         'interviewer-dashboard/',
         views.InterviewerDashboardView.as_view(),

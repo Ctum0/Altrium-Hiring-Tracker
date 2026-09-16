@@ -1,5 +1,5 @@
+import re
 from datetime import datetime
-
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -719,3 +719,196 @@ class JobClosureMailTests(JobsBaseTestCase):
     def _close_for(self, job):
         self.login('hr')
         return self.client.post(reverse('jobs:close', args=[job.pk]))
+
+
+class DataRetentionPolicyTests(JobsBaseTestCase):
+    """Phase 11 (NFR): closing a job never deletes or hides candidate
+    data, no matter how old the closure is. JobCloseView only flips
+    is_active and stamps closed_at (see test_close_job_does_not_reject_candidates
+    above); this class proves the year-old case explicitly, end to end
+    through both the ordinary candidate search and the retention report.
+    """
+
+    def test_year_old_closed_job_candidates_still_searchable_and_reported(self):
+        from datetime import timedelta
+
+        from candidates.models import Candidate, JobApplication
+        from jobs.models import Job
+
+        job = Job.objects.create(title='Legacy Role', created_by=self.hr)
+        candidate = Candidate.objects.create(
+            email='legacy@example.com', first_name='Lena', last_name='Legacy',
+        )
+        JobApplication.objects.create(candidate=candidate, job=job, status='new')
+
+        self.login('hr')
+        r = self.client.post(reverse('jobs:close', args=[job.pk]))
+        self.assertEqual(r.status_code, 302)
+
+        # Simulate a year having passed since closure. No age-based
+        # exclusion or expiry exists anywhere in the query paths below;
+        # this only backdates the timestamp used to demonstrate that.
+        Job.objects.filter(pk=job.pk).update(
+            closed_at=timezone.now() - timedelta(days=365)
+        )
+        job.refresh_from_db()
+        self.assertFalse(job.is_active)
+
+        # 1. Still fully searchable via the existing candidate list/search.
+        list_r = self.client.get(reverse('candidates:list'), {'job': job.pk, 'all': '1'})
+        self.assertEqual(list_r.status_code, 200)
+        self.assertContains(list_r, 'Lena')
+
+        search_r = self.client.get(reverse('candidates:list'), {'q': 'Legacy', 'all': '1'})
+        self.assertContains(search_r, 'Lena')
+
+        # 2. Appears correctly in the retention report, with an accurate
+        # days-since-closure and candidate count, not silently dropped.
+        report_r = self.client.get(reverse('accounts:retention_report'))
+        self.assertEqual(report_r.status_code, 200)
+        self.assertContains(report_r, 'Legacy Role')
+        self.assertContains(report_r, '365 day')
+        job_row = next(j for j in report_r.context['closed_jobs'] if j.pk == job.pk)
+        self.assertEqual(job_row.days_since_closure, 365)
+        self.assertEqual(job_row.num_applications, 1)
+
+
+class JobBoardTests(JobsBaseTestCase):
+    """Phase 10 (NFR): Kanban board for a single job's pipeline."""
+
+    def setUp(self):
+        super().setUp()
+        self.job = Job.objects.create(title='Board Job', created_by=self.hr)
+        self.round1 = self.job.rounds.get(order=1)
+        self.round2 = self.job.rounds.get(order=2)
+        self.cand_a = Candidate.objects.create(
+            email='anna@example.com', first_name='Anna', score=80,
+        )
+        self.cand_b = Candidate.objects.create(email='ben@example.com', first_name='Ben')
+        self.app_a = JobApplication.objects.create(candidate=self.cand_a, job=self.job)
+        self.app_b = JobApplication.objects.create(
+            candidate=self.cand_b, job=self.job, assigned_to=self.interviewer,
+        )
+
+    def test_hr_sees_board_with_columns_and_cards(self):
+        self.login('hr')
+        r = self.client.get(reverse('jobs:board', args=[self.job.pk]))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, self.round1.name)
+        self.assertContains(r, self.round2.name)
+        self.assertContains(r, 'Anna')
+        self.assertContains(r, 'Ben')
+        self.assertContains(r, 'Hired')
+        self.assertContains(r, 'Rejected')
+        self.assertContains(r, 'On Hold')
+
+    def test_interviewer_sees_only_assigned_candidate_on_board(self):
+        """Board scoping mirrors the candidate list's visible_applications:
+        interviewers see only their own assigned/panel candidates."""
+        self.login('iv')
+        r = self.client.get(reverse('jobs:board', args=[self.job.pk]))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'Ben')
+        self.assertNotContains(r, 'Anna')
+
+    def _card_tag(self, html, app_pk):
+        """Slice of the card's own opening <div ...> tag (from the id
+        attribute through the tag's closing '>'), so assertions on
+        `draggable` don't accidentally match the board's JS source, which
+        contains the literal string draggable="true" in a CSS selector."""
+        match = re.search(rf'id="board-card-{app_pk}"[\s\S]*?>', html)
+        self.assertIsNotNone(match, f'card for application {app_pk} not found in response')
+        return match.group(0)
+
+    def test_hr_cards_are_draggable(self):
+        self.login('hr')
+        r = self.client.get(reverse('jobs:board', args=[self.job.pk]))
+        html = r.content.decode()
+        self.assertIn('draggable="true"', self._card_tag(html, self.app_a.pk))
+        self.assertIn('draggable="true"', self._card_tag(html, self.app_b.pk))
+
+    def test_non_hr_cards_are_not_draggable(self):
+        """Drag-and-drop is HR-only, matching the stage-select dropdown
+        which is also gated behind {% if user.is_hr %}."""
+        self.login('mgmt')
+        r = self.client.get(reverse('jobs:board', args=[self.job.pk]))
+        self.assertEqual(r.status_code, 200)
+        html = r.content.decode()
+        self.assertNotIn('draggable="true"', self._card_tag(html, self.app_a.pk))
+        self.assertNotIn('draggable="true"', self._card_tag(html, self.app_b.pk))
+
+    def test_terminal_status_cards_are_not_draggable(self):
+        self.login('hr')
+        self.app_a.status = JobApplication.Status.HIRED
+        self.app_a.current_round = None
+        self.app_a.save(update_fields=['status', 'current_round'])
+        r = self.client.get(reverse('jobs:board', args=[self.job.pk]))
+        html = r.content.decode()
+        self.assertNotIn('draggable="true"', self._card_tag(html, self.app_a.pk))
+
+    def test_board_link_present_on_job_detail(self):
+        self.login('hr')
+        r = self.client.get(reverse('jobs:detail', args=[self.job.pk]))
+        self.assertContains(r, reverse('jobs:board', args=[self.job.pk]))
+
+
+class JobBoardDragDropTests(JobsBaseTestCase):
+    """Simulates the exact fetch POST the board's drag-and-drop JS makes:
+    same endpoint (pipeline:move), same payload shape as the stage-select
+    dropdown, only 'source' differs ('board' vs 'list'/'detail'). No move
+    validation is duplicated in the board's JS or view - both a legal and
+    an illegal move must behave identically to the dropdown's coverage in
+    pipeline/tests.py.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.job = Job.objects.create(title='Board Drag Job', created_by=self.hr)
+        self.round1 = self.job.rounds.get(order=1)
+        self.round2 = self.job.rounds.get(order=2)
+        self.cand = Candidate.objects.create(email='drag@example.com', first_name='Drag')
+        self.app = JobApplication.objects.create(candidate=self.cand, job=self.job)
+        # Starts unrouted (current_round=None), exactly like the board's
+        # "Unrouted" column: the feedback gate never blocks a move out of
+        # no round, matching pipeline/tests.py's from_round=None coverage.
+        self.app.current_round = None
+        self.app.save(update_fields=['current_round'])
+
+    def test_legal_drag_move_persists(self):
+        """Board equivalent of dragging a card from Unrouted into a round
+        column: from_round is None, so no feedback is required."""
+        self.login('hr')
+        r = self.client.post(reverse('pipeline:move', args=[self.app.pk]), {
+            'stage': f'round:{self.round1.pk}',
+            'source': 'board',
+        })
+        self.assertEqual(r.status_code, 200)
+        self.app.refresh_from_db()
+        self.assertEqual(self.app.current_round, self.round1)
+
+    def test_illegal_drag_move_without_feedback_rejected_and_not_persisted(self):
+        """Once routed into round1 with no feedback submitted, dragging the
+        card straight to Hired must be blocked - identical to the
+        stage-select dropdown's behavior for the same state."""
+        self.login('hr')
+        self.app.current_round = self.round1
+        self.app.save(update_fields=['current_round'])
+        r = self.client.post(reverse('pipeline:move', args=[self.app.pk]), {
+            'stage': 'status:hired',
+            'source': 'board',
+        })
+        self.assertEqual(r.status_code, 409)
+        self.assertIn('Feedback', r.content.decode())
+        self.app.refresh_from_db()
+        self.assertEqual(self.app.status, JobApplication.Status.NEW)
+        self.assertEqual(self.app.current_round, self.round1)
+
+    def test_non_hr_drag_move_blocked(self):
+        self.login('iv')
+        r = self.client.post(reverse('pipeline:move', args=[self.app.pk]), {
+            'stage': f'round:{self.round1.pk}',
+            'source': 'board',
+        })
+        self.assertEqual(r.status_code, 403)
+        self.app.refresh_from_db()
+        self.assertIsNone(self.app.current_round)

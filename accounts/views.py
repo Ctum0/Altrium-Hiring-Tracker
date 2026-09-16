@@ -915,3 +915,41 @@ class InterviewerProfileView(LoginRequiredMixin, DetailView):
         context['upcoming_interviews'] = upcoming
         context['active_nav'] = 'roster'
         return context
+
+
+class RetentionReportView(LoginRequiredMixin, ListView):
+    """HR/Management: read-only audit of the data retention policy.
+
+    Phase 11 (NFR): closing a job (JobCloseView) only flips is_active and
+    stamps closed_at; it never deletes or archives Candidate or
+    JobApplication rows. This view makes that policy explicit and
+    auditable by listing every closed job with how long ago it closed and
+    how many candidates are still on file, each linking back to the
+    ordinary candidate list to prove the data stays searchable. It adds
+    no deletion, archival, or expiry mechanism of its own.
+    """
+
+    template_name = 'accounts/retention_report.html'
+    context_object_name = 'closed_jobs'
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
+        if not (request.user.is_hr() or request.user.is_management()):
+            return redirect('accounts:home')
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_queryset(self):
+        return (
+            Job.objects.filter(is_active=False)
+            .annotate(num_applications=Count('applications'))
+            .order_by('-closed_at')
+        )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['active_nav'] = 'jobs'
+        now = timezone.now()
+        for job in context['closed_jobs']:
+            job.days_since_closure = (now - job.closed_at).days if job.closed_at else None
+        return context

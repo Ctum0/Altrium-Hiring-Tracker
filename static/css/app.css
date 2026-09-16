@@ -4445,3 +4445,101 @@ body.no-scroll {
   font-size: var(--text-xs);
   color: var(--muted);
 }
+
+/* ===== Kanban Board (jobs/job_board.html) ===== */
+.kanban-board {
+  display: flex;
+  gap: var(--sp-4);
+  overflow-x: auto;
+  padding-bottom: var(--sp-4);
+  align-items: flex-start;
+}
+.kanban-column {
+  flex: 0 0 280px;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 260px);
+}
+.kanban-column-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--border);
+}
+.kanban-column-header h3 {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--ink);
+}
+.kanban-column-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-3);
+  overflow-y: auto;
+  min-height: 80px;
+  transition: background-color 150ms ease;
+}
+.kanban-column-body.drag-over {
+  background: var(--brand-soft);
+  border-radius: var(--radius);
+}
+.kanban-empty {
+  padding: var(--sp-3) var(--sp-1);
+  text-align: center;
+}
+.kanban-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--sp-3);
+  cursor: grab;
+  transition: box-shadow 150ms ease, opacity 150ms ease, border-color 150ms ease;
+}
+.kanban-card[draggable="true"]:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
+}
+.kanban-card:not([draggable="true"]) {
+  cursor: default;
+}
+.kanban-card.dragging {
+  opacity: 0.5;
+}
+.kanban-card-top {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-2);
+}
+.kanban-card-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.kanban-card-name a {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--ink);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kanban-card-name a:hover {
+  text-decoration: underline;
+}
+.kanban-card-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-2);
+}
+.kanban-card-meta .score-ring {
+  width: 28px;
+  height: 28px;
+}
+.kanban-column-terminal .kanban-column-header h3 {
+  color: var(--muted);
+}

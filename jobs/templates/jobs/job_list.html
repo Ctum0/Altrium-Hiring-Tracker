@@ -18,8 +18,17 @@
       New job
     </a>
     {% endif %}
+    {% if show_inactive and user.is_hr or show_inactive and user.is_management %}
+    <a href="{% url 'accounts:retention_report' %}" class="btn btn-secondary">Retention report</a>
+    {% endif %}
   </div>
 </div>
+
+{% if show_inactive %}
+<div class="alert alert-info" style="margin-bottom:var(--sp-4)">
+  Closed job data is retained indefinitely and remains fully searchable. No automatic deletion is performed.
+</div>
+{% endif %}
 
 {% if jobs %}
 <div class="jobs-card-grid">

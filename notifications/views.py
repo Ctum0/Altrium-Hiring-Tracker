@@ -1,6 +1,9 @@
+from itertools import groupby
+
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import HttpResponse
 from django.shortcuts import redirect, render
+from django.utils import timezone
 from django.views import View
 from django.views.generic import ListView
 
@@ -35,6 +38,24 @@ class NotificationListView(LoginRequiredMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['active_nav'] = 'notifications'
+        # Basic date grouping (Today / Yesterday / older dates) for the
+        # current page's notifications. No new model field: grouped from
+        # the existing created_at timestamp only.
+        today = timezone.localdate()
+        yesterday = today - timezone.timedelta(days=1)
+        groups = []
+        for day, items in groupby(
+            context['notifications'],
+            key=lambda n: timezone.localtime(n.created_at).date(),
+        ):
+            if day == today:
+                label = 'Today'
+            elif day == yesterday:
+                label = 'Yesterday'
+            else:
+                label = day.strftime('%B %d, %Y')
+            groups.append({'label': label, 'items': list(items)})
+        context['notification_groups'] = groups
         return context
 
 

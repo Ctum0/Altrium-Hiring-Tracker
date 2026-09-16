@@ -1,0 +1,35 @@
+{% load accounts_extras %}
+<div class="kanban-card"
+     id="board-card-{{ app.pk }}"
+     data-app-id="{{ app.pk }}"
+     {% if app.board_draggable %}draggable="true"{% endif %}
+     tabindex="0">
+  <div class="kanban-card-top">
+    <div class="cand-avatar cand-avatar-{{ app.candidate.full_name|avatar_index }}" aria-hidden="true">
+      {{ app.candidate.full_name|initials }}
+    </div>
+    <div class="kanban-card-name">
+      <a href="{% url 'candidates:detail' app.candidate.pk %}">{{ app.candidate.full_name }}</a>
+      <span class="text-xs text-muted">{{ app.candidate.email }}</span>
+    </div>
+  </div>
+  <div class="kanban-card-meta">
+    {% if app.candidate.score is not None %}
+      {% if app.candidate.score >= 75 %}
+      <span class="score-ring score-ring-high">{{ app.candidate.score }}</span>
+      {% elif app.candidate.score >= 50 %}
+      <span class="score-ring score-ring-mid">{{ app.candidate.score }}</span>
+      {% else %}
+      <span class="score-ring score-ring-low">{{ app.candidate.score }}</span>
+      {% endif %}
+    {% else %}
+    <span class="score-ring score-ring-none">N/A</span>
+    {% endif %}
+    {% if app.shortlist_score is not None %}
+    <span class="text-xs text-muted">Match {{ app.shortlist_score }}</span>
+    {% endif %}
+  </div>
+  <div class="kanban-card-assignee text-xs text-muted">
+    {% if app.assigned_to %}{{ app.assigned_to.get_full_name|default:app.assigned_to.username }}{% else %}Unassigned{% endif %}
+  </div>
+</div>

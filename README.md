@@ -40,9 +40,11 @@ Before this application, Altrium managed hiring across multiple disconnected too
 
 The system uses Role-Based Access Control (RBAC) to control access:
 
-- **HR Manager (`hr_demo`, `hr_sarah`)**: Full access. Opens job positions, ingests and parses CVs, assigns interviewers, moves candidates across stages, overrides shortlist scores, and can remove candidates.
-- **Interviewer (`iv_demo`, `iv_chen`, `iv_rachel`, `iv_patel`)**: Role-scoped access. Sees only candidates assigned to them, submits interview scorecards, and uses AI note polishing.
-- **Management (`mgmt_demo`, `mgmt_davis`)**: Read-only executive access. Views real-time hiring metrics, pipeline health, SLA escalation alerts, and AI panel consensus.
+- **HR Manager (`hr_demo`)**: Full access. Opens job positions, ingests and parses CVs, assigns interviewers, moves candidates across stages, overrides shortlist scores, and can remove candidates.
+- **Interviewer (`iv_demo`)**: Role-scoped access. Sees only candidates assigned to them, submits interview scorecards, and uses AI note polishing.
+- **Management (`mgmt_demo`)**: Read-only executive access. Views real-time hiring metrics, pipeline health, SLA escalation alerts, and AI panel consensus.
+
+See Test Accounts below for the full list of demo logins and which management command creates each one.
 
 ---
 
@@ -62,7 +64,6 @@ All primary functional requirements solving Altrium's core recruitment operation
 - **AI Feedback Assistant**: AI note-polishing engine converting raw interviewer notes into clean, bulleted summaries.
 - **Feedback Edit History**: Immutable audit log preserving prior versions when evaluation notes are edited.
 - **AI Panel Consensus & Conflict Resolver**: Engine synthesizing multi-evaluator vote tallies (Hire/Hold/Reject), agreed strengths, and divergence warnings.
-- **Candidate Pipeline & Kanban Board**: Interactive board tracking applications across stages, supporting stage moves, candidate un-rejection, and candidate removal.
 - **Position Closure & Management Dashboard**: Executive analytics dashboard with active metrics and job closure controls.
 
 - **Auto-Reject Baseline Score**: Jobs can define a minimum AI match score (0-100, validated); CVs scoring below the baseline are auto-rejected at upload/import time (never auto-resurrected on re-upload). A baseline without requirements is rejected at form level, so the baseline can never silently mass-reject.
@@ -73,17 +74,28 @@ All primary functional requirements solving Altrium's core recruitment operation
 - **Honest Analytics**: Pipeline velocity shows measured average days-in-stage (no synthetic formulas); insight cards show real candidate counts and skill frequencies; action links deep-link to filtered candidate lists.
 - **Security Hardening**: docker boot no longer wipes/reseeds production data or resets passwords; SECRET_KEY/DEBUG fail closed in production; login rate-limiting via django-axes; signed S3 media URLs; session + upload size caps; tunnel hosts trusted in DEBUG only.
 
-### 🟡 Sprint 2 & Future Roadmap (Planned Enhancements)
+### 🟢 Sprint 2 (Completed)
 
-Sprint 2 focuses on advanced automation, reporting, and talent re-engagement:
+All Sprint 2 features below are implemented and live in the codebase:
 
-1. **AI Rejection Email Dispatch**: Generating and dispatching personalized, constructive rejection emails to candidates upon position closure or candidate rejection.
-2. **Pipeline Report Exporter (CSV/Excel)**: One-click export tool for HR and Management to generate pipeline metrics, time-to-hire reports, and candidate score sheets.
-3. **Automated Feedback Reminders**: Scheduled background cron sending automated email reminders to interviewers with pending evaluations.
-4. **Automated 7-Day SLA Escalation Dispatcher**: Automated notification dispatcher alerting HR when a candidate remains stalled in an active round for >7 days.
-5. **Talent Pool Re-Matching Engine** *(New Business Feature)*:
-   - **Altrium Problem Addressed**: When Altrium closes a role, past silver-medalist candidates (who scored 80+ but were not hired) are forgotten in closed files. When a new role opens months later, HR starts sourcing from scratch.
-   - **Solution**: When HR posts a new job, the engine automatically scans closed candidate profiles, identifies past high-scoring silver-medalists, and gives HR a 1-click option to re-engage vetted talent, slashing time-to-hire by 60%.
+- **Kanban Board**: Per-job board at `/jobs/<pk>/board/` with one column per interview round plus terminal Hired/Rejected/On Hold lanes; native drag-and-drop moves a candidate between stages.
+- **CV Self-Upload**: Public, unauthenticated application form at `/candidates/apply/<job_pk>/` that runs the same parsing, dedup, and scoring pipeline as an HR-driven upload.
+- **Structured Scorecard with AI-Suggested Ratings**: Fixed-criteria evaluation form (Technical Skill, Communication, Culture Fit) with an AI endpoint that proposes a rating per criterion from raw notes; the interviewer reviews and confirms before submitting.
+- **AI General Feedback**: Once a candidate has feedback from two or more rounds, an AI-written narrative consolidates every round's ratings and notes into one summary, regenerated on each new submission.
+- **Confirmation, Rejection & Acceptance Emails**: Automatic emails on CV intake (confirmation), on rejection or job closure (AI-drafted rejection), and on a hire decision (acceptance), sent through a shared mail helper with a console fallback in development.
+- **Automated Feedback Reminders**: The `send_feedback_reminders` management command emails interviewers with feedback pending more than three days; wired to run daily via cron.
+- **7-Day Escalation Dispatch**: The `dispatch_escalations` management command emails HR/Management when a candidate has been stalled in a stage for more than seven days.
+- **Talent Pool Rematching Engine**: Scans closed jobs for rejected or on-hold candidates who scored 80+ and offers HR a one-click re-engagement into a new, domain-matching job.
+- **CSV Report Export**: One-click CSV download at `/reports/export/` listing job title, department, candidate count, average time-to-hire, and status for every job.
+- **Data Retention Report**: Read-only audit at `/reports/retention/` listing every closed job, days since closure, and candidates still on file; confirms no automatic deletion or archival happens.
+- **Stage Performance Analytics**: Dashboard card computing the pass/fail rate per interview round from move history and flagging rounds with an abnormally high drop-off.
+- **Interviewer Availability Self-Service**: Interviewers set and edit their own recurring weekly availability windows directly in the app.
+- **Domain/Seniority Interviewer Matching**: Structured Domain and Seniority fields on jobs and interviewer accounts; assignment requires both a domain match and interviewer seniority at or above the job's required level.
+- **Rounds-in-Creation Flow**: HR configures a job's interview rounds inline immediately after creating it, before landing on the job detail page.
+
+### 🟡 Future Roadmap (Planned Enhancements)
+
+Every feature originally planned for Sprint 2 has shipped (see Sprint 2 (Completed) above). No further enhancements are currently planned.
 
 ---
 
@@ -130,16 +142,18 @@ Access the app at `http://127.0.0.1:8000`.
 
 ## 🔑 Test Accounts (Password: `testpass123`)
 
-| Role | Username | Name & Role | Access Level |
-| :--- | :--- | :--- | :--- |
-| **HR Manager** | `hr_demo` | Hana Miller (Lead Talent Partner) | Full admin access, job creation, candidate & stage management |
-| **HR Partner** | `hr_sarah` | Sarah Jenkins (Senior Recruiter) | Full admin access, candidate upload & assignment |
-| **Interviewer** | `iv_demo` | Ivan Vance (Backend Lead) | Assigned candidates, scorecards & AI note tools |
-| **Interviewer** | `iv_chen` | Dr. Marcus Chen (Frontend Architect) | Assigned candidates & frontend technical scorecards |
-| **Interviewer** | `iv_rachel` | Rachel Adams (DevOps Manager) | Assigned candidates & infrastructure evaluation |
-| **Interviewer** | `iv_patel` | Vikram Patel (QA Engineering Lead) | Assigned candidates & automation evaluation |
-| **Management** | `mgmt_demo` | Mia Thorne (VP of Engineering) | Read-only executive dashboard & SLA alerts |
-| **Management** | `mgmt_davis` | David Ross (Director of Product) | Read-only pipeline metrics & panel consensus |
+The three base accounts below are created by `python manage.py seed_users`, the only account seeder wired into a production boot (gated behind `SEED_DEMO_USERS=true`). This is what exists on the Railway deployment linked below. The five additional named accounts are only created locally by `python manage.py clean_and_seed_db --force` (used in the Local Setup steps above) and will not exist on a deployment that only ran `seed_users`.
+
+| Role | Username | Name & Role | Access Level | Seeded By |
+| :--- | :--- | :--- | :--- | :--- |
+| **HR Manager** | `hr_demo` | Hana Miller (Lead Talent Partner) | Full admin access, job creation, candidate & stage management | `seed_users` |
+| **HR Partner** | `hr_sarah` | Sarah Jenkins (Senior Recruiter) | Full admin access, candidate upload & assignment | `clean_and_seed_db --force` only |
+| **Interviewer** | `iv_demo` | Ivan Vance (Backend Lead) | Assigned candidates, scorecards & AI note tools | `seed_users` |
+| **Interviewer** | `iv_chen` | Dr. Marcus Chen (Frontend Architect) | Assigned candidates & frontend technical scorecards | `clean_and_seed_db --force` only |
+| **Interviewer** | `iv_rachel` | Rachel Adams (DevOps Manager) | Assigned candidates & infrastructure evaluation | `clean_and_seed_db --force` only |
+| **Interviewer** | `iv_patel` | Vikram Patel (QA Engineering Lead) | Assigned candidates & automation evaluation | `clean_and_seed_db --force` only |
+| **Management** | `mgmt_demo` | Mia Thorne (VP of Engineering) | Read-only executive dashboard & SLA alerts | `seed_users` |
+| **Management** | `mgmt_davis` | David Ross (Director of Product) | Read-only pipeline metrics & panel consensus | `clean_and_seed_db --force` only |
 
 ---
 

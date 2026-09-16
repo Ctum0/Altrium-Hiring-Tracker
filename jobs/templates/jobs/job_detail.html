@@ -13,6 +13,7 @@
   </div>
   <div class="page-actions">
     {% if can_edit %}<a href="{% url 'jobs:edit' job.pk %}" class="btn btn-secondary">Edit</a>{% endif %}
+    <a href="{% url 'jobs:board' job.pk %}" class="btn btn-secondary">Board</a>
     <a href="{% url 'jobs:list' %}" class="btn btn-secondary">All jobs</a>
     {% if can_edit and job.is_active %}
     <form method="post" action="{% url 'jobs:close' job.pk %}" style="display:inline" onsubmit="event.preventDefault();confirmAction(this,'Close job','Close this job? It will stop accepting new CV uploads. Existing candidates keep their current stage and status.')">

@@ -1,0 +1,246 @@
+{% extends 'base.html' %}
+{% block title %}{{ job.title }} Board | Altrium Tracker{% endblock %}
+{% block breadcrumb %}<a class="breadcrumb-link" href="{% url 'jobs:list' %}">Jobs</a><span class="breadcrumb-sep">/</span><a class="breadcrumb-link" href="{% url 'jobs:detail' job.pk %}">{{ job.title }}</a><span class="breadcrumb-sep">/</span>Board{% endblock %}
+{% block page_title %}{{ job.title }} Board{% endblock %}
+{% block content_class %}scrollable{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">{{ job.title }}</h1>
+    <p class="page-sub">
+      {% if is_hr %}Drag a card to move a candidate between stages.{% else %}Pipeline overview for this job.{% endif %}
+    </p>
+  </div>
+  <div class="page-actions">
+    <a href="{% url 'jobs:detail' job.pk %}" class="btn btn-secondary">Table view</a>
+  </div>
+</div>
+
+<div class="kanban-board" id="kanban-board" data-move-url-template="{% url 'pipeline:move' 0 %}">
+  {% if unrouted_apps %}
+  <div class="kanban-column panel">
+    <div class="kanban-column-header">
+      <h3>Unrouted</h3>
+      <span class="badge badge-secondary">{{ unrouted_apps|length }}</span>
+    </div>
+    <div class="kanban-column-body">
+      {% for app in unrouted_apps %}
+      {% include 'jobs/_board_card.html' %}
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% for round in rounds %}
+  <div class="kanban-column panel">
+    <div class="kanban-column-header">
+      <h3>{{ round.name }}</h3>
+      <span class="badge badge-secondary">{{ round.board_apps|length }}</span>
+    </div>
+    <div class="kanban-column-body" data-stage="round:{{ round.pk }}">
+      {% for app in round.board_apps %}
+      {% include 'jobs/_board_card.html' %}
+      {% empty %}
+      <p class="kanban-empty text-xs text-muted">No candidates in this round.</p>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+
+  <div class="kanban-column panel kanban-column-terminal">
+    <div class="kanban-column-header">
+      <h3>Hired</h3>
+      <span class="badge badge-hired">{{ hired_apps|length }}</span>
+    </div>
+    <div class="kanban-column-body" data-stage="status:hired">
+      {% for app in hired_apps %}
+      {% include 'jobs/_board_card.html' %}
+      {% empty %}
+      <p class="kanban-empty text-xs text-muted">No hires yet.</p>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="kanban-column panel kanban-column-terminal">
+    <div class="kanban-column-header">
+      <h3>Rejected</h3>
+      <span class="badge badge-rejected">{{ rejected_apps|length }}</span>
+    </div>
+    <div class="kanban-column-body" data-stage="status:rejected">
+      {% for app in rejected_apps %}
+      {% include 'jobs/_board_card.html' %}
+      {% empty %}
+      <p class="kanban-empty text-xs text-muted">Nobody rejected.</p>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="kanban-column panel kanban-column-terminal">
+    <div class="kanban-column-header">
+      <h3>On Hold</h3>
+      <span class="badge badge-on_hold">{{ on_hold_apps|length }}</span>
+    </div>
+    <div class="kanban-column-body" data-stage="status:on_hold">
+      {% for app in on_hold_apps %}
+      {% include 'jobs/_board_card.html' %}
+      {% empty %}
+      <p class="kanban-empty text-xs text-muted">Nobody on hold.</p>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+{% if not rounds and not unrouted_apps %}
+<div class="empty-state">
+  <p class="empty-state-title">No interview rounds configured</p>
+  <p class="empty-state-body">Add rounds on the table view before using the board.</p>
+</div>
+{% endif %}
+
+<script>
+(function() {
+  var board = document.getElementById('kanban-board');
+  if (!board) return;
+  var urlTemplate = board.dataset.moveUrlTemplate;
+  var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+  var csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+  var draggedCard = null;
+  var draggedSourceBody = null;
+
+  function moveUrl(appId) {
+    return urlTemplate.replace(/\/0\/$/, '/' + appId + '/');
+  }
+
+  function updateCount(columnBody, delta) {
+    var column = columnBody.closest('.kanban-column');
+    if (!column) return;
+    var badge = column.querySelector('.kanban-column-header .badge');
+    if (!badge) return;
+    var next = Math.max(0, parseInt(badge.textContent, 10) + delta);
+    badge.textContent = String(next);
+  }
+
+  function clearEmptyMessage(columnBody) {
+    var empty = columnBody.querySelector('.kanban-empty');
+    if (empty) empty.remove();
+  }
+
+  function maybeShowEmptyMessage(columnBody) {
+    if (!columnBody.querySelector('.kanban-card')) {
+      var p = document.createElement('p');
+      p.className = 'kanban-empty text-xs text-muted';
+      p.textContent = 'No candidates.';
+      columnBody.appendChild(p);
+    }
+  }
+
+  board.addEventListener('dragstart', function(e) {
+    var card = e.target.closest('.kanban-card[draggable="true"]');
+    if (!card) return;
+    draggedCard = card;
+    draggedSourceBody = card.closest('.kanban-column-body');
+    card.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', card.dataset.appId);
+  });
+
+  board.addEventListener('dragend', function(e) {
+    var card = e.target.closest('.kanban-card');
+    if (card) card.classList.remove('dragging');
+    board.querySelectorAll('.kanban-column-body.drag-over').forEach(function(el) {
+      el.classList.remove('drag-over');
+    });
+    draggedCard = null;
+    draggedSourceBody = null;
+  });
+
+  board.addEventListener('dragover', function(e) {
+    var columnBody = e.target.closest('.kanban-column-body[data-stage]');
+    if (!columnBody || !draggedCard) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    columnBody.classList.add('drag-over');
+  });
+
+  board.addEventListener('dragleave', function(e) {
+    var columnBody = e.target.closest('.kanban-column-body[data-stage]');
+    if (!columnBody) return;
+    if (!columnBody.contains(e.relatedTarget)) {
+      columnBody.classList.remove('drag-over');
+    }
+  });
+
+  board.addEventListener('drop', function(e) {
+    var columnBody = e.target.closest('.kanban-column-body[data-stage]');
+    if (!columnBody) return;
+    e.preventDefault();
+    columnBody.classList.remove('drag-over');
+    var card = draggedCard;
+    var sourceBody = draggedSourceBody;
+    if (!card || !sourceBody) return;
+    if (sourceBody === columnBody) return;
+
+    var appId = card.dataset.appId;
+    var stage = columnBody.dataset.stage;
+    var body = new URLSearchParams();
+    body.set('stage', stage);
+    body.set('source', 'board');
+
+    // The card is left in its current column until the server confirms the
+    // move: this is the exact same feedback-gate/RBAC endpoint the
+    // candidate list's stage-select dropdown posts to (pipeline:move), so
+    // an illegal move (e.g. missing feedback) never has to be visually
+    // "undone" - it simply never left.
+    fetch(moveUrl(appId), {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': csrfToken,
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+      body: body,
+    }).then(function(resp) {
+      if (resp.ok) {
+        clearEmptyMessage(columnBody);
+        columnBody.appendChild(card);
+        updateCount(sourceBody, -1);
+        updateCount(columnBody, 1);
+        maybeShowEmptyMessage(sourceBody);
+        if (stage.indexOf('status:') === 0) {
+          card.removeAttribute('draggable');
+        }
+        return;
+      }
+      return resp.text().then(function(text) {
+        showBoardToast(text && text.indexOf('<') !== 0 ? text : ('Request failed (' + resp.status + ').'));
+      });
+    }).catch(function() {
+      showBoardToast('Network error - check your connection and retry.');
+    });
+  });
+
+  function showBoardToast(message) {
+    var existing = document.querySelector('.toast-stack');
+    var stack = existing || document.createElement('div');
+    if (!existing) {
+      stack.className = 'toast-stack';
+      document.body.appendChild(stack);
+    }
+    var toast = document.createElement('div');
+    toast.className = 'toast toast-error';
+    toast.setAttribute('role', 'alert');
+    toast.textContent = message;
+    var closeBtn = document.createElement('button');
+    closeBtn.className = 'toast-dismiss';
+    closeBtn.setAttribute('aria-label', 'Dismiss');
+    closeBtn.textContent = '\u00d7';
+    closeBtn.addEventListener('click', function() { toast.remove(); });
+    toast.appendChild(closeBtn);
+    stack.appendChild(toast);
+    setTimeout(function() {
+      toast.style.opacity = '0';
+      setTimeout(function() { toast.remove(); }, 200);
+    }, 5000);
+  }
+})();
+</script>
+{% endblock %}

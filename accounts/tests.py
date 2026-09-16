@@ -859,3 +859,79 @@ class StagePerformanceTest(AuthAndRoleTestBase):
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.context['stage_performance'], [])
         self.assertContains(r, 'Not enough data yet')
+
+
+class RetentionReportTest(AuthAndRoleTestBase):
+    """Phase 11 (NFR): read-only retention report — role gating and
+    content. Proves closed-job data stays visible in the report no
+    matter how long ago the job closed."""
+
+    def test_interviewer_redirected(self):
+        c = Client()
+        assert c.login(username='iv', password='pass12345')
+        r = c.get(reverse('accounts:retention_report'))
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(r.url, reverse('accounts:home'))
+
+    def test_anonymous_redirected_to_login(self):
+        r = Client().get(reverse('accounts:retention_report'))
+        self.assertEqual(r.status_code, 302)
+        self.assertIn('/login/', r.url)
+
+    def test_hr_can_view(self):
+        c = Client()
+        assert c.login(username='hr', password='pass12345')
+        r = c.get(reverse('accounts:retention_report'))
+        self.assertEqual(r.status_code, 200)
+
+    def test_management_can_view(self):
+        c = Client()
+        assert c.login(username='mgmt', password='pass12345')
+        r = c.get(reverse('accounts:retention_report'))
+        self.assertEqual(r.status_code, 200)
+
+    def test_active_job_excluded(self):
+        _make_job(self.hr, title='Still Open Role')
+        c = Client()
+        assert c.login(username='hr', password='pass12345')
+        r = c.get(reverse('accounts:retention_report'))
+        self.assertNotContains(r, 'Still Open Role')
+
+    def test_year_old_closed_job_reported_with_candidate_count(self):
+        """The core DoD: a job closed a year ago is not silently dropped
+        or aged out of the report, and its candidate count reflects data
+        that is still on file, not deleted."""
+        job = _make_job(self.hr, title='Year Old Role')
+        job.is_active = False
+        job.closed_at = timezone.now()
+        job.save()
+        candidate = Candidate.objects.create(
+            first_name='Old', last_name='Timer', email='old@example.com',
+        )
+        JobApplication.objects.create(candidate=candidate, job=job, status='new')
+        # Backdate closed_at directly in the DB, same technique used to
+        # simulate historical application timestamps elsewhere in this
+        # file (see test_avg_time_to_hire_matches_known_span).
+        from jobs.models import Job as JobModel
+        JobModel.objects.filter(pk=job.pk).update(
+            closed_at=timezone.now() - timedelta(days=365)
+        )
+
+        c = Client()
+        assert c.login(username='hr', password='pass12345')
+        r = c.get(reverse('accounts:retention_report'))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'Year Old Role')
+        self.assertContains(r, '365 day')
+        self.assertContains(r, '1 candidate')
+        self.assertContains(r, 'retained indefinitely')
+
+        job_row = next(j for j in r.context['closed_jobs'] if j.pk == job.pk)
+        self.assertEqual(job_row.days_since_closure, 365)
+        self.assertEqual(job_row.num_applications, 1)
+
+        # The report's deep link must be a real path to the ordinary
+        # candidate search/filter, not a dead end.
+        self.assertIn(f'/candidates/?job={job.pk}&all=1', r.content.decode())
+        cand_r = c.get(reverse('candidates:list'), {'job': job.pk, 'all': '1'})
+        self.assertContains(cand_r, 'Old Timer')

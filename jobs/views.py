@@ -9,12 +9,20 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views import View
-from django.views.generic import CreateView, DeleteView, DetailView, ListView, TemplateView, UpdateView
+from django.views.generic import (
+    CreateView,
+    DeleteView,
+    DetailView,
+    ListView,
+    TemplateView,
+    UpdateView,
+)
 
-from notifications.mail import send_candidate_email
 from ai.matching import auto_apply
 from candidates.models import JobApplication
+from candidates.views import visible_applications
 from feedback.models import InterviewFeedback
+from notifications.mail import send_candidate_email
 
 from .forms import JobForm, RoundForm
 from .models import InterviewRound, Job
@@ -226,6 +234,71 @@ class JobDetailView(LoginRequiredMixin, DetailView):
             )
         if self.request.user.is_hr():
             context['talent_pool_suggestions'] = find_suggestions(job)
+        return context
+
+
+class JobBoardView(LoginRequiredMixin, DetailView):
+    """Kanban board for a single job's pipeline: one column per interview
+    round (in order), plus terminal lanes for Hired, Rejected, and On Hold.
+
+    Visibility mirrors JobDetailView (any authenticated user can open the
+    board); which candidates appear on it is scoped the same way the
+    candidate list scopes rows (visible_applications): HR and Management
+    see every application, Interviewers see only their assigned/panel
+    candidates. Drag-and-drop is offered only to HR, matching the
+    candidate list's stage-select dropdown, which is also HR-only.
+
+    Card moves POST straight to pipeline:move (see job_board.html) - this
+    view only assembles read data. No move validation is duplicated here.
+    """
+    model = Job
+    template_name = 'jobs/job_board.html'
+    context_object_name = 'job'
+
+    TERMINAL_STATUSES = (
+        JobApplication.Status.HIRED,
+        JobApplication.Status.REJECTED,
+        JobApplication.Status.ON_HOLD,
+    )
+
+    def get_queryset(self):
+        return Job.objects.select_related('hiring_manager', 'created_by')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['active_nav'] = 'jobs'
+        job = self.object
+        is_hr = self.request.user.is_hr()
+        rounds = list(job.rounds.all())
+        round_ids = {r.pk for r in rounds}
+
+        apps = (
+            visible_applications(self.request.user)
+            .filter(job=job)
+            .order_by('-updated_at')
+        )
+
+        by_round = {rid: [] for rid in round_ids}
+        unrouted_apps = []
+        terminal_apps = {status: [] for status in self.TERMINAL_STATUSES}
+        for app in apps:
+            app.board_draggable = is_hr and app.status not in self.TERMINAL_STATUSES
+            if app.status in self.TERMINAL_STATUSES:
+                terminal_apps[app.status].append(app)
+            elif app.current_round_id in by_round:
+                by_round[app.current_round_id].append(app)
+            else:
+                unrouted_apps.append(app)
+
+        for r in rounds:
+            r.board_apps = by_round[r.pk]
+
+        context['rounds'] = rounds
+        context['unrouted_apps'] = unrouted_apps
+        context['hired_apps'] = terminal_apps[JobApplication.Status.HIRED]
+        context['rejected_apps'] = terminal_apps[JobApplication.Status.REJECTED]
+        context['on_hold_apps'] = terminal_apps[JobApplication.Status.ON_HOLD]
+        context['is_hr'] = is_hr
         return context
 
 
