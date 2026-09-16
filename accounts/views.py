@@ -457,10 +457,10 @@ class HRDashboardView(LoginRequiredMixin, ListView):
 
         week_ago = timezone.now() - timedelta(days=7)
         stalled_qs = JobApplication.objects.filter(
-            updated_at__lt=week_ago
+            stage_entered_at__lt=week_ago
         ).exclude(status__in=['hired', 'rejected']).select_related(
             'candidate', 'job', 'assigned_to'
-        ).order_by('updated_at')
+        ).order_by('stage_entered_at')
         stalled_count = stalled_qs.count()
         context['stalled_applications'] = stalled_qs
         context['stalled_count'] = stalled_count

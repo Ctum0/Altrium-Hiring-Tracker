@@ -7,19 +7,40 @@ class InterviewFeedback(models.Model):
     # constant so future per-round customization can override/extend it.
     DEFAULT_CRITERIA = ('Technical Skill', 'Communication', 'Culture Fit')
 
+    # Relative importance of each default criterion when computing the
+    # overall score. Technical ability is the primary evaluation axis for
+    # this platform (see README.md/PRODUCT.md), so it carries half the
+    # weight; the remaining criteria split the rest evenly. Any criterion
+    # not listed here (e.g. future per-round customization) falls back to
+    # an equal weight of 1.0, and weights are renormalized to sum to 1
+    # across whichever criteria are actually present in a submission.
+    CRITERIA_WEIGHTS = {
+        'Technical Skill': 0.5,
+        'Communication': 0.25,
+        'Culture Fit': 0.25,
+    }
+
     @staticmethod
     def compute_overall(criteria_scores) -> int:
-        """Overall score = mean of criterion scores, rounded to an int."""
-        scores = [
-            entry.get('score')
+        """Overall score = weighted mean of criterion scores, rounded to an int.
+
+        Each criterion is weighted per ``CRITERIA_WEIGHTS`` (default 1.0 for
+        unknown/custom criteria); weights are renormalized across whatever
+        criteria are present so the result is always a valid 0-100 average.
+        """
+        pairs = [
+            (entry.get('criterion'), entry.get('score'))
             for entry in criteria_scores or []
             if isinstance(entry, dict)
             and not isinstance(entry.get('score'), bool)
             and isinstance(entry.get('score'), (int, float))
         ]
-        if not scores:
+        if not pairs:
             raise ValueError('compute_overall requires at least one numeric criterion score.')
-        return round(sum(scores) / len(scores))
+        weights = [InterviewFeedback.CRITERIA_WEIGHTS.get(name, 1.0) for name, _score in pairs]
+        total_weight = sum(weights)
+        weighted_sum = sum(score * weight for (_name, score), weight in zip(pairs, weights))
+        return round(weighted_sum / total_weight)
 
     application = models.ForeignKey(
         'candidates.JobApplication',
@@ -88,17 +109,11 @@ class InterviewFeedback(models.Model):
 
     @property
     def overall_score(self):
-        """Mean of the criterion scores (rounded); None without criteria."""
-        scores = [
-            item['score']
-            for item in (self.criteria_scores or [])
-            if isinstance(item, dict)
-            and not isinstance(item.get('score'), bool)
-            and isinstance(item.get('score'), (int, float))
-        ]
-        if not scores:
+        """Weighted mean of the criterion scores (rounded); None without criteria."""
+        try:
+            return self.compute_overall(self.criteria_scores)
+        except ValueError:
             return None
-        return round(sum(scores) / len(scores))
 
 
 class FeedbackEditHistory(models.Model):

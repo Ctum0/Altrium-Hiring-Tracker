@@ -186,7 +186,10 @@ class HRDashboardAnalyticsTest(AuthAndRoleTestBase):
         return c
 
     def test_stalled_candidates_appear_in_escalation(self):
-        """Applications not updated for >7 days should be in stalled list."""
+        """Applications whose stage_entered_at is >7 days old should be in
+        the stalled list, even if updated_at is recent (e.g. an unrelated
+        note edit) -- the dashboard card must key off the same field as
+        notifications.tasks.dispatch_escalations, not updated_at."""
         from jobs.models import Job
 
         job = Job.objects.create(
@@ -202,15 +205,50 @@ class HRDashboardAnalyticsTest(AuthAndRoleTestBase):
             status='shortlisted',
             assigned_to=self.hr,
         )
-        # Simulate 10 days ago
+        # Genuinely stalled: entered this stage 10 days ago, but touched
+        # (e.g. a note edit) just now -- updated_at alone would hide this.
         ten_days_ago = timezone.now() - timedelta(days=10)
-        JobApplication.objects.filter(id=app.id).update(updated_at=ten_days_ago)
+        JobApplication.objects.filter(id=app.id).update(
+            stage_entered_at=ten_days_ago, updated_at=timezone.now(),
+        )
 
         c = self._login_hr()
         r = c.get(reverse('accounts:hr_dashboard'))
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.context['stalled_count'], 1)
         self.assertIn(app, r.context['stalled_applications'])
+
+    def test_recently_moved_candidate_not_stalled_despite_old_updated_at(self):
+        """An application that just moved into a new stage is NOT stalled,
+        even if updated_at is old -- only stage_entered_at should count."""
+        from jobs.models import Job
+
+        job = Job.objects.create(
+            title='Test Role', department='Engineering', is_active=True,
+            created_by=self.hr,
+        )
+        candidate = Candidate.objects.create(
+            first_name='John', last_name='Roe', email='john@example.com'
+        )
+        app = JobApplication.objects.create(
+            candidate=candidate,
+            job=job,
+            status='shortlisted',
+            assigned_to=self.hr,
+        )
+        # Just moved into this stage today, but the row itself is old
+        # (e.g. created long ago and untouched until this move).
+        ten_days_ago = timezone.now() - timedelta(days=10)
+        JobApplication.objects.filter(id=app.id).update(
+            stage_entered_at=timezone.now() - timedelta(days=1),
+            updated_at=ten_days_ago,
+        )
+
+        c = self._login_hr()
+        r = c.get(reverse('accounts:hr_dashboard'))
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.context['stalled_count'], 0)
+        self.assertNotIn(app, r.context['stalled_applications'])
 
     def test_velocity_returns_values(self):
         """Velocity computation should return numeric values when apps exist."""

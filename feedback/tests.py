@@ -472,7 +472,7 @@ class TestFeedbackListHeading(FeedbackBaseTestCase):
 # 11. Structured Scorecard (criteria mean, fallback, AI suggest)
 # ---------------------------------------------------------------------------
 class TestScorecardComputation(FeedbackBaseTestCase):
-    """Criteria-mean calculation and manual-score fallback."""
+    """Weighted-criteria calculation and manual-score fallback."""
 
     def test_criteria_mean_calculated_as_overall(self):
         """Submitting criteria computes overall score = rounded mean."""
@@ -488,7 +488,7 @@ class TestScorecardComputation(FeedbackBaseTestCase):
         fb = InterviewFeedback.objects.get(
             application=self.app, round=self.round1, interviewer=self.interviewer,
         )
-        self.assertEqual(fb.score, 80)  # mean(80, 70, 90) = 80
+        self.assertEqual(fb.score, 80)  # weighted(80, 70, 90) = 0.5*80+0.25*70+0.25*90 = 80
         self.assertEqual(
             fb.criteria_scores,
             [
@@ -508,6 +508,66 @@ class TestScorecardComputation(FeedbackBaseTestCase):
             ]),
             85,
         )
+
+    def test_weighted_overall_favors_technical_skill(self):
+        """Asymmetric scores: Technical Skill dominance pulls the result up.
+
+        Old unweighted mean: (90+60+60)/3 = 70.
+        New weighted: 0.5*90 + 0.25*60 + 0.25*60 = 75.
+        """
+        result = InterviewFeedback.compute_overall([
+            {'criterion': 'Technical Skill', 'score': 90},
+            {'criterion': 'Communication', 'score': 60},
+            {'criterion': 'Culture Fit', 'score': 60},
+        ])
+        self.assertEqual(result, 75)
+        self.assertNotEqual(result, round((90 + 60 + 60) / 3))  # differs from old plain mean (70)
+
+    def test_weighted_overall_penalizes_low_technical_skill(self):
+        """Asymmetric scores: weak Technical Skill pulls the result down.
+
+        Old unweighted mean: (40+90+90)/3 = 73.
+        New weighted: 0.5*40 + 0.25*90 + 0.25*90 = 65.
+        """
+        result = InterviewFeedback.compute_overall([
+            {'criterion': 'Technical Skill', 'score': 40},
+            {'criterion': 'Communication', 'score': 90},
+            {'criterion': 'Culture Fit', 'score': 90},
+        ])
+        self.assertEqual(result, 65)
+        self.assertNotEqual(result, round((40 + 90 + 90) / 3))  # differs from old plain mean (73)
+
+    def test_weighted_overall_unknown_criterion_renormalizes(self):
+        """An unlisted criterion falls back to weight 1.0 and renormalizes.
+
+        Weights: Technical Skill 0.5, Communication 0.25, Culture Fit 0.25,
+        System Design 1.0 (unknown, default) -> total weight 2.0.
+        Weighted sum: 0.5*90 + 0.25*60 + 0.25*60 + 1.0*100 = 175.
+        175 / 2.0 = 87.5 -> rounds to 88.
+        """
+        result = InterviewFeedback.compute_overall([
+            {'criterion': 'Technical Skill', 'score': 90},
+            {'criterion': 'Communication', 'score': 60},
+            {'criterion': 'Culture Fit', 'score': 60},
+            {'criterion': 'System Design', 'score': 100},
+        ])
+        self.assertEqual(result, 88)
+
+    def test_submit_feedback_persists_weighted_score(self):
+        """End-to-end submission persists the weighted score, not the plain mean."""
+        self.client.login(username='interviewer1', password='testpass123')
+        resp = self.client.post(
+            f'/feedback/{self.app.pk}/{self.round1.pk}/',
+            data={
+                'criterion_0': 90, 'criterion_1': 60, 'criterion_2': 60,
+                'notes': 'Strong technical, weaker soft skills.', 'raw_notes': '',
+            },
+        )
+        self.assertEqual(resp.status_code, 302)
+        fb = InterviewFeedback.objects.get(
+            application=self.app, round=self.round1, interviewer=self.interviewer,
+        )
+        self.assertEqual(fb.score, 75)  # weighted, not the old plain mean of 70
 
     def test_manual_score_fallback_without_criteria(self):
         """No criterion inputs -> manual score path keeps working."""
@@ -548,8 +608,12 @@ class TestScorecardComputation(FeedbackBaseTestCase):
         })
         self.assertFalse(form.is_valid())
 
-    def test_overall_score_property_matches_mean(self):
-        """overall_score property returns the mean of stored criteria."""
+    def test_overall_score_property_matches_weighted_mean(self):
+        """overall_score property returns the weighted mean of stored criteria.
+
+        Weights: Technical Skill 0.5, Communication 0.25, Culture Fit 0.25.
+        0.5*90 + 0.25*75 + 0.25*85 = 45 + 18.75 + 21.25 = 85.
+        """
         fb = InterviewFeedback.objects.create(
             application=self.app, round=self.round1, interviewer=self.interviewer,
             score=83,
@@ -560,7 +624,8 @@ class TestScorecardComputation(FeedbackBaseTestCase):
             ],
             notes='Property check.',
         )
-        self.assertEqual(fb.overall_score, 83)
+        self.assertEqual(fb.overall_score, 85)
+        self.assertEqual(fb.overall_score, InterviewFeedback.compute_overall(fb.criteria_scores))
 
 
 class TestAISuggestEndpoint(FeedbackBaseTestCase):

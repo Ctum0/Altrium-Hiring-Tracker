@@ -9,7 +9,7 @@ class FeedbackForm(forms.ModelForm):
     Backward compatible: POSTs without any ``criterion_<i>`` keys behave
     exactly like before (manual overall score required). When criterion
     inputs are present, they must all be filled and the overall score is
-    computed as their mean instead of being typed.
+    computed as their weighted mean instead of being typed.
     """
 
     class Meta:
