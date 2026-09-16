@@ -84,7 +84,7 @@
       </div>
       {% else %}
       <span class="text-xs text-muted">
-        {% if app.assigned_to %}{{ app.assigned_to.get_full_name|default:app.assigned_to.username }}{% else %}Unassigned{% endif %}
+        {% if app.assigned_to %}<a href="{% url 'accounts:interviewer_profile' pk=app.assigned_to.pk %}" style="color:inherit">{{ app.assigned_to.get_full_name|default:app.assigned_to.username }}</a>{% else %}Unassigned{% endif %}
       </span>
       {% endif %}
     </div>

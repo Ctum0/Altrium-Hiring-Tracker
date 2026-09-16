@@ -65,7 +65,18 @@ def compute_avg_days_to_hire(job_id=None):
                 .first()
             )
         if hired_at and created_at:
-            durations.append((hired_at - created_at).total_seconds() / 86400.0)
+            duration_days = (hired_at - created_at).total_seconds() / 86400.0
+            if duration_days < 0:
+                # Corrupted/inconsistent data: the hired timestamp is
+                # earlier than the application's created_at (e.g. a
+                # backdated stage_entered_at in seed data). A genuine
+                # same-day hire is 0 days, never negative, so this only
+                # ever excludes actually-corrupt rows, not fast hires.
+                # We exclude rather than clip to 0, since clipping would
+                # still inject a fabricated fast-hire data point and drag
+                # the average down.
+                continue
+            durations.append(duration_days)
 
     return round(sum(durations) / len(durations), 1) if durations else None
 
@@ -522,7 +533,13 @@ class HRDashboardView(LoginRequiredMixin, ListView):
                         .first()
                     )
                 if ref_time:
-                    ages.append((now - ref_time).total_seconds() / 86400.0)
+                    age_days = (now - ref_time).total_seconds() / 86400.0
+                    if age_days < 0:
+                        # Same corrupted-data guard as compute_avg_days_to_hire:
+                        # a ref_time after "now" means bad seed/move data, not
+                        # a real negative time-in-stage. Exclude, don't clip.
+                        continue
+                    ages.append(age_days)
 
             return round(sum(ages) / len(ages), 1) if ages else None
 

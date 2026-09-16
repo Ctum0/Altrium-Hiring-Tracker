@@ -33,7 +33,7 @@
           <td>{{ app.job.title }}</td>
           <td>{{ app.current_round.name|default:"—" }}</td>
           <td>
-            <span class="badge badge-danger">{{ app.assigned_to.get_full_name|default:app.assigned_to.username }}</span>
+            <a href="{% url 'accounts:interviewer_profile' pk=app.assigned_to.pk %}" class="badge badge-danger" style="text-decoration:none">{{ app.assigned_to.get_full_name|default:app.assigned_to.username }}</a>
             <span class="text-xs text-muted">(deactivated)</span>
           </td>
           <td>

@@ -1,3 +1,4 @@
+import re
 from unittest.mock import patch
 
 from django.test import SimpleTestCase, override_settings
@@ -82,3 +83,29 @@ class GroqClientTests(SimpleTestCase):
              patch.object(services._client, 'post', side_effect=Exception('network down')):
             result = services.parse_cv('resume text')
         self.assertEqual(result['first_name'], '')
+
+
+class FallbackPhoneRegexTests(SimpleTestCase):
+    """Regression coverage for the fallback CV-parser phone regex: it must
+    extract parenthesized US area codes, not just bare digit runs, since
+    a missed phone silently breaks name+phone fuzzy dedup (candidates.dedup)."""
+
+    def test_extracts_number_with_parenthesized_area_code_and_country_code(self):
+        text = 'John Doe\nPhone: +1 (555) 987-6543\nSkills: Python\n'
+        result = services._fallback_parse_cv(text)
+        self.assertEqual(re.sub(r'\D', '', result['phone']), '15559876543')
+
+    def test_extracts_number_with_parenthesized_area_code_no_country_code(self):
+        text = 'John Doe\nPhone: (555) 987-6543\nSkills: Python\n'
+        result = services._fallback_parse_cv(text)
+        self.assertEqual(re.sub(r'\D', '', result['phone']), '5559876543')
+
+    def test_still_extracts_unparenthesized_formats(self):
+        for raw, digits in [
+            ('555-987-6543', '5559876543'),
+            ('555.987.6543', '5559876543'),
+            ('5559876543', '5559876543'),
+        ]:
+            text = f'John Doe\nPhone: {raw}\nSkills: Python\n'
+            result = services._fallback_parse_cv(text)
+            self.assertEqual(re.sub(r'\D', '', result['phone']), digits)

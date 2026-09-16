@@ -14,6 +14,20 @@ class Job(models.Model):
         DATA = 'data', 'Data'
         OTHER = 'other', 'Other'
 
+    class Department(models.TextChoices):
+        ENGINEERING = 'engineering', 'Engineering'
+        PRODUCT = 'product', 'Product'
+        DESIGN = 'design', 'Design'
+        DATA = 'data', 'Data'
+        INFRASTRUCTURE = 'infrastructure', 'Infrastructure'
+        QUALITY_ASSURANCE = 'quality_assurance', 'Quality Assurance'
+        SALES = 'sales', 'Sales'
+        MARKETING = 'marketing', 'Marketing'
+        PEOPLE = 'people', 'People & HR'
+        FINANCE = 'finance', 'Finance'
+        OPERATIONS = 'operations', 'Operations'
+        OTHER = 'other', 'Other'
+
     class Seniority(models.TextChoices):
         JUNIOR = 'junior', 'Junior'
         MID = 'mid', 'Mid'
@@ -22,8 +36,10 @@ class Job(models.Model):
 
     title = models.CharField(max_length=200)
     department = models.CharField(
-        max_length=100, blank=True, default='',
-        help_text='e.g. Engineering, Design, Marketing',
+        max_length=20,
+        choices=Department.choices,
+        default=Department.OTHER,
+        help_text='Organizational department, used for org-level reporting.',
     )
     domain = models.CharField(
         max_length=20,

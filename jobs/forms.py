@@ -36,10 +36,7 @@ class JobForm(forms.ModelForm):
                 'class': 'form-input',
                 'placeholder': 'e.g. Senior Backend Engineer',
             }),
-            'department': forms.TextInput(attrs={
-                'class': 'form-input',
-                'placeholder': 'e.g. Engineering, Design, Marketing',
-            }),
+            'department': forms.Select(attrs={'class': 'form-select'}),
             'domain': forms.Select(attrs={'class': 'form-select'}),
             'seniority': forms.Select(attrs={'class': 'form-select'}),
             'description': forms.Textarea(attrs={
@@ -72,8 +69,8 @@ class JobForm(forms.ModelForm):
             'Requires at least one requirement; leave empty to disable.'
         )
         self.fields['department'].help_text = (
-            'Used to match interviewer specialties (e.g. an Engineering job '
-            'is interviewed by Engineering-specialty interviewers).'
+            'Organizational department for reporting; use Domain below for '
+            'interviewer and talent-pool matching.'
         )
         self.fields['domain'].help_text = (
             'Structured functional domain, used for interviewer matching and '
@@ -84,7 +81,9 @@ class JobForm(forms.ModelForm):
         )
         # Selects always submit a value from browsers, but programmatic
         # posts may omit them; keep them optional so the model defaults
-        # ('other' / 'mid') apply, exactly as an unselected select would.
+        # (department 'other', domain 'other', seniority 'mid') apply,
+        # exactly as an unselected select would.
+        self.fields['department'].required = False
         self.fields['domain'].required = False
         self.fields['seniority'].required = False
 

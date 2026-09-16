@@ -115,13 +115,24 @@ class User(AbstractUser):
     def is_eligible_interviewer_for(self, job) -> bool:
         """Role-match rule for interviewer assignment.
 
-        Eligible when the interviewer's specialty overlaps the job's
-        department (case-insensitive containment). A blank specialty means
-        generalist (eligible for every job); a blank department imposes no
-        constraint.
+        Two-tier rule. If this interviewer has a structured `domain`
+        classification (non-blank), it is authoritative: a blank or
+        'other' job domain (nobody classified this job) imposes no
+        constraint, otherwise the interviewer's domain must exactly
+        match the job's domain (case-insensitive). If the interviewer
+        has no structured domain (legacy/generalist account), fall back
+        to the legacy rule: the interviewer's specialty overlapping the
+        job's department (case-insensitive containment), with a blank
+        specialty or blank department imposing no constraint.
         """
         if self.role != Role.INTERVIEWER:
             return False
+        domain = (self.domain or '').strip().lower()
+        if domain:
+            job_domain = (job.domain or '').strip().lower()
+            if not job_domain or job_domain == Job.Domain.OTHER:
+                return True
+            return domain == job_domain
         specialty = (self.specialty or '').strip().lower()
         department = (job.department or '').strip().lower()
         if not specialty or not department:

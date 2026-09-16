@@ -309,7 +309,7 @@ def _fallback_parse_cv(text: str) -> dict:
         result['email'] = email_match.group(0).lower()
 
     # 2. Extract Phone
-    phone_match = re.search(r'\(?\+?\d{1,4}\)?[-.\s]?\d{2,4}[-.\s]?\d{3,4}[-.\s]?\d{3,4}', text)
+    phone_match = re.search(r'(?:\+?\d{1,4}[-.\s]?)?\(?\d{2,4}\)?[-.\s]?\d{3,4}[-.\s]?\d{3,4}', text)
     if phone_match and len(re.sub(r'\D', '', phone_match.group(0))) >= 7:
         result['phone'] = phone_match.group(0).strip()
 
