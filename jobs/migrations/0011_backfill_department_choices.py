@@ -1,5 +1,13 @@
 """Backfill Job.department from legacy free-text values to the new
-Job.Department choice set (added in 0011_alter_job_department).
+Job.Department choice set (schema-narrowed in 0012_alter_job_department).
+
+Must run BEFORE the AlterField that narrows the column to max_length=20:
+Postgres enforces varchar(n) length at the column level (SQLite does not,
+which is why this ordering issue was invisible in local/CI testing against
+sqlite) -- narrowing the column first would raise
+"value too long for type character varying(20)" for any existing
+production row with, e.g., "Software Engineering Department" (32 chars),
+a realistic value in a free-text field that accumulated real HR input.
 
 Uses simple case-insensitive substring/word-boundary matching against the
 free-text value that was typed into the old TextInput field. Blank or
@@ -53,7 +61,7 @@ def noop_reverse(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('jobs', '0011_alter_job_department'),
+        ('jobs', '0010_backfill_domain_seniority'),
     ]
 
     operations = [
