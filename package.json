@@ -1,7 +1,12 @@
 {
   "devDependencies": {
     "axe-core": "^4.12.1",
-    "playwright": "^1.62.1",
+    "playwright": "^1.63.0",
     "prettier": "^3.9.6"
+  },
+  "dependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "chrome-launcher": "^1.2.1",
+    "lighthouse": "^13.4.1"
   }
 }

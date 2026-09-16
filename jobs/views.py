@@ -275,6 +275,7 @@ class JobBoardView(LoginRequiredMixin, DetailView):
         apps = (
             visible_applications(self.request.user)
             .filter(job=job)
+            .select_related('candidate', 'job', 'current_round', 'assigned_to')
             .order_by('-updated_at')
         )
 

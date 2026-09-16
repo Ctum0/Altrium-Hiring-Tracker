@@ -109,7 +109,9 @@ class CandidateListView(LoginRequiredMixin, ListView):
             qs = qs.order_by(F('candidate__score').desc(nulls_last=True), '-updated_at')
         else:
             qs = qs.order_by('-updated_at')
-        return qs
+        # Explicitly select_related to prevent N+1 queries when filters are applied
+        # (visible_applications provides the base, but filters can break prefetch caches)
+        return qs.select_related('candidate', 'job', 'current_round', 'assigned_to')
 
     def paginate_queryset(self, queryset, page_size):
         """Clamp out-of-range pages instead of 404ing."""
