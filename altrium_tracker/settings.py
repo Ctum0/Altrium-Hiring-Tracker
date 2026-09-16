@@ -119,13 +119,27 @@ WSGI_APPLICATION = 'altrium_tracker.wsgi.application'
 
 
 # Database
-# Local development and production share the same PostgreSQL database,
-# configured entirely through DATABASE_URL (Aiven in production).
-# _env() reads real environment variables first, then the local .env file,
-# so both Render and local development resolve the same Aiven connection.
+# Local development and production share the same connection interface,
+# configured entirely through DATABASE_URL. _env() reads real environment
+# variables first, then the local .env file, so both the deploy platform
+# and local development resolve consistently.
+#
+# SECURITY WARNING: fail closed in production, mirroring SECRET_KEY above --
+# a missing DATABASE_URL on a deployed platform must raise a clear error at
+# boot, not decouple's generic UndefinedValueError traceback (or, worse, an
+# accidental silent fallback to a throwaway sqlite file that quietly
+# discards every write). Local dev without a .env falls back to sqlite.
+_database_url = _env('DATABASE_URL', default='')
+if not _database_url:
+    if DEBUG:
+        _database_url = f'sqlite:///{BASE_DIR / "db.sqlite3"}'
+    else:
+        raise ImproperlyConfigured(
+            'DATABASE_URL must be set when DJANGO_DEBUG is not true.'
+        )
 DATABASES = {
     'default': dj_database_url.parse(
-        _env('DATABASE_URL'),
+        _database_url,
         conn_max_age=600,
         conn_health_checks=True,
     )
@@ -265,6 +279,13 @@ if not DEBUG and not _redis_url:
 
 # Security settings - only enforced in production (DEBUG=False)
 if not DEBUG:
+    # Railway/Render terminate TLS at their edge proxy and forward requests
+    # to gunicorn over plain HTTP internally. Without this, Django's
+    # request.is_secure() never sees the connection as secure and
+    # SECURE_SSL_REDIRECT below 301s every request back to https://<same
+    # url> forever (an infinite self-redirect loop -- this exact bug took
+    # production down; see SECURE_PROXY_SSL_HEADER's absence in git blame).
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     SECURE_SSL_REDIRECT = _env('DJANGO_SECURE_SSL_REDIRECT', default=True, cast=bool)
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
