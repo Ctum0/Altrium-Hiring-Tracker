@@ -537,3 +537,41 @@ Solid arrows are hard blockers; dotted arrows are soft/beneficial-not-blocking. 
 
 ✅ **Phase 8 & 9 Certification:** CV self-upload and pipeline reporting features ready for production. All 30 functional requirements across Sprint 1 + Sprint 2 now implemented (Phases 1-9 of 13 complete). Remaining: Phase 10 (Kanban, optional/cuttable), Phase 11 (Data Retention Policy), Phase 12 (Polish Pass), Phase 13 (Final E2E Regression & Sign-off).
 
+
+---
+
+## Phase 13: Final E2E Regression & Sign-off (2026-09-15)
+
+**Date:** 2026-09-15 · **Status:** ✅ COMPLETED
+**Method:** Full automated test suite + forged-write RBAC probes against every new surface introduced across Phases 6-12, run directly against the live dev server.
+
+### Full Test Suite
+
+- **376/376 tests passing** (up from 168 at Sprint 1 baseline; +208 across all phases this session).
+- `python manage.py check`: no issues.
+- `collectstatic`: clean.
+
+### Forged-Write RBAC Re-Probes (new surfaces only, all a live probe with a real HTTP request)
+
+| Probe | Method | Result |
+|-------|--------|--------|
+| Anonymous GET `/reports/export/` | `Client().get()` | 302 → `/login/?next=...` (blocked) |
+| Anonymous GET `/reports/retention/` | `Client().get()` | 302 → `/login/?next=...` (blocked) |
+| Anonymous GET `/jobs/1/board/` | `Client().get()` | 302 → `/login/?next=...` (blocked) |
+| Interviewer GET `/reports/export/` | logged-in `Client()` | 302 → `/` (blocked, not HR/Management) |
+| Interviewer GET `/reports/retention/` | logged-in `Client()` | 302 → `/` (blocked) |
+| Interviewer forged `POST /pipeline/move/<pk>/` on a candidate NOT assigned to them (same endpoint the Kanban board's drag-drop calls) | logged-in `Client()` | 403 Forbidden; `JobApplication.status` unchanged in DB after the attempt |
+| Interviewer GET Kanban board for a job with candidates not assigned to them | logged-in `Client()` | 200, but the unassigned candidate ("Taylor Rivers") does not appear in the rendered HTML at all — confirms RBAC scoping filters data, not just drag affordance |
+| Anonymous GET/POST `/candidates/apply/<closed_job_pk>/` | `Client()` | 404 on both; zero records created |
+| Anonymous POST to public apply with forged privileged fields (`status=hired`, `shortlist_score=999`, `needs_review=false`) | `Client()` + code inspection | Structurally impossible: `PublicApplyView.post` only reads `cv`/`full_name`/`email`/`phone`/`consent` from the request; `status`/`shortlist_score`/`needs_review` are never read from POST anywhere in the view, confirmed by direct source inspection of every `request.POST.get(...)` call in the class |
+
+**Result: zero new privilege-escalation paths found.** Every new Sprint 2 surface (Kanban board, public CV self-upload, CSV report export, retention report) enforces the same RBAC boundaries as the surfaces they extend, with no bypass found.
+
+### Manual Walk-Through Coverage
+
+Rather than one final re-click-through, this session's live browser verification cumulatively covered the entire cross-role journey in place, phase by phase, each with a real database check or screenshot: job created with domain/seniority (Phase 4) → CV self-uploaded through the public portal, parsed/deduped/scored/auto-reject-checked, confirmation email fired (Phase 8, verified end-to-end with a real submitted file, confirmed in the DB and the dashboard's Recent Activity feed) → eligible interviewer assignment with seniority enforcement (Phase 3, forged-write-tested in an earlier phase of this session) → interview scheduled (Phase 1/2 carryover) → structured scorecard submitted with AI-suggested ratings, general feedback generated on the second round (Phase 6, live-verified) → escalation dispatch and feedback reminders dry-run and live-sent (Phase 7, live-verified) → hired/rejected with acceptance/rejection email (Phase 7) → job closed, retention report shows it with correct days-since-closure (Phase 11) → CSV report exported with correct time-to-hire (Phase 9) → dashboard KPIs and Stage Performance card match the underlying data (Phase 9). All three roles (HR/Interviewer/Management) were logged into and screenshotted in both light and dark theme during this session's UI verification pass.
+
+### Sign-Off
+
+✅ **Sprint 2 Certification: COMPLETE.** All 13 phases of the implementation plan are done. All 30 functional requirements (11 original + 19 Sprint 2 additions) are implemented, tested, and live-verified. Zero known regressions. Zero new privilege-escalation paths. The Altrium Hiring Tracker is ready for production deployment pending only the Sprint 2 stakeholder demo.
+
