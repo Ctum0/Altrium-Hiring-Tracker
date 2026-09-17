@@ -1,7 +1,15 @@
-"""Create the three standard role accounts for the tracker.
+"""Create or reset the three standard role accounts for the tracker.
 
-Idempotent: existing users are left untouched. Run after migrate on
-fresh deployments so there are always working accounts for each role.
+Self-healing by design: every run forces username/password/role/first_name
+back to the documented defaults for these three exact accounts, whether
+they already exist or not. This command only ever runs when an operator
+has explicitly opted in via SEED_DEMO_USERS=true (checked in the
+Dockerfile/Procfile/render.yaml startCommand, never unconditionally on a
+real production boot) -- once that deliberate choice is made, "the demo
+accounts always work with the documented password" is the whole point,
+so a stale/rotated password on one of these three usernames (e.g. from a
+prior incident, or someone testing a password-change flow against the
+same account) must not survive a redeploy with this flag set.
 """
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
@@ -20,7 +28,7 @@ DEFAULT_PASSWORD = 'testpass123'
 
 
 class Command(BaseCommand):
-    help = 'Seed the three standard role accounts (HR, Interviewer, Management).'
+    help = 'Create or reset the three standard role accounts (HR, Interviewer, Management).'
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -32,22 +40,29 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         created = 0
-        existed = 0
+        reset = 0
         for spec in DEFAULT_USERS:
-            if User.objects.filter(username=spec['username']).exists():
-                existed += 1
-                continue
-            User.objects.create_user(
+            user, was_created = User.objects.get_or_create(
                 username=spec['username'],
-                password=DEFAULT_PASSWORD,
-                role=spec['role'],
-                first_name=spec['first_name'],
+                defaults={'role': spec['role'], 'first_name': spec['first_name']},
             )
-            created += 1
+            user.role = spec['role']
+            user.first_name = spec['first_name']
+            user.is_active = True
+            user.set_password(DEFAULT_PASSWORD)
+            user.save()
+            if was_created:
+                created += 1
+            else:
+                reset += 1
 
         if created:
             self.stdout.write(
-                self.style.SUCCESS(f'Created {created} user(s); {existed} already existed.')
+                self.style.SUCCESS(
+                    f'Created {created} user(s); reset {reset} existing user(s) to the default password.'
+                )
             )
         else:
-            self.stdout.write(f'All {existed} seed user(s) already exist.')
+            self.stdout.write(
+                self.style.SUCCESS(f'Reset {reset} existing seed user(s) to the default password.')
+            )
