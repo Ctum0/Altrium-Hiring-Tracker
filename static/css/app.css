@@ -1458,13 +1458,18 @@ a:hover {
 
 /* Each workspace section carries its own icon-tile hue, reused nowhere else,
    so the sidebar reads as a set of distinct destinations rather than one
-   flat list (matches the colored-icon-per-category SaaS reference). */
-.nav-icon-tile-blue   { background: var(--brand-gradient); color: #ffffff; }
-.nav-icon-tile-violet { background: var(--grad-violet); color: #ffffff; }
-.nav-icon-tile-teal   { background: var(--grad-teal); color: #062b29; }
-.nav-icon-tile-cyan   { background: var(--grad-emerald); color: #04371f; }
-.nav-icon-tile-amber  { background: var(--grad-amber); color: #3b2a00; }
-.nav-icon-tile-rose   { background: var(--grad-danger); color: #ffffff; }
+   flat solid fill (matches the colored-icon-per-category SaaS reference).
+   Colors are flat literals rather than the shared --grad-* and --brand-gradient
+   tokens because those are two-stop gradients tuned for glow surfaces, not
+   solid-fill contrast; each value below is a single hue-family flat that
+   holds >=4.5:1 against its icon color in both themes (values don't need
+   per-theme variants since the fill no longer depends on the page canvas). */
+.nav-icon-tile-blue   { background: #0369A1; color: #ffffff; }
+.nav-icon-tile-violet { background: #8D4DDE; color: #ffffff; }
+.nav-icon-tile-teal   { background: #00A5A6; color: #062b29; }
+.nav-icon-tile-cyan   { background: #00B079; color: #04371f; }
+.nav-icon-tile-amber  { background: #D19000; color: #3b2a00; }
+.nav-icon-tile-rose   { background: #D23337; color: #ffffff; }
 
 .nav-link .nav-icon-tile {
   opacity: 0.9;
@@ -3353,34 +3358,52 @@ a.ref-kpi-card.kpi-card-link:focus-visible {
   flex-shrink: 0;
 }
 
+/* Flat fills (no glow): each color is the single-stop equivalent of the
+   former --grad-* / --brand-gradient ramp, re-picked for >=4.5:1 contrast
+   against the fixed icon color below in BOTH themes. --shadow-sm is the
+   restrained, non-glowing elevation token already used elsewhere for small
+   elevated elements (theme-aware via its own :root/:root[data-theme='light']
+   definitions, so no per-theme override needed here). */
 .ref-kpi-icon-blue {
-  background: var(--brand-gradient);
+  /* dark-theme default: --brand (#22D3EE) is too light for white text
+     (1.81:1); hue-matched, darkened flat cyan-blue instead (5.77:1). */
+  background: #0a7080;
   color: #ffffff;
-  box-shadow: var(--brand-glow);
+  box-shadow: var(--shadow-sm);
+}
+
+:root[data-theme='light'] .ref-kpi-icon-blue {
+  /* light theme's flat --brand (#036fa8) already passes 5.46:1 vs white. */
+  background: var(--brand);
 }
 
 .ref-kpi-icon-teal {
-  background: var(--grad-teal);
+  /* flat stop of former --grad-teal light end: 6.73:1 vs #062b29 text. */
+  background: #00c0c2;
   color: #062b29;
-  box-shadow: 0 0 18px rgba(79, 209, 197, 0.45);
+  box-shadow: var(--shadow-sm);
 }
 
 .ref-kpi-icon-violet {
-  background: var(--grad-violet);
+  /* flat stop of former --grad-violet dark end: 6.65:1 vs white text. */
+  background: #773ac1;
   color: #ffffff;
-  box-shadow: 0 0 18px rgba(117, 81, 255, 0.45);
+  box-shadow: var(--shadow-sm);
 }
 
 .ref-kpi-icon-danger {
-  background: var(--grad-danger);
+  /* existing flat --danger-solid token (identical value in both theme
+     blocks): 4.83:1 vs white text. */
+  background: var(--danger-solid);
   color: #ffffff;
-  box-shadow: 0 0 18px rgba(227, 26, 26, 0.45);
+  box-shadow: var(--shadow-sm);
 }
 
 .ref-kpi-icon-pending {
-  background: var(--grad-amber);
+  /* flat stop of former --grad-amber light end: 7.34:1 vs #3b2a00 text. */
+  background: #edb417;
   color: #3b2a00;
-  box-shadow: 0 0 18px rgba(255, 181, 71, 0.45);
+  box-shadow: var(--shadow-sm);
 }
 
 .ref-kpi-meta {
@@ -4133,16 +4156,41 @@ body.no-scroll {
   flex-shrink: 0;
   text-transform: uppercase;
 }
-.cand-avatar-0 { background: var(--brand-gradient); }
-.cand-avatar-1 { background: var(--grad-violet); color: #1f0a33; }
-.cand-avatar-2 { background: var(--grad-teal); color: #062b29; }
-.cand-avatar-3 { background: var(--grad-danger); color: #330a05; }
-.cand-avatar-4 { background: var(--grad-amber); color: #1a1000; }
-.cand-avatar-5 { background: var(--grad-emerald); color: #052e1f; }
-.cand-avatar-6 { background: linear-gradient(135deg, #3182CE 0%, #2B6CB0 100%); color: #0a1f33; }
-.cand-avatar-7 { background: linear-gradient(135deg, #D69E2E 0%, #B7791F 100%); color: #1a1000; }
-.cand-avatar-8 { background: linear-gradient(135deg, #805AD5 0%, #6B46C1 100%); }
-.cand-avatar-9 { background: linear-gradient(135deg, #D93636 0%, #C53030 100%); }
+/* Person avatars: one restrained brand-tinted tone (reused pattern from
+   .user-avatar) instead of a 10-hue gradient cycle -- differentiation
+   comes from the initials text, not the background color. Index classes
+   kept so template markup (cand-avatar-{{ n|avatar_index }}) is unchanged. */
+.cand-avatar-0,
+.cand-avatar-1,
+.cand-avatar-2,
+.cand-avatar-3,
+.cand-avatar-4,
+.cand-avatar-5,
+.cand-avatar-6,
+.cand-avatar-7,
+.cand-avatar-8,
+.cand-avatar-9 {
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+/* Light theme: --brand alone measures ~4.57:1 on the brand-soft tint --
+   passing but too close to the 4.5:1 floor to be safe across renderers.
+   --brand-active is already the "darker ink on tinted fill" token this
+   codebase uses for exactly this problem (see --danger-solid pattern);
+   reusing it here lifts the initials to ~6.33:1. Dark theme's --brand
+   (bright cyan on the dark tint) already measures ~5.94:1 unaided. */
+:root[data-theme='light'] .cand-avatar-0,
+:root[data-theme='light'] .cand-avatar-1,
+:root[data-theme='light'] .cand-avatar-2,
+:root[data-theme='light'] .cand-avatar-3,
+:root[data-theme='light'] .cand-avatar-4,
+:root[data-theme='light'] .cand-avatar-5,
+:root[data-theme='light'] .cand-avatar-6,
+:root[data-theme='light'] .cand-avatar-7,
+:root[data-theme='light'] .cand-avatar-8,
+:root[data-theme='light'] .cand-avatar-9 {
+  color: var(--brand-active);
+}
 
 /* ===== Score Ring Badge ===== */
 .score-ring {

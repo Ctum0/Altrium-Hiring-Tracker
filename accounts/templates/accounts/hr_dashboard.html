@@ -567,11 +567,6 @@
     return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + alpha + ')';
   }
 
-  var gradCtx = trendCanvas.getContext('2d');
-  var gradient = gradCtx.createLinearGradient(0, 0, 0, 180);
-  gradient.addColorStop(0, hexToRgba(brandColor, 0.45));
-  gradient.addColorStop(1, hexToRgba(brandColor, 0));
-
   var stageColorVars = ['--status-new', '--status-shortlisted', '--status-progress', '--status-hired', '--status-rejected', '--status-hold'];
   var stagePointColors = stageColorVars.map(function(v) {
     return getComputedStyle(document.documentElement).getPropertyValue(v).trim() || brandColor;
@@ -580,22 +575,15 @@
   var pointColors = stageLabels.map(function(_, i) { return stagePointColors[i % stagePointColors.length]; });
 
   window.trendChartObj = new Chart(trendCanvas, {
-    type: 'line',
+    type: 'bar',
     data: {
       labels: stageLabels,
       datasets: [{
         label: 'Candidates',
         data: stageCounts,
-        borderColor: brandColor,
-        borderWidth: 2.5,
-        backgroundColor: gradient,
-        fill: true,
-        tension: 0.4,
-        pointBackgroundColor: pointColors,
-        pointBorderColor: '#ffffff',
-        pointBorderWidth: 2,
-        pointRadius: 5,
-        pointHoverRadius: 7,
+        backgroundColor: pointColors,
+        borderWidth: 0,
+        borderRadius: 6,
       }]
     },
     options: {
