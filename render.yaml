@@ -1,3 +1,9 @@
+databases:
+  - name: altrium-tracker-db
+    plan: free
+    databaseName: altrium_tracker
+    user: altrium
+
 services:
   - type: web
     name: altrium-tracker
@@ -11,7 +17,9 @@ services:
     startCommand: python manage.py collectstatic --noinput && python manage.py migrate --noinput && if [ "$SEED_DEMO_USERS" = "true" ]; then python manage.py seed_users --noinput; fi && gunicorn altrium_tracker.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120
     envVars:
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: altrium-tracker-db
+          property: connectionString
       - key: DJANGO_SECRET_KEY
         generateValue: true
       - key: DJANGO_DEBUG
