@@ -265,7 +265,7 @@ class HRDashboardView(LoginRequiredMixin, ListView):
             else:
                 group = {
                     'title': job.title,
-                    'department': job.department,
+                    'department': job.get_department_display() if job.department else '',
                     'hiring_manager': job.hiring_manager,
                     'app_count': job.app_count,
                     'pks': [job.pk],

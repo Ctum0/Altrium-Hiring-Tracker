@@ -2202,6 +2202,38 @@ class PublicApplyTests(CandidatesBaseTestCase):
         self.assertEqual(candidate.phone, '555-9999')
 
 
+class PublicJobsListTests(CandidatesBaseTestCase):
+    """The public /careers/ page: unauthenticated, lists every active job
+    automatically (no separate publish flag), excludes closed jobs, and
+    links each listing to its own apply page."""
+
+    def test_public_and_no_login_required(self):
+        r = self.client.get(reverse('careers'))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, self.job.title)
+
+    def test_apply_link_points_to_the_right_job(self):
+        r = self.client.get(reverse('careers'))
+        self.assertContains(r, reverse('candidates:public_apply', args=[self.job.pk]))
+
+    def test_closed_job_excluded(self):
+        self.job.is_active = False
+        self.job.save(update_fields=['is_active'])
+        r = self.client.get(reverse('careers'))
+        self.assertNotContains(r, self.job.title)
+
+    def test_newly_created_active_job_appears_without_any_publish_step(self):
+        job2 = Job.objects.create(title='Frontend Engineer', created_by=self.hr, seniority='mid')
+        r = self.client.get(reverse('careers'))
+        self.assertContains(r, job2.title)
+
+    def test_empty_state_when_no_active_jobs(self):
+        Job.objects.all().update(is_active=False)
+        r = self.client.get(reverse('careers'))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'No open roles')
+
+
 class IntakeHelperTests(CandidatesBaseTestCase):
     """Unit coverage for the shared candidates.intake.ingest_cv pipeline
     used by both CandidateUploadView and PublicApplyView."""

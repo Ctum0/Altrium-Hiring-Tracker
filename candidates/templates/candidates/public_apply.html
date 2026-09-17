@@ -14,9 +14,10 @@
 
 <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:var(--sp-6) var(--sp-4) var(--sp-10)">
   <div class="form-card" style="max-width:560px;width:100%">
+    <a href="{% url 'careers' %}" class="text-xs" style="color:var(--muted);text-decoration:none;display:inline-block;margin-bottom:var(--sp-3)">&larr; All open positions</a>
     <h1 class="auth-title" style="margin-bottom:var(--sp-1)">Apply for {{ job.title }}</h1>
     <p class="auth-sub" style="margin-bottom:var(--sp-4)">
-      {% if job.department %}{{ job.department }} &middot; {% endif %}{{ job.get_domain_display }} &middot; {{ job.get_seniority_display }}
+      {% if job.department %}{{ job.get_department_display }} &middot; {% endif %}{{ job.get_domain_display }} &middot; {{ job.get_seniority_display }}
     </p>
     {% if job.description %}
     <p class="text-sm text-muted" style="white-space:pre-line;margin-bottom:var(--sp-5)">{{ job.description }}</p>

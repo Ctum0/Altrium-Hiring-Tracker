@@ -407,6 +407,23 @@ class PublicApplyThanksView(View):
         return render(request, 'candidates/public_apply_thanks.html', {'job': job})
 
 
+class PublicJobsListView(ListView):
+    """Public, unauthenticated: every active job, so candidates have one
+    stable link to browse what's open instead of needing a per-job link
+    handed to them individually. Every active job is listed automatically
+    -- there is no separate "publish to careers page" flag; a job is
+    already fully public the moment it accepts applications (its own
+    apply page has no secrecy assumption), so this view only adds
+    discoverability of data that is already reachable.
+    """
+    model = Job
+    template_name = 'candidates/public_jobs_list.html'
+    context_object_name = 'jobs'
+
+    def get_queryset(self):
+        return Job.objects.filter(is_active=True).order_by('-created_at')
+
+
 class CandidateImportView(LoginRequiredMixin, View):
     """HR only: import a candidate from external sources by pasting profile text."""
 

@@ -1,0 +1,55 @@
+{% extends 'auth_base.html' %}
+{% block title %}Open Positions | Altrium Tracker{% endblock %}
+
+{% block auth_content %}
+<nav class="auth-nav" aria-label="Main">
+  <a href="{% url 'accounts:login' %}" class="auth-nav-brand" style="text-decoration:none">
+    <span class="brand-mark">A</span>
+    <span class="brand-name">Altrium</span>
+  </a>
+  <div class="auth-nav-actions">
+    {% include 'includes/theme_toggle.html' %}
+  </div>
+</nav>
+
+<div style="flex:1;padding:var(--sp-6) var(--sp-4) var(--sp-10);max-width:840px;margin:0 auto;width:100%">
+  <h1 class="auth-title" style="margin-bottom:var(--sp-1)">Open Positions</h1>
+  <p class="auth-sub" style="margin-bottom:var(--sp-6)">
+    {% if jobs %}{{ jobs|length }} role{{ jobs|length|pluralize }} open at Altrium right now. Pick one below to apply.
+    {% else %}No open roles right now — check back soon.{% endif %}
+  </p>
+
+  {% if jobs %}
+  <div class="jobs-card-grid">
+    {% for job in jobs %}
+    <a href="{% url 'candidates:public_apply' job.pk %}" class="job-card-premium">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:var(--sp-2)">
+        <div style="flex:1;min-width:0">
+          <h2 class="job-card-title">{{ job.title }}</h2>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">
+            {% if job.department %}{{ job.get_department_display }} &middot; {% endif %}{{ job.get_domain_display }} &middot; {{ job.get_seniority_display }}
+          </div>
+        </div>
+        {% if job.num_openings > 1 %}
+        <span class="badge badge-in_progress" style="flex-shrink:0;font-size:var(--text-micro);padding:2px 7px">{{ job.num_openings }} openings</span>
+        {% endif %}
+      </div>
+      {% if job.description %}
+      <p class="text-sm text-muted" style="margin:var(--sp-2) 0 0;white-space:pre-line;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">{{ job.description }}</p>
+      {% endif %}
+      <div class="job-card-meta">
+        <span></span>
+        <span style="font-size:11px;color:var(--brand)">Apply &rarr;</span>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto 12px;color:var(--muted)" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 8h6"/><path d="M9 12h6"/><path d="M9 16h4"/></svg>
+    <p class="empty-state-title">No open roles right now</p>
+    <p class="empty-state-body">Check back soon — new positions are posted here as soon as they open.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
