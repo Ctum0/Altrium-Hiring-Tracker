@@ -14,9 +14,13 @@ from .models import PipelineMove
 
 
 class PipelineMoveView(LoginRequiredMixin, View):
-    """HTMX endpoint: move a candidate between stages via the inline dropdown.
+    """HTMX endpoint: move a candidate between stages via the inline dropdown
+    or the Kanban board's drag-and-drop.
 
     Blocks advancement if the current round has no submitted feedback.
+    'unrouted' moves a candidate back to the board's Unrouted column (round
+    cleared, no terminal decision); moving back is not advancing, so the
+    feedback gate does not apply to it.
     """
 
     def post(self, request, pk):
@@ -28,6 +32,7 @@ class PipelineMoveView(LoginRequiredMixin, View):
         stage_value = request.POST.get('stage') or ''
         to_round_id = None
         to_status = None
+        to_unrouted = False
         if stage_value.startswith('round:'):
             raw_id = stage_value.split(':', 1)[1]
             try:
@@ -38,13 +43,35 @@ class PipelineMoveView(LoginRequiredMixin, View):
             to_status = stage_value.split(':', 1)[1]
             if to_status not in [s for s, _ in JobApplication.Status.choices]:
                 return HttpResponse('Invalid status.', status=400)
+        elif stage_value == 'unrouted':
+            to_unrouted = True
         elif stage_value:
             return HttpResponse('Malformed stage value.', status=400)
 
         from_round = app.current_round
         from_status = app.status
 
-        if to_round_id is not None:
+        if to_unrouted:
+            # Moving back to Unrouted is not advancing: the feedback gate
+            # does not apply. Only meaningful from a routed, non-terminal
+            # state - a terminal decision is final until explicitly moved
+            # out via a status change, and an already-unrouted candidate is
+            # a no-op below.
+            if app.status in (JobApplication.Status.HIRED,
+                              JobApplication.Status.REJECTED,
+                              JobApplication.Status.ON_HOLD):
+                return HttpResponse(
+                    'Cannot unroute a candidate with a final decision.',
+                    status=409,
+                )
+            app.current_round = None
+            # in_progress is an artifact of being routed to a round; any
+            # other non-terminal status (new/shortlisted) already describes
+            # an unrouted candidate and is left untouched.
+            if app.status == JobApplication.Status.IN_PROGRESS:
+                app.status = JobApplication.Status.SHORTLISTED
+            app.feedback_submitted = False
+        elif to_round_id is not None:
             to_round = get_object_or_404(InterviewRound, pk=to_round_id, job=app.job)
 
             # Feedback gate on ANY round change (forward, backward, or

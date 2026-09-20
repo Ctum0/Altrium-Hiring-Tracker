@@ -150,7 +150,7 @@ class JobRoundTests(JobsBaseTestCase):
         job = Job.objects.create(title='Dev', created_by=self.hr)
         cand = Candidate.objects.create(email='a@example.com', first_name='Anna')
         app = JobApplication.objects.create(candidate=cand, job=job)
-        r = self.client.post(reverse('jobs:close', args=[job.pk]))
+        r = self.client.post(reverse('jobs:close', args=[job.pk]), {'closure_reason': 'cancelled'})
         self.assertEqual(r.status_code, 302)
         job.refresh_from_db()
         self.assertFalse(job.is_active)
@@ -718,7 +718,7 @@ class JobClosureMailTests(JobsBaseTestCase):
 
     def _close_for(self, job):
         self.login('hr')
-        return self.client.post(reverse('jobs:close', args=[job.pk]))
+        return self.client.post(reverse('jobs:close', args=[job.pk]), {'closure_reason': 'cancelled'})
 
 
 class DataRetentionPolicyTests(JobsBaseTestCase):
@@ -742,7 +742,7 @@ class DataRetentionPolicyTests(JobsBaseTestCase):
         JobApplication.objects.create(candidate=candidate, job=job, status='new')
 
         self.login('hr')
-        r = self.client.post(reverse('jobs:close', args=[job.pk]))
+        r = self.client.post(reverse('jobs:close', args=[job.pk]), {'closure_reason': 'cancelled'})
         self.assertEqual(r.status_code, 302)
 
         # Simulate a year having passed since closure. No age-based
@@ -912,3 +912,88 @@ class JobBoardDragDropTests(JobsBaseTestCase):
         self.assertEqual(r.status_code, 403)
         self.app.refresh_from_db()
         self.assertIsNone(self.app.current_round)
+
+
+class JobClosureReasonTests(JobsBaseTestCase):
+    """Closure reason selection (spec): HR must pick Hired / Cancelled /
+    On hold / Other when closing; invalid values are rejected, not silently
+    accepted; reopening clears the reason."""
+
+    def _make_job(self):
+        return Job.objects.create(title='Dev', created_by=self.hr)
+
+    def test_close_without_reason_fails_and_job_stays_active(self):
+        job = self._make_job()
+        self.login('hr')
+        r = self.client.post(reverse('jobs:close', args=[job.pk]), {})
+        self.assertEqual(r.status_code, 302)
+        self.assertIn(reverse('jobs:detail', args=[job.pk]), r.url)
+        job.refresh_from_db()
+        self.assertTrue(job.is_active)
+        self.assertIsNone(job.closed_at)
+        self.assertIsNone(job.closure_reason)
+        # Message explains what went wrong.
+        r = self.client.get(reverse('jobs:detail', args=[job.pk]))
+        self.assertContains(r, 'Select a closure reason')
+
+    def test_close_with_each_valid_reason_sets_field(self):
+        for reason, label in Job.ClosureReason.choices:
+            job = self._make_job()
+            self.login('hr')
+            r = self.client.post(
+                reverse('jobs:close', args=[job.pk]), {'closure_reason': reason}
+            )
+            self.assertEqual(r.status_code, 302)
+            job.refresh_from_db()
+            self.assertFalse(job.is_active)
+            self.assertEqual(job.closure_reason, reason)
+            self.assertEqual(job.get_closure_reason_display(), label)
+
+    def test_close_with_invalid_reason_rejected(self):
+        job = self._make_job()
+        self.login('hr')
+        r = self.client.post(
+            reverse('jobs:close', args=[job.pk]), {'closure_reason': 'pigeon_post'}
+        )
+        self.assertEqual(r.status_code, 302)
+        job.refresh_from_db()
+        self.assertTrue(job.is_active)
+        self.assertIsNone(job.closed_at)
+        self.assertIsNone(job.closure_reason)
+        r = self.client.get(reverse('jobs:detail', args=[job.pk]))
+        self.assertContains(r, 'Select a closure reason')
+
+    def test_reopen_clears_closure_reason(self):
+        job = self._make_job()
+        self.login('hr')
+        self.client.post(
+            reverse('jobs:close', args=[job.pk]), {'closure_reason': 'on_hold'}
+        )
+        r = self.client.post(reverse('jobs:reopen', args=[job.pk]))
+        self.assertEqual(r.status_code, 302)
+        job.refresh_from_db()
+        self.assertTrue(job.is_active)
+        self.assertIsNone(job.closed_at)
+        self.assertIsNone(job.closure_reason)
+
+    def test_non_hr_cannot_close(self):
+        job = self._make_job()
+        self.login('iv')
+        r = self.client.post(
+            reverse('jobs:close', args=[job.pk]), {'closure_reason': 'cancelled'}
+        )
+        self.assertEqual(r.status_code, 302)
+        self.assertIn(reverse('jobs:list'), r.url)
+        job.refresh_from_db()
+        self.assertTrue(job.is_active)
+        self.assertIsNone(job.closure_reason)
+
+    def test_detail_shows_reason_next_to_closed_badge(self):
+        job = self._make_job()
+        self.login('hr')
+        self.client.post(
+            reverse('jobs:close', args=[job.pk]), {'closure_reason': 'cancelled'}
+        )
+        r = self.client.get(reverse('jobs:detail', args=[job.pk]))
+        self.assertContains(r, 'Closed')
+        self.assertContains(r, 'Cancelled')

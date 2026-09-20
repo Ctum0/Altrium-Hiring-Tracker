@@ -8,7 +8,7 @@
     <h1 class="page-title">{{ job.title }}</h1>
     <p class="page-sub">
       Created {{ job.created_at|date:'M j, Y' }} by {{ job.created_by.get_full_name|default:job.created_by.username }}
-      {% if job.is_active %}&middot; <span class="badge badge-progress">Active</span>{% else %}&middot; <span class="badge badge-hold">Closed{% if job.closed_at %} {{ job.closed_at|date:'M j, Y' }}{% endif %}</span>{% endif %}
+      {% if job.is_active %}&middot; <span class="badge badge-progress">Active</span>{% else %}&middot; <span class="badge badge-hold">Closed{% if job.closed_at %} {{ job.closed_at|date:'M j, Y' }}{% endif %}{% if job.closure_reason %} &middot; {{ job.get_closure_reason_display }}{% endif %}</span>{% endif %}
     </p>
   </div>
   <div class="page-actions">
@@ -16,8 +16,15 @@
     <a href="{% url 'jobs:board' job.pk %}" class="btn btn-secondary">Board</a>
     <a href="{% url 'jobs:list' %}" class="btn btn-secondary">All jobs</a>
     {% if can_edit and job.is_active %}
-    <form method="post" action="{% url 'jobs:close' job.pk %}" style="display:inline" onsubmit="event.preventDefault();confirmAction(this,'Close job','Close this job? It will stop accepting new CV uploads. Existing candidates keep their current stage and status.')">
+    <form method="post" action="{% url 'jobs:close' job.pk %}" class="flex gap-2" style="align-items:center" onsubmit="event.preventDefault();confirmAction(this,'Close job','Close this job? It will stop accepting new CV uploads. Existing candidates keep their current stage and status.')">
       {% csrf_token %}
+      <label class="form-label" for="closure-reason" style="margin:0">Reason</label>
+      <select name="closure_reason" id="closure-reason" class="form-select" required style="width:auto">
+        <option value="" selected disabled>Select a reason</option>
+        {% for value, label in job.ClosureReason.choices %}
+        <option value="{{ value }}">{{ label }}</option>
+        {% endfor %}
+      </select>
       <button type="submit" class="btn btn-danger">Close job</button>
     </form>
     {% elif can_edit and not job.is_active %}

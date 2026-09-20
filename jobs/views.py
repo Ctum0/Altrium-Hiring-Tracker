@@ -112,8 +112,17 @@ class JobCloseView(LoginRequiredMixin, View):
             return redirect('jobs:list')
 
         if job.is_active:
+            reason = request.POST.get('closure_reason', '')
+            if reason not in Job.ClosureReason.values:
+                messages.error(
+                    request,
+                    'Select a closure reason (Position filled, Cancelled, '
+                    'On hold, or Other) before closing the job.',
+                )
+                return redirect('jobs:detail', pk=job.pk)
             job.is_active = False
             job.closed_at = timezone.now()
+            job.closure_reason = reason
             job.save()
             messages.success(
                 request,
@@ -166,6 +175,7 @@ class JobReopenView(LoginRequiredMixin, View):
         if not job.is_active:
             job.is_active = True
             job.closed_at = None
+            job.closure_reason = None
             job.save()
             messages.success(request, f'Job "{job.title}" reopened and accepting CVs.')
         else:

@@ -56,7 +56,7 @@ If you want a real portal (login, dashboard, live status, message thread) that's
 - On submit → redirects straight to **Rounds-in-Creation** (`/jobs/<pk>/rounds-setup/`, `RoundsSetupView`): add/rename/reorder interview rounds inline, before ever landing on the job detail page.
 - On save, scans closed jobs for rejected/on-hold candidates who scored ≥80 in the **same Domain and Seniority** and surfaces them as one-click "Suggested candidates to re-engage" (`jobs/talent_pool.py`, `find_suggestions`).
 - Job detail page (`/jobs/<pk>/`) shows a live per-round roll-up — candidates in each round, assignee, scheduled time — computed on the fly from each `JobApplication`, never a separately stored table that could go stale.
-- Job Closure (`/jobs/<pk>/close/`, `JobCloseView`) stops new applications; retains all candidate data indefinitely (verified: a year-old closed job stays fully searchable, no auto-deletion anywhere). Reopen (`/jobs/<pk>/reopen/`) is available.
+- Job Closure (`/jobs/<pk>/close/`, `JobCloseView`) stops new applications; HR selects a closure reason (Hired / Cancelled / On hold / Other — required, validated server-side); retains all candidate data indefinitely (verified: a year-old closed job stays fully searchable, no auto-deletion anywhere). The closed job's detail badge shows the reason (`Closed <date> · <Reason>`). Reopen (`/jobs/<pk>/reopen/`) is available and clears the reason with the closure stamp.
 
 ### 4.2 CV Upload / CV Import (HR-side)
 **Who:** HR. **Entry:** `/candidates/upload/` (bulk PDF/DOCX) and `/candidates/import/` (paste a profile URL/text).
@@ -113,7 +113,7 @@ HR enters a meeting link/date/notes; double-booking the same interviewer at the 
 
 ### 4.12 Kanban Board
 **Who:** view — anyone with visibility into the job; drag-drop — HR only. **Entry:** `/jobs/<pk>/board/` (`JobBoardView`).
-One column per interview round (in order) plus terminal Hired/Rejected/On Hold lanes. Native HTML5 drag-and-drop POSTs to the exact same `pipeline:move` endpoint the dropdown uses — zero duplicated validation logic, so an illegal drag surfaces the identical 409 the dropdown would. RBAC-scoped: an interviewer's board never shows candidates outside their own assignment, not merely a disabled drag handle.
+One column per interview round (in order) plus terminal Hired/Rejected/On Hold lanes plus an Unrouted lane that is a live drop target (HR can drag a routed candidate back to Unrouted; terminal states cannot be unrouted — a final decision must be changed via a status move; unrouting clears the round, resets `in_progress` to the pre-routing status, resets the feedback flag, and writes a PipelineMove audit row; no feedback gate applies since it is a step back). Native HTML5 drag-and-drop POSTs to the exact same `pipeline:move` endpoint the dropdown uses — zero duplicated validation logic, so an illegal drag surfaces the identical 409 the dropdown would. RBAC-scoped: an interviewer's board never shows candidates outside their own assignment, not merely a disabled drag handle.
 
 ### 4.13 Job Closure → Talent Pool loop
 Closing a job (§4.1) fires rejection emails to every still-open applicant, retains all data, and — because rejected/on-hold high scorers (≥80) are exactly what §4.1's talent-pool scan later surfaces for a *new* job of matching Domain+Seniority — creates a genuine feedback loop rather than a dead end.
@@ -127,8 +127,10 @@ Six triggers, one shared mechanism (`notifications/mail.py`):
 | Interview Invitation | Instantly, when a real interview time is scheduled/changed | Candidate |
 | Rejection (AI-drafted) | Instantly, on explicit reject OR job closure | Candidate |
 | Acceptance | Instantly, on Hired | Candidate |
-| Feedback Reminder | Scheduled (`send_feedback_reminders`, 3-day threshold) | Assigned interviewer |
-| Escalation | Scheduled (`dispatch_escalations`, 7-day threshold, keyed on `stage_entered_at` — fixed this session to match the dashboard card exactly) | HR/Management |
+| Feedback Reminder | Scheduled (`send_feedback_reminders`, 3-day threshold) — Render cron `altrium-feedback-reminders`, daily 08:00 UTC | Assigned interviewer |
+| Escalation | Scheduled (`dispatch_escalations`, 7-day threshold, keyed on `stage_entered_at` — fixed this session to match the dashboard card exactly) — Render cron `altrium-escalations`, daily 08:30 UTC | HR/Management |
+
+Both cron services are declared in `render.yaml` (created on the next blueprint sync). Commands default to dry-run; the cron start commands pass `--send`. Idempotent via 24-hour sent-marker Notification rows — at most one email per candidate per day. Without `EMAIL_HOST` configured on the cron services, output goes to the console backend instead of real delivery.
 
 Rejection emails are AI-drafted (2–3 warm, constructive sentences) with an automatic fallback to a fixed closing line if the AI call fails — verified live that a submission never blocks on a dead API key.
 

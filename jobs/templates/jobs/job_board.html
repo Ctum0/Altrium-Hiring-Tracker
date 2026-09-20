@@ -17,19 +17,19 @@
 </div>
 
 <div class="kanban-board" id="kanban-board" data-move-url-template="{% url 'pipeline:move' 0 %}">
-  {% if unrouted_apps %}
   <div class="kanban-column panel">
     <div class="kanban-column-header">
       <h3>Unrouted</h3>
       <span class="badge badge-secondary">{{ unrouted_apps|length }}</span>
     </div>
-    <div class="kanban-column-body">
+    <div class="kanban-column-body" data-stage="unrouted">
       {% for app in unrouted_apps %}
       {% include 'jobs/_board_card.html' %}
+      {% empty %}
+      <p class="kanban-empty text-xs text-muted">No candidates.</p>
       {% endfor %}
     </div>
   </div>
-  {% endif %}
 
   {% for round in rounds %}
   <div class="kanban-column panel">

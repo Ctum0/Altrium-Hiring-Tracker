@@ -34,6 +34,12 @@ class Job(models.Model):
         SENIOR = 'senior', 'Senior'
         LEAD = 'lead', 'Lead'
 
+    class ClosureReason(models.TextChoices):
+        HIRED = 'hired', 'Position filled'
+        CANCELLED = 'cancelled', 'Cancelled'
+        ON_HOLD = 'on_hold', 'On hold'
+        OTHER = 'other', 'Other'
+
     title = models.CharField(max_length=200)
     department = models.CharField(
         max_length=20,
@@ -86,6 +92,13 @@ class Job(models.Model):
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     closed_at = models.DateTimeField(null=True, blank=True)
+    closure_reason = models.CharField(
+        max_length=20,
+        choices=ClosureReason.choices,
+        null=True,
+        blank=True,
+        help_text='Why the job was closed. Chosen at closure time; cleared on reopen.',
+    )
 
     class Meta:
         ordering = ['-created_at']

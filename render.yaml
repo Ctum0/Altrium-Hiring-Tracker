@@ -53,3 +53,55 @@ services:
         sync: false
       - key: S3_PUBLIC_DOMAIN
         sync: false
+
+  # Scheduled reminder jobs (Feature 4). Both management commands default
+  # to a dry run; --send makes them deliver one digest email per recipient,
+  # with 24h sent-markers suppressing duplicate sends, so daily runs are
+  # idempotent. Cron jobs have no free tier on Render (minimum $1/month
+  # per cron job), so no plan is set -- the default compute plan applies.
+  # SMTP settings (EMAIL_HOST / EMAIL_HOST_USER / EMAIL_HOST_PASSWORD) are
+  # prompted at sync; without EMAIL_HOST the jobs log to console instead
+  # of delivering.
+  - type: cron
+    name: altrium-feedback-reminders
+    runtime: python
+    schedule: '0 8 * * *' # daily 08:00 UTC
+    buildCommand: pip install -r requirements.txt
+    startCommand: python manage.py send_feedback_reminders --send
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: altrium-tracker-db
+          property: connectionString
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DJANGO_DEBUG
+        value: "false"
+      - key: EMAIL_HOST
+        sync: false
+      - key: EMAIL_HOST_USER
+        sync: false
+      - key: EMAIL_HOST_PASSWORD
+        sync: false
+
+  - type: cron
+    name: altrium-escalations
+    runtime: python
+    schedule: '30 8 * * *' # daily 08:30 UTC
+    buildCommand: pip install -r requirements.txt
+    startCommand: python manage.py dispatch_escalations --send
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: altrium-tracker-db
+          property: connectionString
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DJANGO_DEBUG
+        value: "false"
+      - key: EMAIL_HOST
+        sync: false
+      - key: EMAIL_HOST_USER
+        sync: false
+      - key: EMAIL_HOST_PASSWORD
+        sync: false

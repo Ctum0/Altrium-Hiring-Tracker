@@ -210,6 +210,109 @@ class PipelineTests(TestCase):
         self.assertEqual(self.app.current_round, self.round1)
         self.assertEqual(self.app.status, JobApplication.Status.NEW)
 
+    def test_unrouted_resets_round_and_status(self):
+        """HR can drag a routed candidate back to Unrouted: round cleared,
+        status reset to the unrouted-equivalent, audit row written."""
+        assert self.client.login(username='hr', password='pass12345')
+        self.app.current_round = self.round1
+        self.app.status = JobApplication.Status.IN_PROGRESS
+        self.app.save(update_fields=['current_round', 'status'])
+        r = self.client.post(reverse('pipeline:move', args=[self.app.pk]), {
+            'stage': 'unrouted',
+        })
+        self.assertEqual(r.status_code, 200)
+        self.app.refresh_from_db()
+        self.assertIsNone(self.app.current_round)
+        self.assertEqual(self.app.status, JobApplication.Status.SHORTLISTED)
+        self.assertFalse(self.app.feedback_submitted)
+        move = PipelineMove.objects.filter(application=self.app).latest('moved_at')
+        self.assertEqual(move.from_round, self.round1)
+        self.assertIsNone(move.to_round)
+        self.assertEqual(move.from_status, JobApplication.Status.IN_PROGRESS)
+        self.assertEqual(move.to_status, JobApplication.Status.SHORTLISTED)
+
+    def test_unrouted_skips_feedback_gate(self):
+        """Unrouting is a step back, not an advance: no feedback required."""
+        assert self.client.login(username='hr', password='pass12345')
+        self.app.current_round = self.round1
+        self.app.status = JobApplication.Status.IN_PROGRESS
+        self.app.save(update_fields=['current_round', 'status'])
+        r = self.client.post(reverse('pipeline:move', args=[self.app.pk]), {
+            'stage': 'unrouted',
+        })
+        self.assertEqual(r.status_code, 200)
+        self.app.refresh_from_db()
+        self.assertIsNone(self.app.current_round)
+
+    def test_unrouted_blocked_from_terminal_status(self):
+        """A final decision is not unroutable; it must be moved via status."""
+        assert self.client.login(username='hr', password='pass12345')
+        self.app.status = JobApplication.Status.REJECTED
+        self.app.current_round = self.round1
+        self.app.save(update_fields=['status', 'current_round'])
+        r = self.client.post(reverse('pipeline:move', args=[self.app.pk]), {
+            'stage': 'unrouted',
+        })
+        self.assertEqual(r.status_code, 409)
+        self.app.refresh_from_db()
+        self.assertEqual(self.app.status, JobApplication.Status.REJECTED)
+        self.assertEqual(self.app.current_round, self.round1)
+        self.assertFalse(PipelineMove.objects.filter(application=self.app).exists())
+
+    def test_unrouted_when_already_unrouted_is_noop(self):
+        """Unrouting an unrouted candidate changes nothing: 204, no audit row."""
+        assert self.client.login(username='hr', password='pass12345')
+        r = self.client.post(reverse('pipeline:move', args=[self.app.pk]), {
+            'stage': 'unrouted',
+        })
+        self.assertEqual(r.status_code, 204)
+        self.app.refresh_from_db()
+        self.assertIsNone(self.app.current_round)
+        self.assertEqual(self.app.status, JobApplication.Status.NEW)
+        self.assertFalse(PipelineMove.objects.filter(application=self.app).exists())
+
+    def test_unrouted_round_trip(self):
+        """Full round trip: unrouted -> round -> unrouted -> round."""
+        assert self.client.login(username='hr', password='pass12345')
+        self.client.post(reverse('pipeline:move', args=[self.app.pk]), {
+            'stage': f'round:{self.round1.pk}',
+        })
+        self.client.post(reverse('pipeline:move', args=[self.app.pk]), {
+            'stage': 'unrouted',
+        })
+        self.client.post(reverse('pipeline:move', args=[self.app.pk]), {
+            'stage': f'round:{self.round2.pk}',
+        })
+        self.app.refresh_from_db()
+        self.assertEqual(self.app.current_round, self.round2)
+        self.assertEqual(self.app.status, JobApplication.Status.IN_PROGRESS)
+        self.assertEqual(PipelineMove.objects.filter(application=self.app).count(), 3)
+
+    def test_interviewer_cannot_unroute(self):
+        assert self.client.login(username='iv', password='pass12345')
+        self.app.current_round = self.round1
+        self.app.status = JobApplication.Status.IN_PROGRESS
+        self.app.save(update_fields=['current_round', 'status'])
+        r = self.client.post(reverse('pipeline:move', args=[self.app.pk]), {
+            'stage': 'unrouted',
+        })
+        self.assertEqual(r.status_code, 403)
+        self.app.refresh_from_db()
+        self.assertEqual(self.app.current_round, self.round1)
+        self.assertEqual(self.app.status, JobApplication.Status.IN_PROGRESS)
+
+    def test_anonymous_cannot_unroute(self):
+        original_stage = self.app.stage_entered_at
+        r = self.client.post(reverse('pipeline:move', args=[self.app.pk]), {
+            'stage': 'unrouted',
+        })
+        self.assertIn(r.status_code, (302, 403))
+        self.app.refresh_from_db()
+        self.assertIsNone(self.app.current_round)
+        self.assertEqual(self.app.status, JobApplication.Status.NEW)
+        self.assertEqual(self.app.stage_entered_at, original_stage)
+        self.assertFalse(PipelineMove.objects.filter(application=self.app).exists())
+
 
 class PipelineMailTriggerTests(TestCase):
     """Feature 4: rejection (AI-personalized) and acceptance emails on
