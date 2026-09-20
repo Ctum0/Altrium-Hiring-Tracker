@@ -23,5 +23,7 @@ EXPOSE 8000
 # seed_users creates demo accounts with a hardcoded password (testpass123).
 # Never run it unconditionally on a prod boot -- only opt in explicitly via
 # SEED_DEMO_USERS=true (e.g. for a disposable demo/staging deploy). Default
-# (unset) is NOT to run it.
-CMD sh -c "python manage.py collectstatic --noinput && python manage.py migrate --noinput && if [ \"$SEED_DEMO_USERS\" = \"true\" ]; then python manage.py seed_users --noinput; fi && gunicorn altrium_tracker.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 2 --timeout 120"
+# (unset) is NOT to run it. SEED_DEMO_DATA=true additionally runs
+# clean_and_seed_db, which WIPES all jobs/candidates/applications/feedback
+# and seeds the enterprise demo scenario -- destructive, opt-in only.
+CMD sh -c "python manage.py collectstatic --noinput && python manage.py migrate --noinput && if [ \"$SEED_DEMO_USERS\" = \"true\" ]; then python manage.py seed_users --noinput; fi && if [ \"$SEED_DEMO_DATA\" = \"true\" ]; then python manage.py clean_and_seed_db; fi && gunicorn altrium_tracker.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 2 --timeout 120"
