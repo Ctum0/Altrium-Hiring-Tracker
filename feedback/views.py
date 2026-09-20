@@ -151,12 +151,19 @@ class FeedbackFormView(LoginRequiredMixin, View):
             for i, name in enumerate(InterviewFeedback.DEFAULT_CRITERIA)
         ]
         form = FeedbackForm(instance=existing)
+        # ?next= lets entry points (candidate detail, dashboard) return the
+        # interviewer to where they came from after submit or cancel.
+        next_url = request.GET.get('next') or ''
+        # Open-redirect guard: only relative paths.
+        if next_url and not next_url.startswith('/'):
+            next_url = ''
         return render(request, 'feedback/feedback_form.html', {
             'form': form,
             'application': self.application,
             'round': self.round_obj,
             'is_edit': existing is not None,
             'criteria_rows': criteria_rows,
+            'next_url': next_url,
         })
 
     def post(self, request, *args, **kwargs):
@@ -275,6 +282,11 @@ class FeedbackFormView(LoginRequiredMixin, View):
             f'Feedback {action} for {self.application.candidate.full_name} '
             f'({self.round_obj.name}).',
         )
+        # Return to the entry point (?next=, relative paths only) so the
+        # interviewer keeps their working context; default stays feedback:list.
+        next_url = request.POST.get('next') or ''
+        if next_url.startswith('/') and not next_url.startswith('//'):
+            return redirect(next_url)
         return redirect('feedback:list')
 
 

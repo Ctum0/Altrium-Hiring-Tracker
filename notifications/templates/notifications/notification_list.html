@@ -36,7 +36,7 @@
       </div>
     </div>
     {% if not n.is_read %}
-    <form method="post" action="{% url 'notifications:mark_read' n.pk %}"
+    <form method="post" action="{% url 'notifications:mark_read' n.pk %}" data-mark-read
           hx-post="{% url 'notifications:mark_read' n.pk %}"
           hx-target="closest .notification-row"
           hx-swap="outerHTML">
@@ -78,4 +78,32 @@
   <p class="empty-state-body">When a candidate is assigned to you or pipeline status changes, you will be notified here.</p>
 </div>
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  // Clicking a notification link is an implicit "read": mark it read in the
+  // background while the browser navigates. Best-effort; the explicit
+  // checkmark button and "Mark all read" remain the authoritative paths.
+  document.addEventListener('click', function (e) {
+    var link = e.target.closest('.notification-row a[href]');
+    if (!link || link.target === '_blank') return;
+    var row = link.closest('.notification-row');
+    if (!row || row.dataset.readSent) return;
+    var form = row.querySelector('form[data-mark-read]');
+    if (!form) return;
+    e.preventDefault();
+    row.dataset.readSent = '1';
+    var body = new URLSearchParams(new FormData(form));
+    var csrf = body.get('csrfmiddlewaretoken') || '';
+    fetch(form.action, {
+      method: 'POST',
+      headers: {'X-CSRFToken': csrf},
+      body: body,
+      keepalive: true,
+    }).finally(function () { window.location.href = link.href; });
+  });
+})();
+</script>
 {% endblock %}

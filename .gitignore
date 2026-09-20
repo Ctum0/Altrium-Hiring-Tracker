@@ -57,3 +57,13 @@ test_db.sqlite3
 scratch/
 login-*.md
 wireframes_figma/
+
+# QA evidence and session state (never commit credentials/cookies)
+qa/**
+!qa/reports/
+!qa/journeys/
+!qa/reports/**
+!qa/journeys/**
+tests/feature-transitions/artifacts/
+playwright-report/
+test-results/

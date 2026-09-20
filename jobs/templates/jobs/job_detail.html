@@ -12,6 +12,7 @@
     </p>
   </div>
   <div class="page-actions">
+    {% if can_edit and job.is_active %}<a href="{% url 'candidates:upload' %}?job={{ job.pk }}" class="btn btn-primary">Upload CVs</a>{% endif %}
     {% if can_edit %}<a href="{% url 'jobs:edit' job.pk %}" class="btn btn-secondary">Edit</a>{% endif %}
     <a href="{% url 'jobs:board' job.pk %}" class="btn btn-secondary">Board</a>
     <a href="{% url 'jobs:list' %}" class="btn btn-secondary">All jobs</a>

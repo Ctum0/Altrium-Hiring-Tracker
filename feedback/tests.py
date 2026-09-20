@@ -278,6 +278,18 @@ class TestRoleGating(FeedbackBaseTestCase):
 # 5. AI polish endpoint
 # ---------------------------------------------------------------------------
 class TestAIPolishEndpoint(FeedbackBaseTestCase):
+    # The polish endpoint's assertions target the LOCAL FALLBACK output.
+    # When a working GROQ_API_KEY is configured (e.g. in a developer's
+    # .env), polish_notes returns real AI prose instead and the assertions
+    # would fail on environment, not on code — same hazard
+    # TestGeneralFeedback already guards against. Force the deterministic
+    # fallback by stubbing the chat call.
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls._chat_patcher = patch('ai.services._chat', return_value='')
+        cls._chat_patcher.start()
+        cls.addClassCleanup(cls._chat_patcher.stop)
 
     def test_non_interviewer_403(self):
         """Non-interviewer user cannot access the polish endpoint."""
@@ -676,6 +688,18 @@ class TestGeneralFeedback(FeedbackBaseTestCase):
         else:
             data['score'] = score
         return self.client.post(f'/feedback/{app.pk}/{rnd.pk}/', data=data)
+
+    # These tests assert the narrative quotes the submitted notes verbatim,
+    # which is the LOCAL FALLBACK synthesis. When a working AI backend is
+    # configured (it summarizes rather than quotes), the assertions would
+    # fail on environment, not on code. Force the deterministic fallback by
+    # stubbing the AI chat call that general_feedback_summary depends on.
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls._chat_patcher = patch('ai.services._chat', return_value='')
+        cls._chat_patcher.start()
+        cls.addClassCleanup(cls._chat_patcher.stop)
 
     def test_generated_on_second_submission(self):
         """general_feedback is empty after round 1, populated after round 2."""

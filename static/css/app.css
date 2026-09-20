@@ -3678,14 +3678,22 @@ a.ref-kpi-card.kpi-card-link:focus-visible {
   }
 
   .brand-sub,
-  .nav-group-label,
-  .sidebar-footer .user-meta {
+  .nav-group-label {
     display: none;
   }
 
   .nav {
     flex-direction: row;
     margin-left: var(--sp-3);
+    flex-wrap: wrap;
+    row-gap: var(--sp-1);
+  }
+
+  /* Wrap the nav instead of silently clipping trailing items: every
+     destination (including Notifications) stays reachable, and the row
+     grows vertically rather than overflowing horizontally. */
+  .nav .nav-link {
+    white-space: nowrap;
   }
 
   .sidebar-footer {
@@ -3693,6 +3701,20 @@ a.ref-kpi-card.kpi-card-link:focus-visible {
     margin-top: 0;
     border-top: none;
     padding: 0;
+    flex-shrink: 0;
+  }
+
+  /* Keep the user identity reachable on small viewports: the sidebar is a
+     horizontal bar here, so the footer must never be pushed out of view. */
+  .sidebar-footer .user-meta {
+    display: block;
+    max-width: 140px;
+  }
+  .sidebar-footer .user-name {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .main-content {
@@ -3803,78 +3825,9 @@ a.ref-kpi-card.kpi-card-link:focus-visible {
    "position_index") — and have been removed rather than fixed. Their
    light-mode gap (only some variants had a light override) is moot. */
 
-/* ===== Candidate Detail Two-Column Grid (responsive, scroll-safe) ===== */
-.candidate-detail-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
-  gap: 20px;
-  height: calc(100vh - 130px);
-  min-height: 0;
-  min-width: 0;
-}
+/* Candidate detail layout rules moved to the page-scoped
+   "CANDIDATE DETAIL RESTRUCTURE" section at the end of this file. */
 
-.candidate-detail-profile {
-  height: 100%;
-  max-height: 100%;
-  min-height: 0;
-  overflow-y: auto;
-}
-
-.candidate-detail-profile .resume-cta {
-  padding-top: 12px;
-  margin-top: 12px;
-  border-top: 1px solid var(--glass-border);
-}
-
-.candidate-detail-apps {
-  height: 100%;
-  min-height: 0;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.candidate-detail-apps-scroll {
-  flex: 1;
-  min-height: 0;
-  min-width: 0;
-  overflow-y: auto;
-  padding-right: 6px;
-}
-
-/* Main content is scrollable on small screens so stacked detail pages flow */
-.main-content.candidate-detail {
-  overflow: hidden;
-}
-
-@media (max-width: 900px) {
-  .candidate-detail-grid {
-    grid-template-columns: minmax(0, 1fr);
-    height: auto;
-    min-height: 0;
-    gap: 16px;
-  }
-
-  /* min-height/min-width: 0 on these (set for the desktop inner-scroll
-     columns) must also reset here, or CSS Grid's auto-row-sizing keeps
-     using their collapsed min-content size instead of actual content
-     height once overflow goes back to visible — tall content (e.g. a
-     generated AI fit summary) then spills out and overlaps the next
-     section instead of pushing it down. */
-  .candidate-detail-profile,
-  .candidate-detail-apps,
-  .candidate-detail-apps-scroll {
-    height: auto;
-    min-height: auto;
-    min-width: auto;
-    max-height: none;
-    overflow: visible;
-  }
-
-  .main-content.candidate-detail {
-    overflow-y: auto;
-  }
-}
 
 /* ===== Candidate Job-Fit Panel ===== */
 .fit-panel {
@@ -4590,4 +4543,662 @@ body.no-scroll {
 }
 .kanban-column-terminal .kanban-column-header h3 {
   color: var(--muted);
+}
+
+/* ==========================================================================
+ * CANDIDATE DETAIL RESTRUCTURE (page-scoped section)
+ * Page: candidates/candidate_detail.html + pipeline/_app_row.html +
+ *       pipeline/_panel_consensus.html + candidates/_fit_summary.html +
+ *       candidates/_slot_preview.html + feedback/_general_feedback.html.
+ * Goals: page-level scroll (no nested scroll trap), collapsed application
+ * rows that expand in place, single identity statement, token-only type
+ * scale, grouped controls at one 36px height, ghost destructive action.
+ * ========================================================================== */
+
+/* ---- Page header: identity stated once ---- */
+.cd-page-header {
+  margin-bottom: var(--sp-4);
+}
+.cd-identity-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+  flex: 1;
+}
+.cd-identity-text {
+  min-width: 0;
+}
+.cd-page-title {
+  font-size: var(--text-xl);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+.cd-page-sub {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  font-size: var(--text-xs);
+  margin-top: 2px;
+  max-width: none;
+}
+.cd-contact-item + .cd-contact-item::before {
+  content: '\00B7';
+  margin-right: var(--sp-2);
+  color: var(--border-strong);
+}
+.cd-score-chip {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: var(--text-base);
+  padding: 4px 12px;
+  font-weight: 800;
+}
+.cd-review-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  width: fit-content;
+  margin-top: var(--sp-1);
+  text-decoration: none;
+}
+.cd-review-flag:hover {
+  text-decoration: underline;
+}
+.cd-page-actions {
+  gap: var(--sp-2);
+}
+.cd-icon {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+
+/* Destructive action demoted to ghost/danger-outline: border + red text on
+   transparent background, so it no longer dominates the header. The
+   confirmAction modal still guards the actual POST. */
+.cd-btn-danger-ghost {
+  background: transparent;
+  color: var(--danger);
+  border: 1px solid var(--danger);
+}
+.cd-btn-danger-ghost:hover {
+  background: var(--danger-soft);
+  color: var(--danger);
+  text-decoration: none;
+  transform: none;
+}
+.cd-btn-danger-ghost:focus-visible {
+  outline-color: var(--danger);
+}
+
+/* ---- Layout: page-level scroll, no nested scroll trap ---- */
+.candidate-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+  height: auto;
+  min-height: 0;
+  min-width: 0;
+}
+.candidate-detail-profile {
+  min-height: 0;
+  overflow: visible;
+  padding: var(--sp-4) var(--sp-4) var(--sp-3);
+  box-shadow: var(--shadow-md);
+  border-radius: var(--radius-lg);
+}
+.cd-profile-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+.candidate-detail-apps {
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+.cd-apps-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+.cd-apps-title {
+  font-size: var(--text-lg);
+  font-weight: 800;
+  color: var(--ink);
+  margin: 0;
+}
+
+/* Main content scrolls the whole page like every other detail page */
+.main-content.candidate-detail {
+  overflow-y: auto;
+}
+
+/* ---- Profile inner panels ---- */
+.cd-profile-grid {
+  display: grid;
+  grid-template-columns: 310px 1fr;
+  gap: var(--sp-3);
+}
+@media (max-width: 640px) {
+  .cd-profile-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.cd-inset-panel {
+  background: var(--surface-2);
+  padding: var(--sp-3);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  min-width: 0;
+}
+.cd-contact-list {
+  display: grid;
+  grid-template-columns: 65px 1fr;
+  gap: var(--sp-1) var(--sp-2);
+  font-size: var(--text-xs);
+  margin: 0;
+}
+.cd-contact-list dd {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cd-contact-list dt {
+  margin: 0;
+}
+.cd-score-form {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+.cd-score-form .form-input {
+  width: 80px;
+}
+.cd-wrap-row {
+  flex-wrap: wrap;
+}
+.cd-fact-list {
+  margin: 0;
+  padding-left: var(--sp-4);
+  font-size: var(--text-xs);
+  color: var(--ink);
+  line-height: 1.45;
+}
+.cd-fact-list li {
+  margin-bottom: var(--sp-1);
+}
+.cd-skills-block .cd-wrap-row {
+  row-gap: var(--sp-1);
+}
+.cd-cv-summary {
+  font-size: var(--text-xs);
+  color: var(--muted);
+  line-height: 1.5;
+  background: var(--surface-2);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  margin: 0 0 var(--sp-2);
+}
+.candidate-detail-profile .resume-cta {
+  padding-top: var(--sp-3);
+  margin-top: var(--sp-3);
+  border-top: 1px solid var(--glass-border);
+}
+.candidate-detail-profile .resume-cta .btn {
+  width: 100%;
+  justify-content: center;
+}
+
+/* ---- General Feedback (AI) card ---- */
+.cd-general-feedback {
+  margin-bottom: 0;
+  padding: var(--sp-3) var(--sp-4);
+}
+.cd-gf-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-2);
+}
+.cd-gf-head .section-label {
+  margin: 0;
+}
+.cd-gf-body {
+  white-space: pre-line;
+  line-height: 1.6;
+  font-size: var(--text-sm);
+  color: var(--ink-secondary);
+}
+.cd-gf-note {
+  margin-top: var(--sp-2);
+  margin-bottom: 0;
+}
+
+/* ---- Collapsed application rows (details/summary expand-in-place) ---- */
+.app-card--collapsible {
+  padding: 0;
+  margin-bottom: 0;
+  gap: 0;
+}
+.app-disclosure {
+  min-width: 0;
+}
+.app-disclosure > summary {
+  list-style: none;
+  cursor: pointer;
+}
+.app-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+.app-summary-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-4);
+  min-height: 44px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.app-summary-row:hover {
+  background: var(--surface-hover);
+}
+.app-disclosure > summary:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: -2px;
+  border-radius: var(--radius-lg);
+}
+.app-summary-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  flex-shrink: 0;
+  transition: transform var(--transition);
+}
+.app-disclosure[open] > summary .app-summary-chevron {
+  transform: rotate(180deg);
+}
+.app-summary-title {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--fg);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.app-summary-badges,
+.app-summary-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  flex-shrink: 1;
+  min-width: 0;
+  margin-left: auto;
+}
+.app-summary-badges {
+  margin-left: 0;
+}
+.app-summary-meta .badge {
+  font-size: var(--text-micro);
+}
+
+/* Expanded body */
+.app-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4) var(--sp-4);
+  border-top: 1px solid var(--border-subtle);
+}
+.app-card--collapsible .app-card-controls {
+  display: contents;
+}
+
+/* Grouped control sections separated by 1px dividers */
+.app-card-control-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding-bottom: var(--sp-3);
+  border-bottom: 1px solid var(--border);
+}
+.app-card-control-group:last-of-type {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+/* The consensus card sits between control groups; it carries its own
+   surface and must not inherit the group divider. */
+.app-card-body > .panel-consensus-card {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+.app-card-control-label {
+  font-size: var(--text-micro);
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* One consistent control height on this page: inputs, selects, buttons */
+.candidate-detail .form-input,
+.candidate-detail .form-select,
+.candidate-detail .stage-select,
+.candidate-detail .btn-sm,
+.candidate-detail .btn-xs {
+  min-height: 36px;
+  height: 36px;
+  padding-top: 0;
+  padding-bottom: 0;
+  box-sizing: border-box;
+}
+.candidate-detail .form-input,
+.candidate-detail .form-select,
+.candidate-detail .stage-select {
+  font-size: var(--text-sm);
+  padding-left: var(--sp-2);
+  padding-right: var(--sp-2);
+}
+.cd-control-form {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.cd-control-form .form-input:first-child {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.cd-control-form .form-input[type='datetime-local'] {
+  flex: 0 1 auto;
+  width: auto;
+}
+.cd-preline {
+  white-space: pre-line;
+}
+.stage-select {
+  width: 100%;
+}
+
+/* Slot preview inside expanded row */
+.slot-preview:empty {
+  display: none;
+}
+.candidate-detail .slot-preview-card {
+  padding: var(--sp-3);
+  font-size: var(--text-xs);
+}
+.slot-preview-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-2);
+}
+.slot-preview-label {
+  margin-bottom: var(--sp-1);
+}
+.slot-preview-note {
+  margin-top: var(--sp-1);
+}
+
+/* ---- AI fit summary ---- */
+.fit-summary--empty {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  border-top: 1px dashed var(--border-strong);
+  padding-top: var(--sp-2);
+}
+.fit-summary--empty p,
+.fit-summary--empty span {
+  margin: 0;
+}
+
+/* ---- AI Panel Consensus card (2+ evaluations only) ---- */
+.panel-consensus-card {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--sp-3) var(--sp-4);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+.consensus-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  padding-bottom: var(--sp-2);
+  border-bottom: 1px solid var(--border);
+}
+.consensus-icon-tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  background: var(--brand-soft);
+  color: var(--brand);
+  flex-shrink: 0;
+}
+.consensus-title {
+  font-size: var(--text-sm);
+  font-weight: 800;
+  color: var(--ink);
+  margin: 0;
+  line-height: 1.2;
+}
+.consensus-metrics {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: var(--sp-3);
+}
+@media (max-width: 480px) {
+  .consensus-metrics {
+    grid-template-columns: 1fr;
+  }
+}
+.consensus-metric-box {
+  background: var(--surface);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  text-align: center;
+  min-width: 0;
+}
+.consensus-metric-label {
+  font-size: var(--text-micro);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.consensus-metric-value {
+  font-family: var(--font-mono);
+  font-size: var(--text-xl);
+  font-weight: 800;
+  color: var(--ink);
+  line-height: 1.1;
+  margin-top: 2px;
+}
+.consensus-metric-value small {
+  font-size: var(--text-micro);
+  color: var(--muted);
+}
+.consensus-metric-sub {
+  font-size: var(--text-micro);
+  color: var(--brand);
+  margin-top: 2px;
+}
+.consensus-vote-box {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  text-align: left;
+  gap: var(--sp-1);
+}
+.consensus-vote-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  font-size: var(--text-micro);
+  font-weight: 700;
+  color: var(--ink);
+}
+.consensus-vote-tally {
+  display: inline-flex;
+  gap: var(--sp-2);
+}
+.consensus-vote-hire { color: var(--status-hired); font-weight: 800; }
+.consensus-vote-hold { color: var(--status-pending); font-weight: 800; }
+.consensus-vote-reject { color: var(--status-rejected); font-weight: 800; }
+.consensus-vote-bar {
+  display: flex;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.consensus-bar-hire { background: var(--status-hired); }
+.consensus-bar-hold { background: var(--status-pending); }
+.consensus-bar-reject { background: var(--status-rejected); }
+.consensus-divergence-note {
+  font-size: var(--text-micro);
+  color: var(--status-rejected);
+  font-weight: 700;
+}
+.consensus-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-2);
+}
+@media (max-width: 480px) {
+  .consensus-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.consensus-strengths-box,
+.consensus-conflict-box,
+.consensus-neutral-box {
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--radius-sm);
+  min-width: 0;
+}
+.consensus-strengths-box {
+  background: var(--status-hired-bg);
+  border: 1px solid var(--status-hired);
+}
+.consensus-conflict-box {
+  background: var(--status-rejected-bg);
+  border: 1px solid var(--status-rejected);
+}
+.consensus-neutral-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.consensus-box-label {
+  font-size: var(--text-micro);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin: 0 0 var(--sp-1);
+  color: var(--muted);
+}
+/* >=4.5:1 on both the tinted box and white in light theme (old #059669 was
+   3.8:1); in dark theme the status token is the brighter ramp value. */
+.consensus-label-strengths {
+  color: var(--status-hired);
+}
+:root[data-theme='light'] .consensus-label-strengths {
+  color: #03795a;
+}
+.consensus-label-conflict {
+  color: var(--status-rejected);
+}
+:root[data-theme='light'] .consensus-label-conflict {
+  color: #b91c1c;
+}
+.consensus-list {
+  margin: 0;
+  padding-left: var(--sp-4);
+  font-size: var(--text-xs);
+  color: var(--ink);
+  line-height: 1.4;
+}
+.consensus-list li {
+  margin-bottom: 2px;
+}
+.consensus-recommendation {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  background: var(--brand-soft);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--brand-border);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+  color: var(--ink);
+}
+.consensus-recommendation .cd-icon {
+  margin-top: 2px;
+  color: var(--brand);
+}
+.consensus-recommendation strong {
+  color: var(--brand);
+}
+
+/* ---- Responsive: stacked layout keeps everything reachable ---- */
+@media (max-width: 900px) {
+  .candidate-detail-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+  .cd-identity-row {
+    flex-wrap: wrap;
+  }
+  .cd-score-chip {
+    margin-left: 0;
+  }
+  .cd-page-actions {
+    margin-top: var(--sp-2);
+  }
+  .app-summary-row {
+    flex-wrap: wrap;
+    row-gap: var(--sp-1);
+  }
+  .app-summary-title {
+    flex-basis: calc(100% - 28px);
+    white-space: normal;
+  }
+  .app-summary-badges,
+  .app-summary-meta {
+    margin-left: 28px;
+  }
 }

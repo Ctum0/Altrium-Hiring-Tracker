@@ -213,6 +213,13 @@ class CandidateUploadView(LoginRequiredMixin, View):
         jobs = Job.objects.filter(is_active=True)
         return self._render(request, jobs)
 
+    def _render(self, request, jobs):
+        return render(request, 'candidates/candidate_upload.html', {
+            'active_nav': 'candidates',
+            'jobs': jobs,
+            'selected_job': request.POST.get('job', '') or request.GET.get('job', ''),
+        })
+
     def post(self, request):
         jobs = Job.objects.filter(is_active=True)
         job_pk = request.POST.get('job')
@@ -298,13 +305,6 @@ class CandidateUploadView(LoginRequiredMixin, View):
             )
         messages.success(request, summary)
         return redirect('candidates:list')
-
-    def _render(self, request, jobs):
-        return render(request, 'candidates/candidate_upload.html', {
-            'active_nav': 'candidates',
-            'jobs': jobs,
-            'selected_job': request.POST.get('job', ''),
-        })
 
 
 class PublicApplyView(View):

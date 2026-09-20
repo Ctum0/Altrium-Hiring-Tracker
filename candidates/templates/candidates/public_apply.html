@@ -27,7 +27,7 @@
     <div class="alert alert-error" role="alert" style="margin-bottom:var(--sp-4)">{{ error }}</div>
     {% endif %}
 
-    <form method="post" enctype="multipart/form-data" novalidate>
+    <form method="post" enctype="multipart/form-data">
       {% csrf_token %}
       <div class="form-field">
         <label class="form-label" for="cv">CV (PDF or DOCX)</label>

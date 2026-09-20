@@ -14,7 +14,7 @@ from django.views.generic import (
     CreateView, DetailView, ListView, RedirectView, TemplateView, View,
 )
 
-from accounts.forms import AvailabilityWindowForm, OnboardUserForm
+from accounts.forms import AvailabilityWindowForm, InterviewerProfileForm, OnboardUserForm
 from accounts.models import InterviewerAvailability, Role
 
 from candidates.models import Candidate, JobApplication
@@ -292,8 +292,14 @@ class HRDashboardView(LoginRequiredMixin, ListView):
         context['feedback_submitted'] = apps_in_round.filter(
             feedback_submitted=True
         ).count()
+        # Actionable pending only: exclude unassigned applications — they are
+        # nobody's work until HR assigns an evaluator, and counting them here
+        # while the Feedback page's Pending tab excludes them made the two
+        # numbers disagree (dashboard said 8, list said 2).
         context['feedback_pending'] = apps_in_round.filter(
-            feedback_submitted=False
+            feedback_submitted=False,
+        ).exclude(
+            assigned_to__isnull=True, panel_interviewers__isnull=True,
         ).count()
         context['total_feedback'] = (
             context['feedback_submitted'] + context['feedback_pending'] or 1
@@ -892,7 +898,10 @@ class InterviewerProfileView(LoginRequiredMixin, DetailView):
     availability, current load, pending feedback, upcoming interviews.
 
     Role-mirrors InterviewerRosterView: HR and Management have read access;
-    interviewers are redirected to home.
+    interviewers are redirected to home. HR can additionally correct the
+    matching profile (name, specialty, seniority, domain) — those fields
+    drive the assign-eligibility rules and previously had no edit path
+    after onboarding.
     """
 
     template_name = 'accounts/interviewer_profile.html'
@@ -907,6 +916,25 @@ class InterviewerProfileView(LoginRequiredMixin, DetailView):
 
     def get_queryset(self):
         return User.objects.filter(role=Role.INTERVIEWER)
+
+    def post(self, request, *args, **kwargs):
+        # HR-only edit of the matching profile; management stays read-only.
+        if not request.user.is_hr():
+            return redirect('accounts:interviewer_profile', pk=kwargs['pk'])
+        self.object = self.get_object()
+        form = InterviewerProfileForm(request.POST, instance=self.object)
+        if form.is_valid():
+            form.save()
+            messages.success(
+                request,
+                f'{self.object.get_full_name() or self.object.username} '
+                f'updated. They now appear in the Assign dropdown for jobs '
+                f'their profile matches.',
+            )
+            return redirect('accounts:interviewer_profile', pk=self.object.pk)
+        context = self.get_context_data(object=self.object)
+        context['profile_form'] = form
+        return self.render_to_response(context)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -941,6 +969,10 @@ class InterviewerProfileView(LoginRequiredMixin, DetailView):
         context['pending_feedback_count'] = pending_feedback
         context['upcoming_interviews'] = upcoming
         context['active_nav'] = 'roster'
+        context['profile_form'] = kwargs.get('profile_form') or (
+            InterviewerProfileForm(instance=interviewer)
+            if self.request.user.is_hr() else None
+        )
         return context
 
 

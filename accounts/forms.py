@@ -78,6 +78,31 @@ class OnboardUserForm(forms.ModelForm):
         return user
 
 
+class InterviewerProfileForm(forms.ModelForm):
+    """HR-only form to correct an existing interviewer's matching profile.
+
+    The eligibility rules (domain match, seniority floor) read these fields
+    at assignment time; without an edit path a misclassified interviewer was
+    permanently invisible in the Assign dropdown.
+    """
+
+    class Meta:
+        model = User
+        fields = ['first_name', 'last_name', 'specialty', 'seniority', 'domain']
+        widgets = {
+            'first_name': forms.TextInput(attrs={'class': 'form-input'}),
+            'last_name': forms.TextInput(attrs={'class': 'form-input'}),
+            'specialty': forms.TextInput(attrs={'class': 'form-input'}),
+            'seniority': forms.Select(attrs={'class': 'form-select'}),
+            'domain': forms.Select(attrs={'class': 'form-select'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for name in ('seniority', 'domain'):
+            self.fields[name].empty_label = None
+
+
 class AvailabilityWindowForm(forms.ModelForm):
     """Interviewer self-service form for one weekly availability window."""
 

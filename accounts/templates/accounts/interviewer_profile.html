@@ -64,6 +64,43 @@
         {% if interviewer.is_active %}<span class="badge badge-hired">Active</span>{% else %}<span class="badge badge-rejected">Deactivated</span>{% endif %}
       </span>
     </div>
+    {% if profile_form %}
+    <details style="margin-top:var(--sp-3)">
+      <summary class="text-sm" style="cursor:pointer;color:var(--brand);font-weight:600">Edit matching profile</summary>
+      <form method="post" style="margin-top:var(--sp-3);display:grid;gap:var(--sp-2)">
+        {% csrf_token %}
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-2)">
+          <div>
+            <label class="form-label" for="id_first_name">First name</label>
+            {{ profile_form.first_name }}
+          </div>
+          <div>
+            <label class="form-label" for="id_last_name">Last name</label>
+            {{ profile_form.last_name }}
+          </div>
+        </div>
+        <div>
+          <label class="form-label" for="id_specialty">Specialty</label>
+          {{ profile_form.specialty }}
+          <p class="form-help">Free-text specialty; blank means generalist.</p>
+        </div>
+        <div>
+          <label class="form-label" for="id_seniority">Seniority</label>
+          {{ profile_form.seniority }}
+          <p class="form-help">Interviewers below the job's level are excluded from its Assign dropdown.</p>
+        </div>
+        <div>
+          <label class="form-label" for="id_domain">Domain</label>
+          {{ profile_form.domain }}
+          <p class="form-help">Structured domain used for role matching.</p>
+        </div>
+        {% if profile_form.non_field_errors %}<p class="form-error">{{ profile_form.non_field_errors.0 }}</p>{% endif %}
+        <div>
+          <button type="submit" class="btn btn-primary btn-sm">Save profile</button>
+        </div>
+      </form>
+    </details>
+    {% endif %}
   </div>
 
   <div class="glass-panel" style="padding:var(--sp-4)">

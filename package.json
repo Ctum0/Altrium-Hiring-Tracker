@@ -1,5 +1,6 @@
 {
   "devDependencies": {
+    "@playwright/mcp": "0.0.82",
     "axe-core": "^4.12.1",
     "playwright": "^1.63.0",
     "prettier": "^3.9.6"

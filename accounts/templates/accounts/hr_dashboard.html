@@ -345,7 +345,7 @@
 
           <!-- Action Line -->
           <div class="ai-card-action ai-action-amber">
-            <span class="ai-action-lbl">Action:</span> <a href="{% url 'candidates:list' %}?stage=rejected" class="ai-action-link">{{ insight.recommendation }} &rarr;</a>
+            <span class="ai-action-lbl">Action:</span> <a href="{% url 'feedback:list' %}?status=pending" class="ai-action-link">{{ insight.recommendation }} &rarr;</a>
           </div>
 
           {% elif insight.id == 'risk' %}
@@ -381,7 +381,7 @@
 
           <!-- Action Line -->
           <div class="ai-card-action ai-action-green">
-            <span class="ai-action-lbl">Action:</span> <a href="{% url 'jobs:list' %}" class="ai-action-link">{{ insight.recommendation }} &rarr;</a>
+            <span class="ai-action-lbl">Action:</span> <a href="{% url 'feedback:list' %}?status=pending" class="ai-action-link">{{ insight.recommendation }} &rarr;</a>
           </div>
 
           {% endif %}

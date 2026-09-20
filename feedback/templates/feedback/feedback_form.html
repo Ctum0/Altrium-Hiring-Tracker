@@ -19,6 +19,7 @@
 
 <form method="post" novalidate>
   {% csrf_token %}
+  {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
   <div class="form-card">
 
     <div class="form-field">
@@ -93,7 +94,7 @@
       <button type="submit" class="btn btn-primary">
         {% if is_edit %}Update feedback{% else %}Submit feedback{% endif %}
       </button>
-      <a href="{% url 'feedback:list' %}" class="btn btn-secondary">Cancel</a>
+      <a href="{% if next_url %}{{ next_url }}{% else %}{% url 'feedback:list' %}{% endif %}" class="btn btn-secondary">Cancel</a>
     </div>
 
   </div>

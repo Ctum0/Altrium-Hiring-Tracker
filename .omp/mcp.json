@@ -1,0 +1,29 @@
+{
+  "$schema": "https://raw.githubusercontent.com/can1357/oh-my-pi/main/packages/coding-agent/src/config/mcp-schema.json",
+  "mcpServers": {
+    "playwright": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "node_modules/@playwright/mcp/cli.js",
+        "--caps=network,storage,testing,vision,devtools",
+        "--isolated",
+        "--config",
+        "qa/playwright-mcp.config.json"
+      ],
+      "env": {
+        "PLAYWRIGHT_BROWSERS_PATH": "!printf '%s' \"$HOME/.cache/ms-playwright\""
+      },
+      "cwd": ".",
+      "timeout": 120000
+    },
+    "github": {
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "headers": {
+        "Authorization": "!printf 'Bearer %s' \"$(printf 'protocol=https\\nhost=github.com\\n\\n' | git credential fill 2>/dev/null | sed -n 's/password=//p')\""
+      },
+      "timeout": 120000
+    }
+  }
+}

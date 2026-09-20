@@ -1,85 +1,92 @@
-{% if app.panel_consensus %}
-<div class="panel glass-panel panel-consensus-card" style="margin-top:12px;margin-bottom:12px;padding:14px 16px;border-radius:var(--radius-md, 12px);background:var(--surface-2);border:1px solid var(--border);box-shadow:var(--shadow-sm)">
+{% comment %}
+AI Panel Consensus & Conflict Resolver card for one application.
+Include with an `app` in context from the application row body.
+Rendered ONLY when two or more interviewer evaluations exist; a single
+evaluation is summarized on the collapsed row instead of showing a
+consensus card for one data point.
+{% endcomment %}
+{% if app.panel_consensus and app.panel_consensus.total_evaluators >= 2 %}
+<div class="panel-consensus-card">
   <!-- Header & Status Badge -->
-  <div class="flex items-center justify-between" style="margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border)">
+  <div class="consensus-header">
     <div class="flex items-center gap-2">
-      <span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:6px;background:rgba(34,211,238,0.12);color:var(--vui-primary-blue)">
+      <span class="consensus-icon-tile" aria-hidden="true">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
       </span>
       <div>
-        <h4 style="font-size:0.92rem;font-weight:800;color:var(--ink);margin:0;line-height:1.2">AI Panel Consensus & Conflict Resolver</h4>
-        <span class="text-micro text-muted" style="font-size:11px">Synthesized across {{ app.panel_consensus.total_evaluators }} interviewer evaluation(s)</span>
+        <h4 class="consensus-title">AI Panel Consensus &amp; Conflict Resolver</h4>
+        <span class="text-micro text-muted">Synthesized across {{ app.panel_consensus.total_evaluators }} interviewer evaluation(s)</span>
       </div>
     </div>
-    <span class="badge {{ app.panel_consensus.status_badge_class }}" style="font-size:11px;font-weight:800;padding:3px 9px">
+    <span class="badge {{ app.panel_consensus.status_badge_class }}">
       {{ app.panel_consensus.status_label }}
     </span>
   </div>
 
   <!-- Metric Summary Row -->
-  <div style="display:grid;grid-template-columns:140px 1fr;gap:12px;margin-bottom:10px">
+  <div class="consensus-metrics">
     <!-- Progressive Weighted Score -->
-    <div style="background:var(--surface-1);padding:8px 10px;border-radius:var(--radius-sm, 8px);border:1px solid var(--border);text-align:center">
-      <div class="text-micro text-muted" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em">Weighted Panel Avg</div>
-      <div style="font-size:1.3rem;font-weight:800;color:var(--ink);line-height:1.1;margin-top:2px">{{ app.panel_consensus.weighted_avg_10 }} <small style="font-size:0.6em;color:var(--muted)">/ 10</small></div>
-      <div class="text-micro" style="font-size:11px;color:var(--vui-primary-blue);margin-top:2px">({{ app.panel_consensus.weighted_avg_100 }}% match)</div>
+    <div class="consensus-metric-box">
+      <div class="consensus-metric-label">Weighted Panel Avg</div>
+      <div class="consensus-metric-value">{{ app.panel_consensus.weighted_avg_10 }} <small>/ 10</small></div>
+      <div class="consensus-metric-sub">({{ app.panel_consensus.weighted_avg_100 }}% match)</div>
     </div>
 
     <!-- Vote Tally & Divergence Bar -->
-    <div style="background:var(--surface-1);padding:8px 10px;border-radius:var(--radius-sm, 8px);border:1px solid var(--border);display:flex;flex-direction:column;justify-content:center">
-      <div class="flex items-center justify-between" style="font-size:11px;font-weight:700;color:var(--ink);margin-bottom:4px">
+    <div class="consensus-metric-box consensus-vote-box">
+      <div class="consensus-vote-head">
         <span>Panel Vote Breakdown:</span>
-        <span>
-          <span style="color:#10b981;font-weight:800">Hire: {{ app.panel_consensus.hire_votes }}</span> &middot;
-          <span style="color:#f59e0b;font-weight:800">Hold: {{ app.panel_consensus.hold_votes }}</span> &middot;
-          <span style="color:#ef4444;font-weight:800">Reject: {{ app.panel_consensus.reject_votes }}</span>
+        <span class="consensus-vote-tally">
+          <span class="consensus-vote-hire">Hire: {{ app.panel_consensus.hire_votes }}</span> &middot;
+          <span class="consensus-vote-hold">Hold: {{ app.panel_consensus.hold_votes }}</span> &middot;
+          <span class="consensus-vote-reject">Reject: {{ app.panel_consensus.reject_votes }}</span>
         </span>
       </div>
-      <div style="display:flex;height:6px;border-radius:9999px;overflow:hidden;background:var(--surface-3)">
+      <div class="consensus-vote-bar">
         {% if app.panel_consensus.hire_votes %}
-        <div style="background:#10b981;flex:{{ app.panel_consensus.hire_votes }}"></div>
+        <div class="consensus-bar-hire" style="flex:{{ app.panel_consensus.hire_votes }}"></div>
         {% endif %}
         {% if app.panel_consensus.hold_votes %}
-        <div style="background:#f59e0b;flex:{{ app.panel_consensus.hold_votes }}"></div>
+        <div class="consensus-bar-hold" style="flex:{{ app.panel_consensus.hold_votes }}"></div>
         {% endif %}
         {% if app.panel_consensus.reject_votes %}
-        <div style="background:#ef4444;flex:{{ app.panel_consensus.reject_votes }}"></div>
+        <div class="consensus-bar-reject" style="flex:{{ app.panel_consensus.reject_votes }}"></div>
         {% endif %}
       </div>
       {% if app.panel_consensus.is_divergent %}
-      <div class="text-micro" style="font-size:11px;color:#ef4444;font-weight:700;margin-top:4px">⚠️ High Divergence: Score spread is {{ app.panel_consensus.score_spread }} pts across rounds.</div>
+      <div class="consensus-divergence-note">High Divergence: Score spread is {{ app.panel_consensus.score_spread }} pts across rounds.</div>
       {% endif %}
     </div>
   </div>
 
   <!-- Agreed Strengths & Conflicts Grid -->
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+  <div class="consensus-grid">
     <!-- Agreed Strengths -->
-    <div style="background:rgba(16,185,129,0.06);padding:8px 10px;border-radius:var(--radius-sm, 8px);border:1px solid rgba(16,185,129,0.2)">
-      <h5 style="font-size:11px;font-weight:800;color:#059669;text-transform:uppercase;letter-spacing:0.03em;margin:0 0 4px 0">✓ Agreed Strengths</h5>
-      <ul style="margin:0;padding-left:14px;font-size:11px;color:var(--ink);line-height:1.4">
+    <div class="consensus-strengths-box">
+      <h5 class="consensus-box-label consensus-label-strengths">Agreed Strengths</h5>
+      <ul class="consensus-list">
         {% for strength in app.panel_consensus.agreed_strengths %}
-        <li style="margin-bottom:2px">{{ strength }}</li>
+        <li>{{ strength }}</li>
         {% endfor %}
       </ul>
     </div>
 
     <!-- Divergence / Conflict Points -->
     {% if app.panel_consensus.is_divergent %}
-    <div style="background:rgba(239,68,68,0.06);padding:8px 10px;border-radius:var(--radius-sm, 8px);border:1px solid rgba(239,68,68,0.2)">
-      <h5 style="font-size:11px;font-weight:800;color:#dc2626;text-transform:uppercase;letter-spacing:0.03em;margin:0 0 4px 0">⚡ Panel Divergence Notes</h5>
-      <ul style="margin:0;padding-left:14px;font-size:11px;color:var(--ink);line-height:1.4">
+    <div class="consensus-conflict-box">
+      <h5 class="consensus-box-label consensus-label-conflict">Panel Divergence Notes</h5>
+      <ul class="consensus-list">
         {% for pt in app.panel_consensus.conflict_points %}
-        <li style="margin-bottom:2px">{{ pt }}</li>
+        <li>{{ pt }}</li>
         {% endfor %}
       </ul>
     </div>
     {% else %}
-    <div style="background:var(--surface-1);padding:8px 10px;border-radius:var(--radius-sm, 8px);border:1px solid var(--border)">
-      <h5 style="font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:0.03em;margin:0 0 4px 0">⚡ Panel Alignment Notes</h5>
-      <ul style="margin:0;padding-left:14px;font-size:11px;color:var(--ink);line-height:1.4">
+    <div class="consensus-neutral-box">
+      <h5 class="consensus-box-label">Panel Alignment Notes</h5>
+      <ul class="consensus-list">
         {% for pt in app.panel_consensus.conflict_points %}
-        <li style="margin-bottom:2px">{{ pt }}</li>
+        <li>{{ pt }}</li>
         {% endfor %}
       </ul>
     </div>
@@ -87,8 +94,9 @@
   </div>
 
   <!-- AI Actionable Recommendation Box for HR -->
-  <div style="background:rgba(34,211,238,0.08);padding:8px 12px;border-radius:var(--radius-sm, 8px);border:1px solid rgba(34,211,238,0.25);font-size:11.5px;line-height:1.45;color:var(--ink)">
-    <strong style="color:var(--vui-primary-blue)">🤖 AI Consensus Action Recommendation:</strong> {{ app.panel_consensus.recommendation }}
+  <div class="consensus-recommendation">
+    <svg class="cd-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M12 8V5"/><circle cx="12" cy="4" r="1"/><path d="M9 13h.01M15 13h.01M9.5 17h5"/></svg>
+    <span><strong>AI Consensus Action Recommendation:</strong> {{ app.panel_consensus.recommendation }}</span>
   </div>
 </div>
 {% endif %}

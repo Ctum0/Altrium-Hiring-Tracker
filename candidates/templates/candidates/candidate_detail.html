@@ -1,73 +1,69 @@
 {% extends 'base.html' %}
-{% load static %}
+{% load static accounts_extras %}
 {% block title %}{{ candidate.full_name }} | Altrium Tracker{% endblock %}
 {% block breadcrumb %}<a class="breadcrumb-link" href="{% url 'candidates:list' %}">Candidates</a><span class="breadcrumb-sep">/</span>{{ candidate.full_name }}{% endblock %}
 {% block page_title %}{{ candidate.full_name }}{% endblock %}
 {% block content_class %}candidate-detail{% endblock %}
 {% block content %}
-<div class="page-header" style="margin-bottom:8px">
-  <div class="flex items-center justify-between" style="width:100%">
-    <div>
-      <h1 class="page-title" style="font-size:1.3rem;font-weight:800;color:var(--ink);letter-spacing:-0.02em;margin:0">{{ candidate.full_name }}</h1>
-      {% if candidate.needs_review %}
-      <a href="{% url 'candidates:review' candidate.pk %}" class="badge" style="background:var(--status-pending-bg);color:var(--status-pending);font-size:11px;padding:2px 8px;border-radius:999px;text-decoration:none;display:inline-block;margin-top:4px">⚠ Needs Review: {{ candidate.needs_review_reasons }}</a>
-      {% endif %}
-      <p class="page-sub" style="font-size:var(--text-xs);color:var(--muted);margin-top:1px">
-        {% if candidate.email %}{{ candidate.email }}{% endif %}
-        {% if candidate.phone %}&middot; {{ candidate.phone }}{% endif %}
-        &middot; Added {{ candidate.created_at|date:'M j, Y' }}
+<div class="page-header cd-page-header">
+  <div class="cd-identity-row">
+    <span class="cand-avatar cand-avatar-{{ candidate.full_name|avatar_index }}" aria-hidden="true">{{ candidate.full_name|initials }}</span>
+    <div class="cd-identity-text">
+      <h1 class="page-title cd-page-title">{{ candidate.full_name }}</h1>
+      <p class="page-sub cd-page-sub">
+        {% if candidate.email %}<span class="cd-contact-item">{{ candidate.email }}</span>{% endif %}
+        {% if candidate.phone %}<span class="cd-contact-item">{{ candidate.phone }}</span>{% endif %}
+        <span class="cd-contact-item">Added {{ candidate.created_at|date:'M j, Y' }}</span>
       </p>
     </div>
-    <div class="page-actions flex gap-2">
-      {% if is_hr %}
-      <form method="post" action="{% url 'candidates:delete' candidate.pk %}" onsubmit="event.preventDefault();confirmAction(this,'Remove candidate','Permanently remove {{ candidate.full_name }} and all associated applications? This cannot be undone.');">
-        {% csrf_token %}
-        <button type="submit" class="btn btn-danger btn-sm" style="padding:4px 10px;font-size:var(--text-xs)">Remove Candidate</button>
-      </form>
-      {% endif %}
-      <a href="{% url 'candidates:list' %}" class="btn btn-secondary btn-sm">All candidates</a>
-    </div>
+    {% if candidate.score is not None %}
+    <span class="score-chip has-score cd-score-chip" title="AI Candidate Compatibility Score (0-100): Calculated from skills match, experience relevance, and CV keyword density against target job requirements.">{{ candidate.score }} / 100</span>
+    {% endif %}
+  </div>
+  {% if candidate.needs_review %}
+  <a href="{% url 'candidates:review' candidate.pk %}" class="badge badge-pending cd-review-flag">
+    <svg class="cd-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    Needs Review: {{ candidate.needs_review_reasons }}
+  </a>
+  {% endif %}
+  <div class="page-actions cd-page-actions">
+    {% if is_hr %}
+    <form method="post" action="{% url 'candidates:delete' candidate.pk %}" onsubmit="event.preventDefault();confirmAction(this,'Remove candidate','Permanently remove {{ candidate.full_name }} and all associated applications? This cannot be undone.');">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-sm cd-btn-danger-ghost">Remove Candidate</button>
+    </form>
+    {% endif %}
+    <a href="{% url 'candidates:list' %}" class="btn btn-secondary btn-sm">All candidates</a>
   </div>
 </div>
 
 <div class="candidate-detail-grid">
-  <div class="panel glass-panel candidate-detail-profile" style="padding:12px 16px;box-shadow:var(--shadow-md);border-radius:var(--radius-lg)">
-    <div>
-      <!-- Profile Header & Score Chip -->
-      <div class="flex items-center justify-between" style="margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--glass-border)">
-        <div>
-          <h2 style="font-size:1.15rem;font-weight:800;color:var(--ink);margin:0">Candidate Profile</h2>
-          <p class="text-xs text-muted" style="margin-top:1px">Source: {{ candidate.source|default:'Uploaded CV' }}</p>
-        </div>
-        {% if candidate.score is not None %}
-        <span class="score-chip has-score" style="font-size:1rem;padding:4px 12px;font-weight:800" title="AI Candidate Compatibility Score (0-100): Calculated from skills match, experience relevance, and CV keyword density against target job requirements.">{{ candidate.score }} / 100 <small style="font-size:0.7em;opacity:0.8;margin-left:4px" aria-hidden="true">ℹ️</small></span>
-        {% endif %}
-      </div>
+  <div class="panel glass-panel candidate-detail-profile">
+    <div class="cd-profile-body">
 
-      <!-- Side-by-Side: Contact Info & Shortlist Score Override -->
-      <div style="display:grid;grid-template-columns:310px 1fr;gap:12px;margin-bottom:10px">
-        <div style="background:var(--surface-2);padding:10px 12px;border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow-sm)">
-          <dl style="display:grid;grid-template-columns:65px 1fr;gap:4px 8px;font-size:var(--text-xs);margin:0">
+      <div class="cd-profile-grid">
+        <div class="cd-inset-panel">
+          <span class="section-label">Contact</span>
+          <dl class="cd-contact-list">
             <dt class="text-muted strong">Email</dt>
-            <dd class="strong" style="color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ candidate.email|default:'-' }}</dd>
+            <dd class="strong" title="{{ candidate.email|default:'' }}">{{ candidate.email|default:'-' }}</dd>
             <dt class="text-muted strong">Phone</dt>
             <dd>{{ candidate.phone|default:'-' }}</dd>
           </dl>
         </div>
 
         {% if is_hr %}
-        <div style="background:var(--surface-2);padding:10px 12px;border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow-sm)">
-          <span class="section-label" title="This global score is shown across the candidate's list and profile. Per-job auto-match scores appear on each application card below.">Shortlist Score</span>
-          <form method="post" action="{% url 'candidates:score' candidate.pk %}" class="flex gap-2" style="align-items:center">
+        <div class="cd-inset-panel">
+          <span class="section-label" title="This global score is shown across the candidate's list and profile. Per-job auto-match scores appear on each application row below.">Shortlist Score</span>
+          <form method="post" action="{% url 'candidates:score' candidate.pk %}" class="cd-score-form">
             {% csrf_token %}
-            <input class="form-input mono" type="number" id="score" name="score" min="0" max="100" value="{% if candidate.score is not None %}{{ candidate.score }}{% endif %}" placeholder="Auto" style="width:80px;padding:2px 6px;font-size:var(--text-xs)">
-            <button type="submit" class="btn btn-primary btn-sm" style="padding:3px 10px;font-size:var(--text-xs)">Save score</button>
+            <input class="form-input mono" type="number" id="score" name="score" min="0" max="100" value="{% if candidate.score is not None %}{{ candidate.score }}{% endif %}" placeholder="Auto">
+            <button type="submit" class="btn btn-primary btn-sm">Save score</button>
             {% if candidate.score is not None %}
             <button type="button" class="btn btn-ghost btn-sm"
                     data-reset-confirm="1"
                     data-confirm-title="Reset score?"
-                    data-confirm-body="Clear the shortlist score for {{ candidate.full_name }}? The candidate will fall back to their auto-score."
-                    style="padding:3px 8px;font-size:var(--text-xs)">Reset</button>
+                    data-confirm-body="Clear the shortlist score for {{ candidate.full_name }}? The candidate will fall back to their auto-score.">Reset</button>
             {% endif %}
             <input type="hidden" name="reset_score" value="" data-reset-payload>
           </form>
@@ -75,38 +71,36 @@
         {% endif %}
       </div>
 
-      <!-- Web Profiles & Links -->
       {% if candidate.extracted_links %}
-      <div style="background:var(--surface-2);padding:8px 12px;border-radius:var(--radius);border:1px solid var(--border);margin-bottom:10px;box-shadow:var(--shadow-sm)">
-        <span class="section-label">Web Profiles & Links</span>
-        <div class="flex gap-2" style="flex-wrap:wrap">
+      <div class="cd-inset-panel">
+        <span class="section-label">Web Profiles &amp; Links</span>
+        <div class="flex gap-2 cd-wrap-row">
           {% for link in candidate.extracted_links %}
-          <span class="badge badge-secondary" style="font-size:var(--text-xs);padding:3px 8px">{{ link }}</span>
+          <span class="badge badge-secondary">{{ link }}</span>
           {% endfor %}
         </div>
       </div>
       {% endif %}
 
-      <!-- Side-by-Side: Education & Key Accomplishments -->
       {% if candidate.extracted_education or candidate.extracted_highlights %}
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px">
+      <div class="cd-profile-grid">
         {% if candidate.extracted_education %}
-        <div style="background:var(--surface-2);padding:10px 12px;border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow-sm)">
-          <h3 class="section-label" style="margin-bottom:6px">Education</h3>
-          <ul style="margin:0;padding-left:16px;font-size:var(--text-xs);color:var(--ink);line-height:1.4">
+        <div class="cd-inset-panel">
+          <h3 class="section-label">Education</h3>
+          <ul class="cd-fact-list">
             {% for edu in candidate.extracted_education %}
-            <li style="margin-bottom:3px">{{ edu }}</li>
+            <li>{{ edu }}</li>
             {% endfor %}
           </ul>
         </div>
         {% endif %}
 
         {% if candidate.extracted_highlights %}
-        <div style="background:var(--surface-2);padding:10px 12px;border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow-sm)">
-          <h3 class="section-label" style="margin-bottom:6px">Key Highlights</h3>
-          <ul style="margin:0;padding-left:16px;font-size:var(--text-xs);color:var(--ink);line-height:1.4">
+        <div class="cd-inset-panel">
+          <h3 class="section-label">Key Highlights</h3>
+          <ul class="cd-fact-list">
             {% for hl in candidate.extracted_highlights %}
-            <li style="margin-bottom:3px">{{ hl }}</li>
+            <li>{{ hl }}</li>
             {% endfor %}
           </ul>
         </div>
@@ -114,25 +108,21 @@
       </div>
       {% endif %}
 
-      <!-- Skills Breakdown -->
       {% if candidate.skills %}
-      <div style="margin-bottom:8px">
-        <h3 class="section-label">Skills & Competencies</h3>
-        <div class="flex gap-1" style="flex-wrap:wrap">
+      <div class="cd-skills-block">
+        <h3 class="section-label">Skills &amp; Competencies</h3>
+        <div class="flex gap-1 cd-wrap-row">
           {% for skill in candidate.skills_list|slice:":10" %}
-          <span class="badge badge-role" style="font-size:var(--text-xs);padding:2px 7px">{{ skill }}</span>
+          <span class="badge badge-role">{{ skill }}</span>
           {% endfor %}
         </div>
       </div>
       {% endif %}
 
-      <!-- CV Executive Overview -->
       {% if candidate.resume_text %}
-      <div style="margin-bottom:8px">
-        <h3 class="section-label">CV Executive Summary</h3>
-        <p class="text-xs text-muted" style="line-height:1.45;background:var(--surface-2);padding:8px 10px;border-radius:var(--radius);border:1px solid var(--border);margin-bottom:4px;box-shadow:var(--shadow-sm)">
-          {{ candidate.resume_preview_snippet }}
-        </p>
+      <div class="cd-skills-block">
+        <h3 class="section-label">CV Summary</h3>
+        <p class="cd-cv-summary">{{ candidate.resume_preview_snippet }}</p>
         <button type="button" class="btn btn-secondary btn-sm" onclick="openCvOverlay()">View full extracted CV text &rarr;</button>
       </div>
       {% endif %}
@@ -141,7 +131,7 @@
       {% for app in applications %}
         {% if app.job.requirements %}
         <div class="fit-panel">
-          <h3>Job fit · {{ app.job.title }}</h3>
+          <h3>Job fit &middot; {{ app.job.title }}</h3>
           <div class="fit-grid">
             <div class="fit-col">
               <h4>Matched</h4>
@@ -168,33 +158,32 @@
 
     {% if candidate.resume_file %}
     <div class="resume-cta">
-      <a class="btn btn-secondary btn-sm" href="{{ candidate.resume_file.url }}" target="_blank" rel="noopener" style="width:100%;justify-content:center;font-size:var(--text-xs);padding:6px 12px">View original resume PDF &rarr;</a>
+      <a class="btn btn-secondary btn-sm" href="{{ candidate.resume_file.url }}" target="_blank" rel="noopener">View original resume PDF &rarr;</a>
     </div>
     {% endif %}
   </div>
 
-  <!-- General Feedback (AI) + Applications Column (only area that scrolls on desktop) -->
+  <!-- Applications column: compact collapsed rows that expand in place.
+       Page-level scroll; no nested scroll trap. -->
   <div class="candidate-detail-apps">
     {% for app in applications %}
       {% include 'feedback/_general_feedback.html' %}
     {% endfor %}
 
-    <div class="flex items-center justify-between" style="margin-bottom:8px">
-      <h3 style="font-size:1.05rem;font-weight:800;color:var(--ink)">Applications ({{ applications|length }})</h3>
+    <div class="cd-apps-heading">
+      <h3 class="cd-apps-title">Applications ({{ applications|length }})</h3>
       {% if is_hr %}
       <a href="{% url 'candidates:import' %}" class="btn btn-secondary btn-sm" title="Opens the paste-profile import form; the candidate is matched by the email in the pasted text.">Import to another job</a>
       {% endif %}
     </div>
 
-    <div class="candidate-detail-apps-scroll">
-      {% if applications %}
-        {% for app in applications %}
-          {% include 'pipeline/_app_row.html' %}
-        {% endfor %}
-      {% else %}
-        <div class="panel panel-pad text-sm text-muted">No applications for this candidate yet.</div>
-      {% endif %}
-    </div>
+    {% if applications %}
+      {% for app in applications %}
+        {% include 'pipeline/_app_row.html' %}
+      {% endfor %}
+    {% else %}
+      <div class="panel panel-pad text-sm text-muted">No applications for this candidate yet.</div>
+    {% endif %}
   </div>
 </div>
 
@@ -209,6 +198,11 @@
     <div class="cv-overlay-body">{{ candidate.resume_text }}</div>
   </div>
 </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if candidate.resume_text %}
 <script>
   var cvOverlay = document.getElementById('cv-overlay');
   window.openCvOverlay = function () {

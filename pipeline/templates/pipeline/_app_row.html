@@ -1,136 +1,146 @@
 {% load static accounts_extras %}
-<div id="app-row-{{ app.pk }}" class="app-card">
-  <!-- Card Header -->
-  <div class="app-card-header">
-    <div class="app-card-title">{{ app.job.title }}</div>
-    <div class="app-card-badges">
-      <span class="badge badge-{{ app.status }}">{{ app.get_status_display }}</span>
-      {% if app.shortlist_score is not None %}
-      <span class="badge badge-in_progress" title="Auto-score vs. this job's requirements">Match: {{ app.shortlist_score }}/100</span>
-      {% elif app.job.requirements.strip %}
-      <span class="badge badge-feedback" title="No auto-score yet (candidate skills not parsed)">Match: N/A</span>
-      {% endif %}
-      {% if app.current_round %}
-      <span class="badge badge-in_progress">{{ app.current_round.name }}</span>
-      {% endif %}
-      {% if app.feedback_submitted %}
-      <span class="badge badge-feedback">Feedback Submitted</span>
-      {% elif app.current_round %}
-      <span class="badge badge-feedback">Feedback Pending</span>
-      {% endif %}
-    </div>
-  </div>
+<div id="app-row-{{ app.pk }}" class="app-card app-card--collapsible{% if app.open %} app-card--open{% endif %}">
+  <!-- Collapsed summary row: job title + status + one primary action.
+       Native <details> keeps expand/collapse keyboard-accessible with no JS. -->
+  <details class="app-disclosure" {% if app.open %}open{% endif %}>
+    <summary class="app-summary-row" aria-label="Toggle controls for {{ app.job.title }} application">
+      <span class="app-summary-chevron" aria-hidden="true">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </span>
+      <span class="app-summary-title">{{ app.job.title }}</span>
+      <span class="app-summary-badges">
+        <span class="badge badge-{{ app.status }}">{{ app.get_status_display }}</span>
+        {% if app.current_round %}<span class="badge badge-in_progress">{{ app.current_round.name }}</span>{% endif %}
+      </span>
+      <span class="app-summary-meta">
+        {% if app.feedback_submitted %}
+        <span class="badge badge-feedback">Feedback Submitted</span>
+        {% elif app.current_round %}
+        <span class="badge badge-feedback">Feedback Pending</span>
+        {% endif %}
+        {% if app.shortlist_score is not None %}
+        <span class="badge badge-in_progress" title="Auto-score vs. this job's requirements">Match: {{ app.shortlist_score }}/100</span>
+        {% elif app.job.requirements.strip %}
+        <span class="badge badge-feedback" title="No auto-score yet (candidate skills not parsed)">Match pending</span>
+        {% endif %}
+      </span>
+    </summary>
 
-  <!-- Card Controls (Zero Horizontal Scroll UX) -->
-  <div class="app-card-controls">
-    <!-- Meeting Link / Interview Details -->
-    <div class="app-card-control-group">
-      <label class="app-card-control-label">Interview Link / Notes</label>
-      {% if is_hr %}
-      <form method="post" action="{% url 'candidates:interview_details' app.pk %}" class="flex gap-2" style="flex-wrap:wrap">
-        {% csrf_token %}
-        <input class="form-input" name="interview_details"
-               value="{{ app.interview_details }}"
-               placeholder="Meet link or notes"
-               aria-label="Interview link or notes for {{ app.candidate.full_name }}"
-               style="padding:var(--sp-1) var(--sp-2);font-size:var(--text-xs)">
-        <input class="form-input" type="datetime-local" name="interview_at"
-               value="{{ app.interview_at|date:'Y-m-d\TH:i' }}"
-               aria-label="Scheduled interview time for {{ app.candidate.full_name }}"
-               {% if not app.assigned_to %}disabled title="Assign an interviewer first to enable scheduling"{% endif %}
-               style="padding:var(--sp-1) var(--sp-2);font-size:var(--text-xs)">
-        <button type="submit" class="btn btn-primary btn-sm">Save</button>
-      </form>
-      {% elif app.interview_details or app.interview_at %}
-      <div class="text-xs text-muted">
-        {% if app.interview_at %}<div style="font-weight:600;color:var(--fg)">{{ app.interview_at|date:'D, M j Y \a\t H:i' }}</div>{% endif %}
-        <span style="white-space:pre-line">{{ app.interview_details|default:"" }}</span>
-      </div>
-      {% else %}
-      <span class="text-xs text-muted">No meeting details added</span>
-      {% endif %}
-    </div>
-
-    <!-- Interviewer Assignment -->
-    <div class="app-card-control-group">
-      <label class="app-card-control-label">Assigned Interviewer</label>
-      {% if is_hr and app.status != 'rejected' and app.status != 'hired' %}
-      <form method="post" action="{% url 'candidates:assign' app.pk %}" class="flex gap-2" id="assign-form-{{ app.pk }}">
-        {% csrf_token %}
-        <select class="form-select" name="interviewer" aria-label="Assigned interviewer for {{ app.candidate.full_name }}"
-                style="padding:var(--sp-1) var(--sp-2);font-size:var(--text-xs)"
-                hx-get="{% url 'candidates:interviewer_slots' app.pk %}"
-                hx-target="#slot-preview-{{ app.pk }}"
-                hx-swap="innerHTML"
-                hx-trigger="change delay:200ms"
-                hx-include="this">
-          <option value="">{% if app.assigned_to %}Keep current{% else %}Assign to...{% endif %}</option>
-          {% for iv in app.eligible_interviewers %}
-          <option value="{{ iv.pk }}" {% if app.assigned_to_id == iv.pk %}selected{% endif %}>{{ iv.get_full_name|default:iv.username }}{% if iv.specialty %} &middot; {{ iv.specialty }}{% endif %}{% if workload_counts %}{% with load=workload_counts|get_item:iv.pk|default:"0" %}{% if load and team_avg_workload and load > team_avg_workload|floatformat:0 %} (⚠ {{ load }} active, above avg){% else %} ({{ load }} active){% endif %}{% endwith %}{% endif %}</option>
-          {% endfor %}
-          {% if app.assigned_to %}
-          <option value="__unassign__">Unassign…</option>
-          {% endif %}
-        </select>
-        <button type="submit" class="btn btn-primary btn-sm"
-                data-confirm-action="assign" data-app-pk="{{ app.pk }}">Assign</button>
-      </form>
-      <!-- Slot preview: server-rendered for the current assignee, refreshed
-           via HTMX whenever HR picks another interviewer -->
-      <div id="slot-preview-{{ app.pk }}" class="slot-preview" aria-live="polite">
-        {% if app.assigned_to %}
-          {% include 'candidates/_slot_preview.html' with preview=app.slot_preview_context app=app %}
+    <!-- Expanded body: full control set, grouped into labeled sections -->
+    <div class="app-card-body">
+      <!-- Meeting Link / Interview Details -->
+      <div class="app-card-control-group">
+        <label class="app-card-control-label">Interview Link / Notes</label>
+        {% if is_hr %}
+        <form method="post" action="{% url 'candidates:interview_details' app.pk %}" class="cd-control-form">
+          {% csrf_token %}
+          <input class="form-input" name="interview_details"
+                 value="{{ app.interview_details }}"
+                 placeholder="Meet link or notes"
+                 aria-label="Interview link or notes for {{ app.candidate.full_name }}">
+          <input class="form-input" type="datetime-local" name="interview_at"
+                 value="{{ app.interview_at|date:'Y-m-d\TH:i' }}"
+                 aria-label="Scheduled interview time for {{ app.candidate.full_name }}"
+                 {% if not app.assigned_to %}disabled title="Assign an interviewer first to enable scheduling"{% endif %}>
+          <button type="submit" class="btn btn-primary btn-sm">Save</button>
+        </form>
+        {% elif app.interview_details or app.interview_at %}
+        <div class="text-xs text-muted">
+          {% if app.interview_at %}<div class="strong">{{ app.interview_at|date:'D, M j Y \a\t H:i' }}</div>{% endif %}
+          <span class="cd-preline">{{ app.interview_details|default:"" }}</span>
+        </div>
+        {% else %}
+        <span class="text-xs text-muted">No meeting details added</span>
         {% endif %}
       </div>
-      {% else %}
-      <span class="text-xs text-muted">
-        {% if app.assigned_to %}<a href="{% url 'accounts:interviewer_profile' pk=app.assigned_to.pk %}" style="color:inherit">{{ app.assigned_to.get_full_name|default:app.assigned_to.username }}</a>{% else %}Unassigned{% endif %}
-      </span>
+
+      <!-- Interviewer Assignment -->
+      <div class="app-card-control-group">
+        <label class="app-card-control-label">Assigned Interviewer</label>
+        {% if is_hr and app.status != 'rejected' and app.status != 'hired' %}
+        <form method="post" action="{% url 'candidates:assign' app.pk %}" class="cd-control-form" id="assign-form-{{ app.pk }}">
+          {% csrf_token %}
+          <select class="form-select" name="interviewer" aria-label="Assigned interviewer for {{ app.candidate.full_name }}"
+                  hx-get="{% url 'candidates:interviewer_slots' app.pk %}"
+                  hx-target="#slot-preview-{{ app.pk }}"
+                  hx-swap="innerHTML"
+                  hx-trigger="change delay:200ms"
+                  hx-include="this">
+            <option value="">{% if app.assigned_to %}Keep current{% else %}Assign to...{% endif %}</option>
+            {% for iv in app.eligible_interviewers %}
+            <option value="{{ iv.pk }}" {% if app.assigned_to_id == iv.pk %}selected{% endif %}>{{ iv.get_full_name|default:iv.username }}{% if iv.specialty %} &middot; {{ iv.specialty }}{% endif %}{% if workload_counts %}{% with load=workload_counts|get_item:iv.pk|default:"0" %}{% if load and team_avg_workload and load > team_avg_workload|floatformat:0 %} ({{ load }} active, above avg){% else %} ({{ load }} active){% endif %}{% endwith %}{% endif %}</option>
+            {% endfor %}
+            {% if app.assigned_to %}
+            <option value="__unassign__">Unassign…</option>
+            {% endif %}
+          </select>
+          {% if not app.assigned_to and not app.eligible_interviewers %}
+          <p class="text-xs" style="color:var(--status-pending);margin:4px 0 0" role="note">
+            No interviewer matches this role's domain and seniority requirements yet.
+            Update interviewer profiles on the <a href="{% url 'accounts:interviewer_roster' %}" style="color:inherit;text-decoration:underline">Interviewers roster</a>.
+          </p>
+          {% endif %}
+          <button type="submit" class="btn btn-primary btn-sm"
+                  data-confirm-action="assign" data-app-pk="{{ app.pk }}">Assign</button>
+        </form>
+        <!-- Slot preview: server-rendered for the current assignee, refreshed
+             via HTMX whenever HR picks another interviewer -->
+        <div id="slot-preview-{{ app.pk }}" class="slot-preview" aria-live="polite">
+          {% if app.assigned_to %}
+            {% include 'candidates/_slot_preview.html' with preview=app.slot_preview_context app=app %}
+          {% endif %}
+        </div>
+        {% else %}
+        <span class="text-xs text-muted">
+          {% if app.assigned_to %}<a href="{% url 'accounts:interviewer_profile' pk=app.assigned_to.pk %}" style="color:inherit">{{ app.assigned_to.get_full_name|default:app.assigned_to.username }}</a>{% else %}Unassigned{% endif %}
+        </span>
+        {% endif %}
+      </div>
+
+      <!-- Pipeline Stage Move -->
+      {% if is_hr %}
+      <div class="app-card-control-group">
+        <label class="app-card-control-label">Move Stage</label>
+        <select class="stage-select" name="stage"
+                aria-label="Move {{ app.candidate.full_name }} to another stage"
+                onchange="confirmStageMove(this)"
+                hx-post="{% url 'pipeline:move' app.pk %}"
+                hx-vals='{"source": "detail"}'
+                hx-target="#app-row-{{ app.pk }}"
+                hx-swap="outerHTML"
+                hx-trigger="stagechange">
+          <option value="">Move to…</option>
+          <optgroup label="Advance to round">
+          {% for round in app.job.rounds.all %}
+          <option value="round:{{ round.pk }}" {% if app.current_round_id == round.pk %}selected{% endif %}>{{ round.name }}</option>
+          {% endfor %}
+          </optgroup>
+          <optgroup label="End candidacy">
+          <option value="status:hired" {% if app.status == 'hired' %}selected{% endif %}>Hired</option>
+          <option value="status:rejected" {% if app.status == 'rejected' %}selected{% endif %}>Rejected</option>
+          <option value="status:on_hold" {% if app.status == 'on_hold' %}selected{% endif %}>On Hold</option>
+          </optgroup>
+        </select>
+      </div>
       {% endif %}
-    </div>
 
-    <!-- Pipeline Stage Move -->
-    {% if is_hr %}
-    <div class="app-card-control-group">
-      <label class="app-card-control-label">Move Stage</label>
-      <select class="stage-select" name="stage"
-              aria-label="Move {{ app.candidate.full_name }} to another stage"
-              onchange="confirmStageMove(this)"
-              hx-post="{% url 'pipeline:move' app.pk %}"
-              hx-vals='{"source": "detail"}'
-              hx-target="#app-row-{{ app.pk }}"
-              hx-swap="outerHTML"
-              hx-trigger="stagechange"
-              style="width:100%">
-        <option value="">Move to…</option>
-        <optgroup label="Advance to round">
-        {% for round in app.job.rounds.all %}
-        <option value="round:{{ round.pk }}" {% if app.current_round_id == round.pk %}selected{% endif %}>{{ round.name }}</option>
-        {% endfor %}
-        </optgroup>
-        <optgroup label="End candidacy">
-        <option value="status:hired" {% if app.status == 'hired' %}selected{% endif %}>Hired</option>
-        <option value="status:rejected" {% if app.status == 'rejected' %}selected{% endif %}>Rejected</option>
-        <option value="status:on_hold" {% if app.status == 'on_hold' %}selected{% endif %}>On Hold</option>
-        </optgroup>
-      </select>
-    </div>
-    {% endif %}
-  </div>
+      <!-- AI Panel Consensus & Conflict Resolver (rendered only when 2+
+           evaluations exist; a single evaluation is summarized by the
+           status badge and feedback state on the summary row) -->
+      {% include 'pipeline/_panel_consensus.html' %}
 
-  <!-- AI Panel Consensus & Conflict Resolver (Rendered when feedback submissions exist) -->
-  {% include 'pipeline/_panel_consensus.html' %}
-
-  <!-- Card Footer -->
-  <div class="app-card-footer">
-    <div>
-      Applied {{ app.created_at|date:"M j, Y" }} &middot; {% if app.feedbacks.count %}{{ app.feedbacks.count }} feedback submission(s){% else %}No round feedback recorded yet{% endif %}
-      {% if app.moves.exists %}
-      <div class="last-move">Last moved to <strong>{{ app.get_status_display }}{% if app.current_round %} &middot; {{ app.current_round.name }}{% endif %}</strong> by {{ app.moves.first.moved_by.get_full_name|default:app.moves.first.moved_by.username }} {{ app.moves.first.moved_at|date:"M j, g:i A" }}</div>
-      {% endif %}
+      <!-- Card Footer -->
+      <div class="app-card-footer">
+        <div>
+          Applied {{ app.created_at|date:"M j, Y" }} &middot; {% if app.feedbacks.count %}{{ app.feedbacks.count }} feedback submission(s){% else %}No round feedback recorded yet{% endif %}
+          {% if app.moves.exists %}
+          <div class="last-move">Last moved to <strong>{{ app.get_status_display }}{% if app.current_round %} &middot; {{ app.current_round.name }}{% endif %}</strong> by {{ app.moves.first.moved_by.get_full_name|default:app.moves.first.moved_by.username }} {{ app.moves.first.moved_at|date:"M j, g:i A" }}</div>
+          {% endif %}
+        </div>
+        <div class="flex gap-2">
+          <a href="{% url 'feedback:list' %}?application={{ app.pk }}" class="btn btn-ghost btn-sm">View Feedback History &rarr;</a>
+        </div>
+      </div>
     </div>
-    <div class="flex gap-2">
-      <a href="{% url 'feedback:list' %}?application={{ app.pk }}" class="btn btn-ghost btn-sm">View Feedback History &rarr;</a>
-    </div>
-  </div>
+  </details>
 </div>

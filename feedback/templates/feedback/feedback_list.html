@@ -69,7 +69,7 @@
           <td>
             {% if user.is_interviewer and app.current_round %}
               {% if app.assigned_to == user or app.pk in panel_member_app_ids %}
-              <a href="{% url 'feedback:form' app.pk app.current_round.pk %}" class="btn btn-primary btn-xs">Submit Feedback</a>
+              <a href="{% url 'feedback:form' app.pk app.current_round.pk %}?next=/feedback/%3Fstatus%3Dpending" class="btn btn-primary btn-xs">Submit Feedback</a>
               {% else %}
               <a href="{% url 'candidates:detail' app.candidate.pk %}" class="btn btn-secondary btn-xs">View Candidate &rarr;</a>
               {% endif %}
