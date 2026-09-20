@@ -55,6 +55,27 @@ class LoginTests(AuthAndRoleTestBase):
         assert c.login(username='hr', password='pass12345')
         r = c.post(reverse('accounts:logout'))
         self.assertEqual(r.status_code, 302)
+        self.assertEqual(r.url, reverse('accounts:login'))
+
+    def test_logout_get_not_allowed(self):
+        c = Client()
+        assert c.login(username='hr', password='pass12345')
+        r = c.get(reverse('accounts:logout'))
+        self.assertEqual(r.status_code, 405)
+        # still authenticated after the rejected GET
+        r = c.get('/candidates/')
+        self.assertEqual(r.status_code, 200)
+
+    def test_logout_ends_session(self):
+        c = Client()
+        assert c.login(username='hr', password='pass12345')
+        assert c.get('/candidates/').status_code == 200
+        r = c.post(reverse('accounts:logout'))
+        self.assertEqual(r.status_code, 302)
+        # subsequent protected request redirects to the login page
+        r = c.get('/candidates/')
+        self.assertEqual(r.status_code, 302)
+        self.assertIn('/login/', r.url)
 
 
 class RoleHelperTests(AuthAndRoleTestBase):

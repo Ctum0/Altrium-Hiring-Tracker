@@ -38,6 +38,30 @@ class PipelineTests(TestCase):
             notes='Test feedback.',
         )
 
+    def test_anonymous_cannot_move(self):
+        """Unauthenticated POST must not reach the view or touch the DB."""
+        original_stage = self.app.stage_entered_at
+        r = self.client.post(reverse('pipeline:move', args=[self.app.pk]), {
+            'stage': 'status:hired',
+        })
+        self.assertIn(r.status_code, (302, 403))
+        self.app.refresh_from_db()
+        self.assertEqual(self.app.status, JobApplication.Status.NEW)
+        self.assertEqual(self.app.stage_entered_at, original_stage)
+        self.assertFalse(PipelineMove.objects.filter(application=self.app).exists())
+
+    def test_move_updates_stage_entered_at(self):
+        """A successful move stamps stage_entered_at with a fresh timestamp."""
+        assert self.client.login(username='hr', password='pass12345')
+        before = self.app.stage_entered_at
+        r = self.client.post(reverse('pipeline:move', args=[self.app.pk]), {
+            'stage': f'round:{self.round1.pk}',
+        })
+        self.assertEqual(r.status_code, 200)
+        self.app.refresh_from_db()
+        self.assertEqual(self.app.current_round, self.round1)
+        self.assertGreater(self.app.stage_entered_at, before)
+
     def test_move_round_to_round(self):
         assert self.client.login(username='hr', password='pass12345')
         self.app.current_round = self.round1

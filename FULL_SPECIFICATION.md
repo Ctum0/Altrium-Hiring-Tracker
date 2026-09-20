@@ -63,8 +63,9 @@ If you want a real portal (login, dashboard, live status, message thread) that's
 Both funnel into the single shared `ingest_cv()` pipeline (`candidates/intake.py`) — the exact same function the public apply path calls.
 
 ### 4.3 CV Self-Upload (Candidate-facing)
-**Who:** anyone, unauthenticated. **Entry:** `/candidates/apply/<job_pk>/`.
+**Who:** anyone, unauthenticated. **Entry:** `/careers/` (public "Open Positions" board — lists every `is_active` job automatically, no publish flag; one stable shareable link) → per-job `/candidates/apply/<job_pk>/` → thanks page with a link back to `/careers/`.
 Same pipeline as 4.2, byte-for-byte (verified via a shared-code-path test asserting identical parsed fields/score/reject outcome for the same file through both routes). See §3 for the "no portal" boundary.
+Edge behavior (all live-verified): duplicate submission for the same job+email re-renders the form with "You have already applied" (no silent swallow, no duplicate rows); CV over 10MB rejected with a friendly inline error; missing consent re-renders with entered data preserved; corrupt/unreadable file shows a friendly error (parseable-but-low-confidence instead creates a needs_review candidate and lands on thanks); inactive or nonexistent job pk → 404. Logout is POST-only per Django 5 (`GET /logout/` → 405; the navbar logout control is a POST form).
 
 ### 4.4 CV Parsing (AI) + CV Intake Quality Rules
 Runs inside `ingest_cv()` for every upload, either path:

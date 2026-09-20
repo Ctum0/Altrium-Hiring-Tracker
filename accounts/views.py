@@ -41,11 +41,13 @@ def compute_avg_days_to_hire(job_id=None):
     hired_qs = JobApplication.objects.filter(status='hired')
     if job_id is not None:
         hired_qs = hired_qs.filter(job_id=job_id)
-    hired_apps = list(hired_qs.values_list('id', 'created_at'))
+    # stage_entered_at fetched up front so the no-move-history fallback
+    # needs no per-application query.
+    hired_apps = list(hired_qs.values_list('id', 'created_at', 'stage_entered_at'))
     if not hired_apps:
         return None
 
-    hired_ids = [app_id for app_id, _ in hired_apps]
+    hired_ids = [app_id for app_id, _, _ in hired_apps]
     first_hire_move = {}
     for move in (
         PipelineMove.objects.filter(application_id__in=hired_ids, to_status='hired')
@@ -55,15 +57,11 @@ def compute_avg_days_to_hire(job_id=None):
             first_hire_move[move.application_id] = move.moved_at
 
     durations = []
-    for app_id, created_at in hired_apps:
+    for app_id, created_at, stage_entered_at in hired_apps:
         hired_at = first_hire_move.get(app_id)
         if hired_at is None:
             # No move history — fall back to stage_entered_at.
-            hired_at = (
-                JobApplication.objects.filter(id=app_id)
-                .values_list('stage_entered_at', flat=True)
-                .first()
-            )
+            hired_at = stage_entered_at
         if hired_at and created_at:
             duration_days = (hired_at - created_at).total_seconds() / 86400.0
             if duration_days < 0:
@@ -110,15 +108,20 @@ def compute_stage_performance():
         InterviewRound.objects.filter(moves_from__isnull=False)
         .distinct()
         .select_related('job')
+        .annotate(
+            fail_count=Count('moves_from', filter=Q(moves_from__to_status='rejected')),
+            advance_count=Count(
+                'moves_from',
+                filter=Q(moves_from__to_round__isnull=False)
+                | Q(moves_from__to_status__in=['hired', 'on_hold']),
+            ),
+        )
     )
 
     stats = []
     for round_obj in rounds_with_moves:
-        moves = PipelineMove.objects.filter(from_round=round_obj)
-        fail_count = moves.filter(to_status='rejected').count()
-        advance_count = moves.filter(
-            Q(to_round__isnull=False) | Q(to_status__in=['hired', 'on_hold'])
-        ).count()
+        fail_count = round_obj.fail_count
+        advance_count = round_obj.advance_count
         total = fail_count + advance_count
         if total == 0:
             continue
@@ -161,8 +164,10 @@ class LoginView(auth_views.LoginView):
 
 
 class LogoutView(auth_views.LogoutView):
-    def get(self, request, *args, **kwargs):
-        return super().post(request, *args, **kwargs)
+    """POST-only logout (Django 5 default); the navbar uses a POST form."""
+
+
+
 
 
 class HomeView(TemplateView):
@@ -219,20 +224,24 @@ class HRDashboardView(LoginRequiredMixin, ListView):
 
         # Score distribution
         scored = Candidate.objects.filter(score__isnull=False)
-        score_buckets = [
-            ('0-25', Q(score__gte=0, score__lte=25)),
-            ('26-50', Q(score__gte=26, score__lte=50)),
-            ('51-75', Q(score__gte=51, score__lte=75)),
-            ('76-100', Q(score__gte=76, score__lte=100)),
-        ]
-        total_scored = scored.count()
+        score_stats = scored.aggregate(
+            total=Count('id'),
+            b25=Count('id', filter=Q(score__gte=0, score__lte=25)),
+            b50=Count('id', filter=Q(score__gte=26, score__lte=50)),
+            b75=Count('id', filter=Q(score__gte=51, score__lte=75)),
+            b100=Count('id', filter=Q(score__gte=76, score__lte=100)),
+            avg=Avg('score'),
+        )
+        total_scored = score_stats['total']
         context['score_distribution'] = [
-            {'label': label, 'count': scored.filter(q).count()}
-            for label, q in score_buckets
+            {'label': label, 'count': score_stats[key]}
+            for label, key in (
+                ('0-25', 'b25'), ('26-50', 'b50'), ('51-75', 'b75'), ('76-100', 'b100'),
+            )
         ]
         context['scored_count'] = total_scored
         context['avg_score'] = (
-            round(scored.aggregate(Avg('score'))['score__avg'], 1)
+            round(score_stats['avg'], 1)
             if total_scored else None
         )
 
@@ -250,6 +259,7 @@ class HRDashboardView(LoginRequiredMixin, ListView):
         # requisitions so near-identical postings don't render as a duplicate glitch.
         active_jobs = list(
             Job.objects.filter(is_active=True)
+            .select_related('hiring_manager')
             .annotate(app_count=Count('applications'))
             .order_by('-created_at')
         )
@@ -374,8 +384,8 @@ class HRDashboardView(LoginRequiredMixin, ListView):
             cand_qs = Candidate.objects.filter(
                 applications__job__title=best_role['title'])
             all_skills = [
-                s.strip() for c in cand_qs
-                for s in (c.skills or '').split(',') if s.strip()
+                s.strip() for skills_str in cand_qs.values_list('skills', flat=True)
+                for s in (skills_str or '').split(',') if s.strip()
             ]
             counts = Counter(all_skills)
             skill_factors = []
@@ -508,30 +518,30 @@ class HRDashboardView(LoginRequiredMixin, ListView):
 
             Falls back to updated_at for applications with no move history.
             """
-            app_ids_in_status = list(
-                JobApplication.objects.filter(status=status_value).values_list('id', flat=True)
+            # Fetch updated_at up front so the no-move fallback needs no
+            # per-application query.
+            apps_in_status = list(
+                JobApplication.objects.filter(status=status_value)
+                .values_list('id', 'updated_at')
             )
-            if not app_ids_in_status:
+            if not apps_in_status:
                 return None
 
+            app_ids = [app_id for app_id, _ in apps_in_status]
             last_move = {}
             for move in (
-                PipelineMove.objects.filter(application_id__in=app_ids_in_status)
+                PipelineMove.objects.filter(application_id__in=app_ids)
                 .order_by('application_id', '-moved_at')
             ):
                 if move.application_id not in last_move:
                     last_move[move.application_id] = move.moved_at
 
             ages = []
-            for app_id in app_ids_in_status:
+            for app_id, updated_at in apps_in_status:
                 ref_time = last_move.get(app_id)
                 if ref_time is None:
                     # No moves yet — fall back to updated_at
-                    ref_time = (
-                        JobApplication.objects.filter(id=app_id)
-                        .values_list('updated_at', flat=True)
-                        .first()
-                    )
+                    ref_time = updated_at
                 if ref_time:
                     age_days = (now - ref_time).total_seconds() / 86400.0
                     if age_days < 0:

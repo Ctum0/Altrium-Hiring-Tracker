@@ -2202,6 +2202,108 @@ class PublicApplyTests(CandidatesBaseTestCase):
         self.assertEqual(candidate.phone, '555-9999')
 
 
+class PublicApplyEdgeCaseTests(CandidatesBaseTestCase):
+    """Edge-case coverage for the public apply flow: oversized files,
+    duplicate submissions, corrupt CVs, consent field preservation, and
+    review-flagged parses reaching the thanks page."""
+
+    def _docx_file(self, name='cv.docx', full_name='Jane Smith',
+                   email='jane@example.com', skills='Python, Django'):
+        from docx import Document
+        doc = Document()
+        doc.add_paragraph(full_name)
+        doc.add_paragraph(f'Email: {email}')
+        doc.add_paragraph(f'Skills: {skills}')
+        doc.add_paragraph('Experienced backend engineer with production experience. ' * 10)
+        bio = BytesIO()
+        doc.save(bio)
+        return SimpleUploadedFile(
+            name, bio.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        )
+
+    def _apply(self, **kwargs):
+        return self.client.post(
+            reverse('candidates:public_apply', args=[self.job.pk]), kwargs,
+        )
+
+    def test_oversized_file_rejected_with_friendly_error(self):
+        big = SimpleUploadedFile(
+            'cv.pdf', b'%PDF-1.4 ' + b'\x00' * (10 * 1024 * 1024 + 1),
+            content_type='application/pdf',
+        )
+        r = self._apply(cv=big, consent='on')
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'too large')
+        self.assertFalse(Candidate.objects.filter(source='portal').exists())
+
+    def test_duplicate_apply_same_job_same_email_shows_friendly_error(self):
+        r1 = self._apply(cv=self._docx_file(), consent='on')
+        self.assertEqual(r1.status_code, 302)
+        r2 = self._apply(cv=self._docx_file(), consent='on')
+        self.assertEqual(r2.status_code, 200)
+        self.assertContains(r2, 'already applied')
+        # Exactly one candidate and one application: no duplicate rows.
+        self.assertEqual(Candidate.objects.filter(email='jane@example.com').count(), 1)
+        self.assertEqual(
+            JobApplication.objects.filter(
+                candidate__email='jane@example.com', job=self.job,
+            ).count(), 1,
+        )
+
+    def test_corrupt_cv_renders_error_no_500_no_record(self):
+        garbage = SimpleUploadedFile(
+            'broken.pdf', b'\x89PNG\r\n\x1a\nnot really a pdf' * 10,
+            content_type='application/pdf',
+        )
+        r = self._apply(cv=garbage, consent='on')
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'could not read that file')
+        self.assertFalse(Candidate.objects.filter(source='portal').exists())
+
+    def test_missing_consent_preserves_entered_data(self):
+        r = self._apply(
+            cv=self._docx_file(),
+            full_name='Pat Doe', email='pat@example.com', phone='555-1',
+        )
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'consent')
+        self.assertContains(r, 'value="Pat Doe"')
+        self.assertContains(r, 'value="pat@example.com"')
+        self.assertContains(r, 'value="555-1"')
+        self.assertFalse(Candidate.objects.filter(source='portal').exists())
+
+    def test_needs_review_cv_still_lands_on_thanks_page(self):
+        """A CV that parses but is flagged needs_review must not be an
+        error for the applicant: the application is filed for human
+        review and the visitor sees the thanks page."""
+        with patch('candidates.intake.parse_cv', return_value={
+            'first_name': '', 'last_name': '', 'email': '', 'phone': '',
+            'skills': [],
+        }):
+            r = self.client.post(
+                reverse('candidates:public_apply', args=[self.job.pk]),
+                {'cv': self._docx_file(name='anon.docx'),
+                 'full_name': 'Anon Person', 'consent': 'on'},
+                follow=True,
+            )
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'Application received')
+        candidate = Candidate.objects.get(source='portal')
+        self.assertTrue(candidate.needs_review)
+        self.assertTrue(
+            JobApplication.objects.filter(candidate=candidate, job=self.job).exists()
+        )
+
+    def test_post_nonexistent_job_404_no_record_created(self):
+        r = self.client.post(reverse('candidates:public_apply', args=[999999]), {
+            'cv': self._docx_file(),
+            'consent': 'on',
+        })
+        self.assertEqual(r.status_code, 404)
+        self.assertFalse(Candidate.objects.filter(email='jane@example.com').exists())
+
+
 class PublicJobsListTests(CandidatesBaseTestCase):
     """The public /careers/ page: unauthenticated, lists every active job
     automatically (no separate publish flag), excludes closed jobs, and

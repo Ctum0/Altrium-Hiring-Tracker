@@ -318,6 +318,9 @@ class PublicApplyView(View):
     """
 
     ALLOWED_EXTENSIONS = CandidateUploadView.ALLOWED_EXTENSIONS
+    # Public intake is unauthenticated: cap CV size at 10MB at the app
+    # layer (do not rely on web-server limits alone).
+    MAX_CV_SIZE = 10 * 1024 * 1024
 
     def get(self, request, job_pk):
         job = get_object_or_404(Job, pk=job_pk, is_active=True)
@@ -352,12 +355,28 @@ class PublicApplyView(View):
                 **form_values,
             )
 
+        if f.size > self.MAX_CV_SIZE:
+            return self._render(
+                request, job,
+                error='That file is too large. Please upload a CV under 10MB.',
+                **form_values,
+            )
+
         outcome = ingest_cv(f, job, source='portal')
         if outcome['failed']:
             return self._render(
                 request, job,
                 error='We could not read that file. Please try a different PDF or DOCX.',
                 **form_values,
+            )
+
+        if outcome['duplicate'] and not outcome['app_created']:
+            # Same candidate, same job: the application already exists.
+            # Acknowledge rather than silently re-absorbing the upload.
+            return self._render(
+                request, job,
+                error='You have already applied to this position.',
+                full_name='', email='', phone='',
             )
 
         self._merge_fallback_contact(outcome['candidate'], outcome['parsed'] or {}, full_name, email, phone)

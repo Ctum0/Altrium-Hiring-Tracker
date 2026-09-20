@@ -38,7 +38,6 @@ class FeedbackListView(LoginRequiredMixin, ListView):
     def get_queryset(self):
         qs = _feedback_queryset(self.request.user)
         app_pk = self.request.GET.get('application')
-        status = self.request.GET.get('status')
         if app_pk:
             qs = qs.filter(application_id=app_pk)
         return qs.order_by('-submitted_at')
