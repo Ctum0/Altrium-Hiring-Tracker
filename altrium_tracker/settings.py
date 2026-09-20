@@ -41,13 +41,12 @@ ALLOWED_HOSTS = _env(
 # production deploy trusts only what DJANGO_ALLOWED_HOSTS names (plus the
 # exact Render host injected by the platform).
 if DEBUG:
-    for _host in ("localhost", "127.0.0.1", ".trycloudflare.com", ".onrender.com", ".up.railway.app"):
+    for _host in ("localhost", "127.0.0.1", ".trycloudflare.com", ".onrender.com"):
         if _host not in ALLOWED_HOSTS:
             ALLOWED_HOSTS.append(_host)
     CSRF_TRUSTED_ORIGINS = [
         "https://*.trycloudflare.com",
         "https://*.onrender.com",
-        "https://*.up.railway.app",
     ]
 else:
     CSRF_TRUSTED_ORIGINS = []
@@ -279,7 +278,7 @@ if not DEBUG and not _redis_url:
 
 # Security settings - only enforced in production (DEBUG=False)
 if not DEBUG:
-    # Railway/Render terminate TLS at their edge proxy and forward requests
+    # Render terminates TLS at its edge proxy and forwards requests
     # to gunicorn over plain HTTP internally. Without this, Django's
     # request.is_secure() never sees the connection as secure and
     # SECURE_SSL_REDIRECT below 301s every request back to https://<same

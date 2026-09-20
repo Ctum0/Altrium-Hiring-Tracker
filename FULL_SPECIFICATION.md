@@ -153,4 +153,4 @@ Rejection emails are AI-drafted (2–3 warm, constructive sentences) with an aut
 
 ## 6. Tech Stack & Deployment
 
-Django 5 / Python 3.12, HTML5 + vanilla JS + HTMX, PostgreSQL in production (SQLite for local dev), Groq LLM with local heuristic fallback, Gunicorn + Whitenoise, Docker. Currently deployed on **Render** (live, self-provisioned Postgres) and **Railway** (pending a manual database-wiring step on your side, per the last exchange).
+Django 5 / Python 3.12, HTML5 + vanilla JS + HTMX, PostgreSQL in production (SQLite for local dev), Groq LLM with local heuristic fallback, Gunicorn + Whitenoise, Docker. Deployed on **Render** (live, self-provisioned Postgres + two cron services for scheduled emails).

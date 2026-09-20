@@ -105,7 +105,7 @@ Every feature originally planned for Sprint 2 has shipped (see Sprint 2 (Complet
 - **Frontend**: HTML5, Vanilla JavaScript, HTMX, Custom Glassmorphism CSS
 - **Database**: PostgreSQL (Production) / SQLite (Local dev)
 - **AI Services**: Groq LLM API (`llama-3.3-70b-versatile`) + Local Heuristic Fallback Engine
-- **Deployment**: Docker, Docker Compose, Gunicorn, Railway
+- **Deployment**: Docker, Docker Compose, Gunicorn, Render (with self-provisioned PostgreSQL + cron services)
 
 ---
 
@@ -142,7 +142,7 @@ Access the app at `http://127.0.0.1:8000`.
 
 ## 🔑 Test Accounts (Password: `testpass123`)
 
-The three base accounts below are created by `python manage.py seed_users`, the only account seeder wired into a production boot (gated behind `SEED_DEMO_USERS=true`). This is what exists on the Railway deployment linked below. The five additional named accounts are only created locally by `python manage.py clean_and_seed_db --force` (used in the Local Setup steps above) and will not exist on a deployment that only ran `seed_users`.
+The three base accounts below are created by `python manage.py seed_users`, the only account seeder wired into a production boot (gated behind `SEED_DEMO_USERS=true`). The five additional named accounts are created by `python manage.py clean_and_seed_db --force` (used in the Local Setup steps above, and by the opt-in `SEED_DEMO_DATA=true` boot flag on Render — destructive, wipes all jobs/candidates first).
 
 | Role | Username | Name & Role | Access Level | Seeded By |
 | :--- | :--- | :--- | :--- | :--- |
@@ -158,7 +158,8 @@ The three base accounts below are created by `python manage.py seed_users`, the 
 ---
 
 ## 🧪 Testing
-Railway Deployement: https://altrium-hiring-tracker-production.up.railway.app/ 
+
+Live deployment: https://altrium-tracker.onrender.com/
 (Use this link to access the WebApplication)
 
 Run the Django automated test suite:
