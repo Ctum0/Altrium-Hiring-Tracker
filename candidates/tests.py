@@ -2606,3 +2606,47 @@ class ListReturnContextTests(CandidatesBaseTestCase):
         r = self.client.get(reverse('candidates:detail', args=[self.candidate.pk]))
         self.assertContains(r, 'All candidates')
         self.assertNotContains(r, 'Back to results')
+
+
+class ResumeDownloadTests(CandidatesBaseTestCase):
+    """Audit regression: the resume button embedded a presigned URL baked
+    into the page — it expired after 10 minutes and clicks failed. The
+    button now hits candidates:resume which re-checks authz and redirects
+    to a freshly signed URL."""
+
+    def setUp(self):
+        super().setUp()
+        from django.core.files.base import ContentFile
+        self.candidate.resume_file = ContentFile(b'%PDF-1.4 test', name='test_resume.pdf')
+        self.candidate.save()
+
+    def test_hr_click_redirects_to_fresh_url(self):
+        self.login('hr')
+        r = self.client.get(reverse('candidates:resume', args=[self.candidate.pk]))
+        self.assertEqual(r.status_code, 302)
+        # S3 deployments redirect to a presigned https URL; local storage
+        # redirects to the protected media route. Either way: a redirect.
+        self.assertTrue(r['Location'])
+
+    def test_unassigned_interviewer_blocked(self):
+        self.login('iv')
+        r = self.client.get(reverse('candidates:resume', args=[self.candidate.pk]))
+        self.assertEqual(r.status_code, 403)
+
+    def test_anonymous_redirected_to_login(self):
+        r = self.client.get(reverse('candidates:resume', args=[self.candidate.pk]))
+        self.assertEqual(r.status_code, 302)
+        self.assertIn('/login/', r.url)
+
+    def test_no_cv_gives_404(self):
+        from django.core.files.storage import default_storage
+        name = self.candidate.resume_file.name
+        default_storage.delete(name)
+        self.login('hr')
+        r = self.client.get(reverse('candidates:resume', args=[self.candidate.pk]))
+        self.assertEqual(r.status_code, 404)
+
+    def test_button_uses_endpoint_not_baked_url(self):
+        self.login('hr')
+        r = self.client.get(reverse('candidates:detail', args=[self.candidate.pk]))
+        self.assertContains(r, reverse('candidates:resume', args=[self.candidate.pk]))

@@ -17,6 +17,7 @@ urlpatterns = [
     path('offboarding/', views.OffboardingCandidatesView.as_view(), name='offboarding'),
     path('<int:pk>/', views.CandidateDetailView.as_view(), name='detail'),
     path('<int:pk>/edit/', views.CandidateEditView.as_view(), name='edit'),
+    path('<int:pk>/resume/', views.ResumeDownloadView.as_view(), name='resume'),
     path('<int:pk>/delete/', views.CandidateDeleteView.as_view(), name='delete'),
     path('<int:pk>/review/', views.CandidateReviewView.as_view(), name='review'),
     path('<int:pk>/score/', views.ScoreUpdateView.as_view(), name='score'),

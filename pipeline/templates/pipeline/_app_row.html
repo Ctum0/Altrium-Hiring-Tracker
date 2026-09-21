@@ -91,7 +91,7 @@
             {% if eligible_by_job %}
             {# Precomputed per-job eligible list from the view (perf audit N+1 #2). #}
             {% for iv in eligible_by_job|get_item:app.job.pk %}
-            <option value="{{ iv.pk }}" {% if app.assigned_to_id == iv.pk %}selected{% endif %}>{{ iv.get_full_name|default:iv.username }}{% if iv.specialty %} &middot; {{ iv.specialty }}{% endif %}{% if workload_counts %}{% with load=workload_counts|get_item:iv.pk|default:"0" %}{% if load and team_avg_workload and load > team_avg_workload|floatformat:0 %} ({{ load }} active, above avg){% else %} ({{ load }} active){% endif %}{% endwith %}{% endif %}</option>
+            <option value="{{ iv.pk }}" {% if app.assigned_to_id == iv.pk %}selected{% endif %}>{{ iv.get_full_name|default:iv.username }}{% if iv.specialty %} &middot; {{ iv.specialty }}{% endif %}{% if iv.availability_count == 0 %} (no availability yet){% endif %}{% if workload_counts %}{% with load=workload_counts|get_item:iv.pk|default:"0" %}{% if load and team_avg_workload and load > team_avg_workload|floatformat:0 %} ({{ load }} active, above avg){% else %} ({{ load }} active){% endif %}{% endwith %}{% endif %}</option>
             {% endfor %}
             {% else %}
             {% for iv in app.eligible_interviewers %}

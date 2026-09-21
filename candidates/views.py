@@ -7,7 +7,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import IntegrityError, transaction
 from django.db.models import Count, F, Q
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -225,9 +225,14 @@ class CandidateDetailView(LoginRequiredMixin, DetailView):
         # grouped per job; the template consumes the precomputed list.
         if context['is_hr']:
             from django.contrib.auth import get_user_model
+            from django.db.models import Count
             User = get_user_model()
+            # availability_count feeds the "(no availability)" dropdown
+            # marker: assignment is allowed but scheduling is blocked until
+            # the interviewer declares weekly windows.
             interviewers = list(
                 User.objects.filter(role='IV', is_active=True)
+                .annotate(availability_count=Count('availability_windows'))
                 .order_by('first_name', 'last_name')
             )
             eligible_by_job = {}
@@ -1372,3 +1377,32 @@ class BulkAssignView(LoginRequiredMixin, View):
             messages.warning(request, f'{len(skipped) - 5} more skipped.')
 
         return redirect(request.POST.get('next') or 'candidates:list')
+
+
+class ResumeDownloadView(LoginRequiredMixin, View):
+    """Serve a candidate's original CV via a FRESH presigned URL.
+
+    Audit finding: the template embedded resume_file.url directly, so a
+    presigned URL baked into the page expired after 10 minutes — clicking
+    'View original resume PDF' on an old tab failed. This endpoint checks
+    authz at click time and redirects to a just-signed URL, so the button
+    always works. Local (non-S3) deployments get the protected media view.
+    """
+
+    def get(self, request, pk):
+        candidate = get_object_or_404(Candidate, pk=pk)
+        if request.user.is_interviewer():
+            assigned = JobApplication.objects.filter(
+                Q(assigned_to=request.user) | Q(panel_interviewers=request.user),
+                candidate=candidate,
+            ).exists()
+            if not assigned:
+                return HttpResponse('You can only view assigned candidates.', status=403)
+        if not candidate.resume_file:
+            raise Http404('No CV on file for this candidate.')
+        from django.core.files.storage import default_storage
+        if not default_storage.exists(candidate.resume_file.name):
+            # DB row points at a missing object (e.g. deleted from the
+            # bucket): a redirect would 404 downstream anyway — fail here.
+            raise Http404('CV file is missing from storage.')
+        return HttpResponseRedirect(candidate.resume_file.url)

@@ -158,7 +158,7 @@
 
     {% if candidate.resume_file %}
     <div class="resume-cta">
-      <a class="btn btn-secondary btn-sm" href="{{ candidate.resume_file.url }}" target="_blank" rel="noopener">View original resume PDF &rarr;</a>
+      <a class="btn btn-secondary btn-sm" href="{% url 'candidates:resume' candidate.pk %}" target="_blank" rel="noopener">View original resume PDF &rarr;</a>
     </div>
     {% endif %}
 
