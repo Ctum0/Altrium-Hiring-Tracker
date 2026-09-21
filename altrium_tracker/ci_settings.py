@@ -6,6 +6,10 @@ falls back to LocMem with the documented warning), no S3.
 """
 from .settings import *  # noqa: F401,F403
 
+# CI is a test environment: enable DEBUG so the dev-only secret fallback
+# applies (no real secret key exists in CI) and ALLOWED_HOSTS widen.
+DEBUG = True
+
 # Fast, deterministic password hashing in CI.
 PASSWORD_HASHERS = [
     'django.contrib.auth.hashers.MD5PasswordHasher',
