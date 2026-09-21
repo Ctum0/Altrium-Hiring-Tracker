@@ -27,7 +27,9 @@ test.describe('assign → notify → click-through', () => {
       .catch(() => null);
     test.skip(!optionValue, 'E2E interviewer not eligible for this job — seed domain must match');
     await assignSelect.selectOption(optionValue);
-    await row.locator('button:has-text("Assign")').click();
+    // The quick-action button (added for collapsed-row UX) also matches
+    // 'Assign' — target the form's submit button specifically.
+    await row.locator('button[type="submit"][data-confirm-action="assign"]').click();
     // The Assign button opens the confirm dialog; wait for it, then OK submits.
     const confirmModal = page.locator('#confirm-modal');
     await expect(confirmModal).toBeVisible();
