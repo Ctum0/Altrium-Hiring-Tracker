@@ -43,8 +43,8 @@ def _ocr_pdf(data: bytes) -> str:
     undecodable PDF) so callers keep the pre-OCR behavior.
     """
     try:
-        from pdf2image import convert_from_bytes
         import pytesseract
+        from pdf2image import convert_from_bytes
     except ImportError as exc:
         logger.info('OCR fallback unavailable (%s); using text layer as-is', exc)
         return ''

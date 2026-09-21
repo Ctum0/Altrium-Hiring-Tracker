@@ -23,7 +23,9 @@ urlpatterns = [
     path('feedback/', include('feedback.urls')),
 ]
 
-if settings.DEBUG and not getattr(settings, 'STORAGES', {}).get('default', {}).get('BACKEND', '').endswith('s3boto3.S3Boto3Storage'):
+if settings.DEBUG and not getattr(settings, 'STORAGES', {}).get('default', {}).get(
+    'BACKEND', ''
+).endswith('s3boto3.S3Boto3Storage'):
     # Local dev only: serve CVs through an authenticated, role-checked view.
     # Production uses the private S3 bucket with presigned URLs (settings.py).
     # The old static() route served every CV to anonymous clients
