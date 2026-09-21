@@ -851,6 +851,32 @@ class JobBoardTests(JobsBaseTestCase):
         r = self.client.get(reverse('jobs:detail', args=[self.job.pk]))
         self.assertContains(r, reverse('jobs:board', args=[self.job.pk]))
 
+    def test_empty_board_shows_intake_cta(self):
+        """GAP regression: a job with zero candidates rendered a board of
+        empty columns with no path forward — the only intake hint was a raw
+        public-apply URL on the detail page. The board must offer Upload
+        CVs and the application link."""
+        empty_job = Job.objects.create(title='Empty Board Job', created_by=self.hr)
+        self.login('hr')
+        r = self.client.get(reverse('jobs:board', args=[empty_job.pk]))
+        self.assertContains(r, 'No candidates on this board yet')
+        self.assertContains(r, reverse('candidates:upload'))
+        self.assertContains(r, reverse('candidates:public_apply', args=[empty_job.pk]))
+
+    def test_populated_board_hides_empty_state(self):
+        self.login('hr')
+        r = self.client.get(reverse('jobs:board', args=[self.job.pk]))
+        self.assertNotContains(r, 'No candidates on this board yet')
+
+    def test_empty_board_hides_cta_for_non_hr(self):
+        """Interviewers see the board read-only: no Upload CVs button and
+        no empty-state intake copy."""
+        empty_job = Job.objects.create(title='Iv Empty Board', created_by=self.hr)
+        self.login('iv')
+        r = self.client.get(reverse('jobs:board', args=[empty_job.pk]))
+        self.assertNotContains(r, 'No candidates on this board yet')
+        self.assertNotContains(r, 'Upload CVs')
+
 
 class JobBoardDragDropTests(JobsBaseTestCase):
     """Simulates the exact fetch POST the board's drag-and-drop JS makes:

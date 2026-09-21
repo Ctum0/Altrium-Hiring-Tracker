@@ -3,6 +3,7 @@ from unittest.mock import patch
 
 from django.db import IntegrityError
 from django.test import TestCase, RequestFactory
+from django.urls import reverse
 
 from accounts.models import Role, User
 from ai.panel import synthesize_panel_consensus
@@ -92,6 +93,44 @@ class TestFeedbackSubmission(FeedbackBaseTestCase):
         self.assertEqual(fb.score, 75)
         self.assertEqual(fb.notes, 'Strong technical skills.')
         self.assertFalse(FeedbackEditHistory.objects.filter(feedback=fb).exists())
+
+    def test_submit_with_next_redirects_to_origin(self):
+        """?next= (relative) returns the interviewer to their entry point."""
+        self.client.login(username='interviewer1', password='testpass123')
+        resp = self.client.post(
+            f'/feedback/{self.app.pk}/{self.round1.pk}/',
+            data={
+                'score': 75, 'notes': 'x', 'raw_notes': '',
+                'next': '/interviewer-dashboard/',
+            },
+        )
+        self.assertRedirects(resp, '/interviewer-dashboard/', fetch_redirect_response=False)
+
+    def test_submit_with_absolute_next_is_ignored(self):
+        """Open-redirect guard: absolute ?next= falls back to feedback:list."""
+        self.client.login(username='interviewer1', password='testpass123')
+        resp = self.client.post(
+            f'/feedback/{self.app.pk}/{self.round1.pk}/',
+            data={
+                'score': 75, 'notes': 'x', 'raw_notes': '',
+                'next': 'https://evil.example.com/',
+            },
+        )
+        self.assertRedirects(resp, reverse('feedback:list'), fetch_redirect_response=False)
+
+    def test_form_get_renders_next_in_cancel_and_hidden_field(self):
+        self.client.login(username='interviewer1', password='testpass123')
+        resp = self.client.get(
+            f'/feedback/{self.app.pk}/{self.round1.pk}/?next=/interviewer-dashboard/',
+        )
+        self.assertContains(resp, 'name="next" value="/interviewer-dashboard/"')
+        self.assertContains(resp, 'href="/interviewer-dashboard/"')
+
+    def test_form_get_without_next_keeps_default_cancel(self):
+        self.client.login(username='interviewer1', password='testpass123')
+        resp = self.client.get(f'/feedback/{self.app.pk}/{self.round1.pk}/')
+        self.assertNotContains(resp, 'name="next"')
+        self.assertContains(resp, 'href="/feedback/"')
 
     def test_submit_feedback_sets_feedback_submitted(self):
         """Submitting feedback for the current round flips feedback_submitted."""

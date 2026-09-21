@@ -44,4 +44,9 @@ def assess_confidence(parsed, raw_text):
     if full_name and len(full_name.split()) < 2:
         reasons.append('single_word_name')
 
+    # 5. No name at all — the record will be hard to identify in lists and
+    # feedback; HR should confirm identity before acting on it.
+    if not full_name:
+        reasons.append('no_name')
+
     return bool(reasons), reasons

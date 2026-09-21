@@ -1,6 +1,7 @@
 {% if app.ai_fit_summary %}
 <div class="fit-summary" id="fit-summary-{{ app.pk }}">
   <div class="fit-summary-body">{{ app.ai_fit_summary|linebreaks }}</div>
+  {% if not user.is_management %}
   <div class="flex gap-2">
     <button type="button" class="btn btn-ghost btn-sm"
             hx-post="{% url 'candidates:ai_fit' app.pk %}"
@@ -10,10 +11,12 @@
       Regenerate
     </button>
   </div>
+  {% endif %}
 </div>
 {% else %}
 <div class="fit-summary fit-summary--empty" id="fit-summary-{{ app.pk }}">
-  <span class="text-xs text-muted">No AI assessment yet.</span>
+  <span class="text-xs text-muted">No AI assessment yet.{% if user.is_management %} HR or the assigned interviewer can generate one.{% endif %}</span>
+  {% if not user.is_management %}
   <button type="button" class="btn btn-primary btn-sm"
           hx-post="{% url 'candidates:ai_fit' app.pk %}"
           hx-target="#fit-summary-{{ app.pk }}"
@@ -21,5 +24,6 @@
           hx-include="[name='csrfmiddlewaretoken']">
     Generate AI assessment
   </button>
+  {% endif %}
 </div>
 {% endif %}

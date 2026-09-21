@@ -5,7 +5,7 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth import views as auth_views
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import Avg, Count, Q
+from django.db.models import Avg, Count, Prefetch, Q
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
@@ -18,6 +18,7 @@ from accounts.forms import AvailabilityWindowForm, InterviewerProfileForm, Onboa
 from accounts.models import InterviewerAvailability, Role
 
 from candidates.models import Candidate, JobApplication
+from feedback.models import InterviewFeedback
 from jobs.models import InterviewRound, Job
 from pipeline.models import PipelineMove
 
@@ -210,9 +211,13 @@ class HRDashboardView(LoginRequiredMixin, ListView):
         context['active_job_count'] = Job.objects.filter(is_active=True).count()
         context['needs_review_count'] = Candidate.objects.filter(needs_review=True).count()
 
-        # Pipeline stage distribution
+        # Pipeline stage distribution — scoped to ACTIVE jobs to match the
+        # "Active pipeline" KPI subtitle (GAP-004): closed-job applications
+        # are historical data, not an active pipeline, and counting them
+        # made the KPI disagree with every active-job-filtered view.
         stage_counts = dict(
-            JobApplication.objects.values('status')
+            JobApplication.objects.filter(job__is_active=True)
+            .values('status')
             .annotate(count=Count('id'))
             .values_list('status', 'count')
         )
@@ -371,6 +376,10 @@ class HRDashboardView(LoginRequiredMixin, ListView):
                 'job_pks': ','.join(str(pk) for pk in top_role_pks),
                 'distribution': role_distribution,
                 'recommendation': ai_action_demand,
+                'action_url': (
+                    f'{reverse("candidates:list")}'
+                    f'?job={",".join(str(pk) for pk in top_role_pks)}'
+                ),
                 'action_accent': 'blue',
             })
 
@@ -411,6 +420,7 @@ class HRDashboardView(LoginRequiredMixin, ListView):
                 'job_pks': ','.join(str(pk) for pk in best_role['pks']),
                 'reason': 'Most common skills among current candidates',
                 'recommendation': 'Prioritize technical interview scheduling',
+                'action_url': f'{reverse("candidates:list")}?job={best_role["pks"]}',
                 'action_accent': 'violet',
             })
 
@@ -463,6 +473,9 @@ class HRDashboardView(LoginRequiredMixin, ListView):
             'stage_flow': raw_stages,
             'bottleneck': bottleneck_name,
             'recommendation': ai_recommendation_health,
+            # Health recommendations are about evaluation throughput; the
+            # pending-feedback list is the actionable surface for them.
+            'action_url': f'{reverse("feedback:list")}?status=pending',
             'action_accent': 'amber',
         })
 
@@ -506,6 +519,9 @@ class HRDashboardView(LoginRequiredMixin, ListView):
             'condition': risk_condition,
             'inactive_count': stalled_count,
             'recommendation': ai_recommendation_risk,
+            # Risk recommendations are about stalled candidates; the stalled
+            # filter on the candidates list is the actionable surface.
+            'action_url': f'{reverse("candidates:list")}?stalled=1',
             'action_accent': 'green',
         })
 
@@ -629,6 +645,15 @@ class InterviewerDashboardView(LoginRequiredMixin, TemplateView):
             Q(assigned_to=user) | Q(panel_interviewers=user)
         ).distinct().select_related(
             'candidate', 'job', 'current_round'
+        ).prefetch_related(
+            # GAP-010: the dashboard's Feedback cell links to the viewer's
+            # own submitted feedback for edit access; prefetch avoids an
+            # N+1 on the row loop.
+            Prefetch(
+                'feedbacks',
+                queryset=InterviewFeedback.objects.filter(interviewer=user),
+                to_attr='own_feedbacks',
+            )
         )
 
         context['assigned_apps'] = assigned_qs.order_by('interview_at', '-updated_at')[:20]

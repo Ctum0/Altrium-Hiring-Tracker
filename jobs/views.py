@@ -310,6 +310,7 @@ class JobBoardView(LoginRequiredMixin, DetailView):
         context['rejected_apps'] = terminal_apps[JobApplication.Status.REJECTED]
         context['on_hold_apps'] = terminal_apps[JobApplication.Status.ON_HOLD]
         context['is_hr'] = is_hr
+        context['total_apps'] = len(apps)
         return context
 
 

@@ -36,9 +36,22 @@
     </div>
 
     <div class="form-actions">
-      <button type="submit" class="btn btn-primary">Import candidate</button>
+      <button type="submit" class="btn btn-primary" id="import-btn">Import candidate</button>
       <a href="{% url 'candidates:list' %}" class="btn btn-secondary">Cancel</a>
     </div>
   </div>
 </form>
+{% endblock %}
+{% block scripts %}
+<script>
+(function() {
+  var form = document.querySelector('form');
+  var btn = document.getElementById('import-btn');
+  if (!form || !btn) return;
+  form.addEventListener('submit', function() {
+    btn.disabled = true;
+    btn.textContent = 'Extracting details… this can take up to a minute';
+  });
+})();
+</script>
 {% endblock %}

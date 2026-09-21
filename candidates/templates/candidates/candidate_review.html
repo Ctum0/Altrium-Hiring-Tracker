@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load accounts_extras %}
 {% block title %}Review: {{ candidate.full_name }} | Altrium Tracker{% endblock %}
 {% block breadcrumb %}<a class="breadcrumb-link" href="{% url 'candidates:list' %}">Candidates</a><span class="breadcrumb-sep">/</span>{{ candidate.full_name }}{% endblock %}
 {% block page_title %}Review Candidate{% endblock %}
@@ -17,10 +18,7 @@
     {% endif %}
     <div class="text-xs text-muted">
       {% for reason in reasons_list %}
-        {% if reason == 'no_email' %}No email was extracted from the CV.{% endif %}
-        {% if reason == 'low_text_volume' %}Very little text was extracted. The file may be corrupted or image-based.{% endif %}
-        {% if reason == 'name_is_skill_word' %}The extracted "name" matches a technical skill, not a person's name.{% endif %}
-        {% if reason == 'single_word_name' %}Only one name word was extracted, likely incomplete.{% endif %}
+        {{ reason|review_reason_label }}
       {% endfor %}
     </div>
   </div>

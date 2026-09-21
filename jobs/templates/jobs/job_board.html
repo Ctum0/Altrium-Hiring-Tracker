@@ -13,8 +13,22 @@
   </div>
   <div class="page-actions">
     <a href="{% url 'jobs:detail' job.pk %}" class="btn btn-secondary">Table view</a>
+    {% if is_hr and job.is_active %}
+    <a href="{% url 'candidates:upload' %}?job={{ job.pk }}" class="btn btn-primary">Upload CVs</a>
+    {% endif %}
   </div>
 </div>
+
+{% if is_hr and total_apps == 0 %}
+<div class="empty-state" style="margin-bottom:var(--sp-4)">
+  <p class="empty-state-title">No candidates on this board yet</p>
+  <p class="empty-state-body">
+    Upload CVs to fill this pipeline, or share the
+    <a href="{% url 'candidates:public_apply' job.pk %}">public application link</a>
+    so candidates apply directly.
+  </p>
+</div>
+{% endif %}
 
 <div class="kanban-board" id="kanban-board" data-move-url-template="{% url 'pipeline:move' 0 %}">
   <div class="kanban-column panel">
@@ -236,10 +250,8 @@
     closeBtn.addEventListener('click', function() { toast.remove(); });
     toast.appendChild(closeBtn);
     stack.appendChild(toast);
-    setTimeout(function() {
-      toast.style.opacity = '0';
-      setTimeout(function() { toast.remove(); }, 200);
-    }, 5000);
+    // Error toasts persist until dismissed (GAP-008): the message is the
+    // only explanation of a blocked move (e.g. the feedback gate 409).
   }
 })();
 </script>

@@ -1,5 +1,6 @@
 import csv
 from datetime import timedelta
+from datetime import time as dt_time
 
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase, override_settings
@@ -682,6 +683,46 @@ class InterviewerProfileTests(AuthAndRoleTestBase):
         self.assertEqual(r.status_code, 302)
         self.assertIn('/login/', r.url)
 
+    def test_hr_can_edit_matching_profile(self):
+        """GAP regression: matching fields were settable only at onboarding;
+        a misclassified interviewer was permanently invisible in the Assign
+        dropdown with no way to fix the data."""
+        self._build_data()
+        c = Client()
+        assert c.login(username='hr', password='pass12345')
+        r = c.post(
+            reverse('accounts:interviewer_profile', args=[self.interviewer.pk]),
+            {
+                'first_name': 'Pat', 'last_name': 'Person',
+                'specialty': 'Quality Assurance',
+                'seniority': 'lead', 'domain': 'quality_assurance',
+            },
+        )
+        self.assertEqual(r.status_code, 302)
+        self.interviewer.refresh_from_db()
+        self.assertEqual(self.interviewer.domain, 'quality_assurance')
+        self.assertEqual(self.interviewer.seniority, 'lead')
+
+    def test_management_cannot_edit_matching_profile(self):
+        self._build_data()
+        c = Client()
+        assert c.login(username='mgmt', password='pass12345')
+        r = c.post(
+            reverse('accounts:interviewer_profile', args=[self.interviewer.pk]),
+            {'first_name': 'Hacked', 'last_name': 'X', 'specialty': '',
+             'seniority': 'junior', 'domain': 'other'},
+        )
+        self.interviewer.refresh_from_db()
+        self.assertNotEqual(self.interviewer.seniority, 'junior')
+
+    def test_profile_page_renders_edit_form_for_hr(self):
+        self._build_data()
+        c = Client()
+        assert c.login(username='hr', password='pass12345')
+        r = c.get(reverse('accounts:interviewer_profile', args=[self.interviewer.pk]))
+        self.assertContains(r, 'Edit matching profile')
+        self.assertContains(r, 'name="domain"')
+
 
 
 class InterviewerRosterAccessTest(AuthAndRoleTestBase):
@@ -918,6 +959,40 @@ class StagePerformanceTest(AuthAndRoleTestBase):
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.context['stage_performance'], [])
         self.assertContains(r, 'Not enough data yet')
+
+    def test_pending_feedback_count_matches_actionable_definition(self):
+        """GAP regression: the dashboard counted unassigned in-round apps as
+        pending feedback while the Feedback page's Pending tab excluded them,
+        so the two numbers disagreed (dashboard 8, list 2). Both must use the
+        same actionable definition: assigned or panel member attached."""
+        from jobs.models import Job, InterviewRound
+        from candidates.models import Candidate, JobApplication
+
+        job = Job.objects.create(title='Feedback Role', created_by=self.hr)
+        # jobs.signals auto-creates a default 'Screening' round on create.
+        rnd = job.rounds.first()
+        iv = User.objects.create_user(
+            username='iv_fb', password='pass12345', role=Role.INTERVIEWER,
+        )
+        InterviewerAvailability.objects.create(
+            interviewer=iv, weekday=0, start_time=dt_time(9, 0), end_time=dt_time(17, 0),
+        )
+        # Assigned + pending -> counted.
+        c1 = Candidate.objects.create(first_name='A', last_name='One', email='a1@example.com')
+        JobApplication.objects.create(
+            candidate=c1, job=job, status='in_progress', current_round=rnd,
+            assigned_to=iv, feedback_submitted=False,
+        )
+        # Unassigned + pending -> NOT counted (nobody's work).
+        c2 = Candidate.objects.create(first_name='B', last_name='Two', email='b2@example.com')
+        JobApplication.objects.create(
+            candidate=c2, job=job, status='in_progress', current_round=rnd,
+            feedback_submitted=False,
+        )
+
+        c = self._login_hr()
+        r = c.get(reverse('accounts:hr_dashboard'))
+        self.assertEqual(r.context['feedback_pending'], 1)
 
 
 class RetentionReportTest(AuthAndRoleTestBase):

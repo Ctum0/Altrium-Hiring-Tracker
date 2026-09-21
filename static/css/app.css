@@ -2354,6 +2354,20 @@ a:hover {
   align-items: center !important;
 }
 
+/* Pending / needs-attention badge (was used in templates but never defined
+   — GAP-003). Amber, matching the --status-pending token used by the
+   Needs Review KPI and tab. */
+.badge-pending {
+  color: var(--status-pending) !important;
+  background: var(--status-pending-bg) !important;
+  border: 1px solid var(--status-pending) !important;
+  font-size: var(--text-xs) !important;
+  font-weight: 600 !important;
+  padding: 4px 10px !important;
+  border-radius: var(--radius-pill) !important;
+  box-shadow: none !important;
+}
+
 /* Theme-aware badge text contrast (AA on tinted chip fills) */
 .badge-new { color: #5aa8ff !important; }
 .badge-shortlisted { color: #FFB547 !important; }

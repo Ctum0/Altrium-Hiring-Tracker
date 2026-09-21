@@ -83,6 +83,12 @@ AXES_FAILURE_LIMIT = 5
 AXES_COOLOFF_TIME = 1  # hours
 AXES_LOCKOUT_PARAMETERS = ['username', 'ip_address']
 AXES_RESET_ON_SUCCESS = True
+# GAP-007: the default "try again later" hides the configured cooloff from
+# the locked-out user. State the duration so they know when to retry.
+AXES_COOLOFF_MESSAGE = (
+    'Account locked: too many login attempts. '
+    'Please try again in about an hour.'
+)
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',

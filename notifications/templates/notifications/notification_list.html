@@ -15,6 +15,14 @@
       {% csrf_token %}
       <button type="submit" class="btn btn-sm btn-secondary">Mark all read</button>
     </form>
+    {% if page_obj and unread_on_page > 0 %}
+    <form method="post" action="{% url 'notifications:mark_page_read' %}" style="display:inline">
+      {% csrf_token %}
+      <input type="hidden" name="pks" value="{% for n in page_obj %}{% if not n.is_read %}{{ n.pk }}{% if not forloop.last %},{% endif %}{% endif %}{% endfor %}">
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <button type="submit" class="btn btn-sm btn-secondary">Mark this page read ({{ unread_on_page }})</button>
+    </form>
+    {% endif %}
   </div>
 </div>
 

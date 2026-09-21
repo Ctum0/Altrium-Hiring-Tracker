@@ -108,6 +108,9 @@
         <td>
           {% if app.feedback_submitted %}
           <span class="badge badge-hired">Submitted</span>
+          {% if app.own_feedbacks %}
+          <a href="{% url 'feedback:detail' app.own_feedbacks.0.pk %}" class="btn btn-ghost btn-sm" style="margin-left:var(--sp-2)">View feedback</a>
+          {% endif %}
           {% elif app.current_round %}
           <a href="{% url 'feedback:form' app.pk app.current_round.pk %}?next={% url 'accounts:interviewer_dashboard' %}" class="btn btn-primary btn-sm">Give feedback</a>
           {% else %}

@@ -82,7 +82,13 @@ class Candidate(models.Model):
     def full_name(self):
         if self.first_name or self.last_name:
             return f'{self.first_name} {self.last_name}'.strip()
-        return 'Unknown name'
+        if self.email:
+            # Email local-part reads as an identity the HR can act on
+            # ("bob.dupcheck") rather than a system failure ("Unknown name").
+            local_part = self.email.split('@', 1)[0].replace('.', ' ').strip()
+            if local_part:
+                return local_part.title()
+        return 'Unnamed candidate'
 
     @property
     def skills_list(self):

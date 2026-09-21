@@ -8,6 +8,8 @@ NEVER break or return empty results.
 import json
 import logging
 import re
+import threading
+import time
 
 import httpx
 from django.conf import settings
@@ -16,8 +18,65 @@ logger = logging.getLogger(__name__)
 
 GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions'
 
-# Reused HTTP client with keep-alive
-_client = httpx.Client(timeout=12.0)
+# Reused HTTP client. 8s bounds the worst-case per-call stall so a dead AI
+# backend never turns an upload into a 30s+ freeze; the local fallback
+# engine answers in milliseconds after the timeout.
+_client = httpx.Client(timeout=8.0)
+
+# Circuit breaker: when the remote AI fails repeatedly (dead endpoint, bad
+# model id, expired key), stop paying the connection timeout on every call.
+# After _BREAKER_THRESHOLD consecutive failures, remote calls are skipped
+# for _BREAKER_COOLDOWN_SECONDS and the local fallback answers instantly.
+# Any success resets the counter. Process-local; conservative on purpose.
+_BREAKER_THRESHOLD = 3
+_BREAKER_COOLDOWN_SECONDS = 300
+_breaker_lock = threading.Lock()
+_breaker_failures = 0
+_breaker_open_until = 0.0
+_breaker_probe_inflight = False
+
+
+def _breaker_open() -> bool:
+    """True when the remote AI is known-bad and calls should be skipped."""
+    with _breaker_lock:
+        return time.monotonic() < _breaker_open_until
+
+
+def _acquire_probe_or_skip() -> bool:
+    """Decide what this call should do while the breaker is open.
+
+    Returns True when the caller may proceed with a real probe request
+    (half-open: one in-flight probe at a time), False when it must fall
+    back immediately.
+    """
+    global _breaker_probe_inflight
+    with _breaker_lock:
+        if not _breaker_probe_inflight:
+            _breaker_probe_inflight = True
+            return True
+        return False
+
+
+def _record_ai_success():
+    global _breaker_failures, _breaker_open_until, _breaker_probe_inflight
+    with _breaker_lock:
+        _breaker_failures = 0
+        _breaker_open_until = 0.0
+        _breaker_probe_inflight = False
+
+
+def _record_ai_failure():
+    global _breaker_failures, _breaker_open_until, _breaker_probe_inflight
+    with _breaker_lock:
+        _breaker_probe_inflight = False
+        _breaker_failures += 1
+        if _breaker_failures >= _BREAKER_THRESHOLD:
+            _breaker_open_until = time.monotonic() + _BREAKER_COOLDOWN_SECONDS
+            logger.warning(
+                'AI circuit breaker OPEN for %ss after %s consecutive failures; '
+                'local fallback will be used until then.',
+                _BREAKER_COOLDOWN_SECONDS, _breaker_failures,
+            )
 
 SYSTEM_PARSE = (
     'You extract structured data from resume text. '
@@ -276,6 +335,9 @@ def _chat(system: str, user: str, temperature: float = 0.2) -> str:
         logger.warning('GROQ_API_KEY is not set; skipping remote AI call.')
         return ''
 
+    if _breaker_open() and not _acquire_probe_or_skip():
+        return ''
+
     try:
         resp = _client.post(
             GROQ_API_URL,
@@ -291,8 +353,11 @@ def _chat(system: str, user: str, temperature: float = 0.2) -> str:
         )
         resp.raise_for_status()
         data = resp.json()
-        return data['choices'][0]['message']['content'].strip()
+        content = data['choices'][0]['message']['content'].strip()
+        _record_ai_success()
+        return content
     except Exception as exc:  # network, auth (403), rate limit, malformed response
+        _record_ai_failure()
         logger.warning('Groq request failed (%s); switching to local fallback engine.', exc)
         return ''
 

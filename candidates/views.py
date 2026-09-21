@@ -75,11 +75,26 @@ class CandidateListView(LoginRequiredMixin, ListView):
         show_all = self.request.GET.get('all') == '1'
         q = self.request.GET.get('q', '').strip()
         needs_review = self.request.GET.get('needs_review') == '1'
+        # ?active_jobs=1 scopes to applications on active jobs — used by the
+        # dashboard "Total Applications / Active pipeline" KPI deep link so
+        # the list shows exactly the population the KPI counts (GAP-004).
+        active_jobs_only = self.request.GET.get('active_jobs') == '1'
+        # ?stalled=1 shows applications idle in their stage > 7 days — the
+        # dashboard Risk Monitor card's action target (GAP-005).
+        stalled_only = self.request.GET.get('stalled') == '1'
 
         # Default: show only active candidates (exclude hired and rejected),
         # unless explicitly showing all or filtering by a final status.
         if not show_all and stage not in ('hired', 'rejected'):
             qs = qs.exclude(status__in=['hired', 'rejected'])
+
+        if active_jobs_only:
+            qs = qs.filter(job__is_active=True)
+
+        if stalled_only:
+            qs = qs.filter(
+                stage_entered_at__lt=timezone.now() - timedelta(days=7),
+            ).exclude(status__in=['hired', 'rejected'])
 
         if needs_review:
             qs = qs.filter(candidate__needs_review=True)
@@ -304,7 +319,10 @@ class CandidateUploadView(LoginRequiredMixin, View):
                 'unreadable or corrupted; the rest were processed.',
             )
         messages.success(request, summary)
-        return redirect('candidates:list')
+        # Keep the job context the user arrived with (?job=<pk> preselected
+        # the form): land on the list already filtered to that job so the
+        # fresh cohort is immediately visible (GAP-006).
+        return redirect(f'{reverse("candidates:list")}?job={job.pk}')
 
 
 class PublicApplyView(View):

@@ -56,6 +56,9 @@ class NotificationListView(LoginRequiredMixin, ListView):
                 label = day.strftime('%B %d, %Y')
             groups.append({'label': label, 'items': list(items)})
         context['notification_groups'] = groups
+        context['unread_on_page'] = sum(
+            1 for n in context['notifications'] if not n.is_read
+        )
         return context
 
 
@@ -88,3 +91,19 @@ class MarkAllReadView(LoginRequiredMixin, View):
             recipient=request.user, is_read=False,
         ).update(is_read=True)
         return redirect('notifications:list')
+
+
+class MarkPageReadView(LoginRequiredMixin, View):
+    """Mark the unread notifications currently shown on one list page as
+    read. Triage-sized alternative to mark-all: page through the backlog
+    and clear what you've seen without nuking the rest."""
+
+    def post(self, request):
+        pks = request.POST.get('pks', '')
+        # Only integers, comma-separated; ignore anything else.
+        ids = [p.strip() for p in pks.split(',') if p.strip().isdigit()]
+        if ids:
+            Notification.objects.filter(
+                recipient=request.user, is_read=False, pk__in=ids,
+            ).update(is_read=True)
+        return redirect(request.POST.get('next') or 'notifications:list')

@@ -199,6 +199,43 @@ class AssignmentTests(CandidatesBaseTestCase):
         self.assertIsNone(self.application.assigned_to)
 
 
+class AssignDropdownContinuityTests(CandidatesBaseTestCase):
+    """GAP regression: the Assign dropdown rendered empty with no
+    explanation when no interviewer passed the eligibility rules, dead-ending
+    the assign workflow. The template must render an explanatory note with a
+    link to the Interviewers roster when the eligible list is empty."""
+
+    def test_candidate_detail_shows_guidance_when_no_eligible_interviewer(self):
+        # Base interviewer is eligible (mid, generalist); make the job
+        # impossible to staff: seniority no interviewer meets.
+        self.job.seniority = 'lead'
+        self.job.save()
+        self.login('hr')
+        r = self.client.get(reverse('candidates:detail', args=[self.candidate.pk]))
+        self.assertContains(r, 'No interviewer matches this role')
+        self.assertContains(r, 'interviewer-roster')
+
+    def test_candidate_detail_no_guidance_when_eligible_interviewer_exists(self):
+        self.login('hr')
+        r = self.client.get(reverse('candidates:detail', args=[self.candidate.pk]))
+        self.assertNotContains(r, 'No interviewer matches this role')
+
+
+class UploadPreselectTests(CandidatesBaseTestCase):
+    """GAP regression: job detail had no intake CTA; the upload page now
+    accepts ?job= to preselect the position the HR came from."""
+
+    def test_upload_preselects_job_from_query_param(self):
+        self.login('hr')
+        r = self.client.get(reverse('candidates:upload'), {'job': self.job.pk})
+        self.assertContains(r, '<option value="%s" selected' % self.job.pk)
+
+    def test_upload_defaults_to_placeholder_without_param(self):
+        self.login('hr')
+        r = self.client.get(reverse('candidates:upload'))
+        self.assertNotContains(r, '<option value="%s" selected' % self.job.pk)
+
+
 class UploadTests(CandidatesBaseTestCase):
     def _docx_file(self, name='cv.docx'):
         from docx import Document

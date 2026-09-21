@@ -99,7 +99,20 @@
       <tbody>
         {% for round in rounds %}
         <tr>
-          <td class="mono">{{ round.order }}</td>
+          <td>
+            {% if can_edit %}
+            <form method="post" action="{% url 'jobs:round_reorder' job.pk %}" style="display:flex;gap:var(--sp-2);align-items:center">
+              {% csrf_token %}
+              <input type="hidden" name="next" value="{% url 'jobs:detail' job.pk %}">
+              <input type="number" name="order_{{ round.pk }}" value="{{ round.order }}" min="1" class="form-input" style="width:80px" aria-label="Order for {{ round.name }}">
+              <button type="submit" class="btn-ghost btn-icon" title="Save order" aria-label="Save order for {{ round.name }}">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+              </button>
+            </form>
+            {% else %}
+            <span class="mono">{{ round.order }}</span>
+            {% endif %}
+          </td>
           <td class="strong">
             {{ round.name }}
             {% if round.is_final %}<span class="badge badge-hold" style="margin-left:var(--sp-2)">Final</span>{% endif %}

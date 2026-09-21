@@ -77,6 +77,50 @@ class NotificationTests(TestCase):
         r = self.client.get(reverse('notifications:list'))
         self.assertEqual(r.status_code, 302)
 
+    def test_mark_page_read_marks_only_listed_pks(self):
+        """GAP regression: the backlog only offered all-or-nothing 'mark all
+        read'. Page-scoped clearing lets HR triage the list page by page."""
+        mine = [
+            Notification.objects.create(recipient=self.iv1, message=f'm{i}')
+            for i in range(3)
+        ]
+        other = Notification.objects.create(recipient=self.iv2, message='theirs')
+        assert self.client.login(username='iv1', password='pass12345')
+        pks = ','.join(str(n.pk) for n in mine[:2])  # only 2 of my 3
+        r = self.client.post(
+            reverse('notifications:mark_page_read'),
+            {'pks': pks, 'next': '/notifications/'},
+        )
+        self.assertEqual(r.status_code, 302)
+        mine[0].refresh_from_db(); mine[1].refresh_from_db(); mine[2].refresh_from_db()
+        other.refresh_from_db()
+        self.assertTrue(mine[0].is_read)
+        self.assertTrue(mine[1].is_read)
+        self.assertFalse(mine[2].is_read)   # not on the page -> untouched
+        self.assertFalse(other.is_read)     # someone else's -> untouched
+
+    def test_mark_page_read_ignores_garbage_input(self):
+        Notification.objects.create(recipient=self.iv1, message='keep unread')
+        assert self.client.login(username='iv1', password='pass12345')
+        r = self.client.post(
+            reverse('notifications:mark_page_read'),
+            {'pks': 'abc,1;DROP,  ,x9', 'next': '/notifications/'},
+        )
+        self.assertEqual(r.status_code, 302)
+        n = Notification.objects.get(recipient=self.iv1)
+        self.assertFalse(n.is_read)
+
+    def test_mark_page_read_requires_ownership(self):
+        """PKs belonging to another user are silently ignored."""
+        theirs = Notification.objects.create(recipient=self.iv2, message='theirs')
+        assert self.client.login(username='iv1', password='pass12345')
+        self.client.post(
+            reverse('notifications:mark_page_read'),
+            {'pks': str(theirs.pk), 'next': '/notifications/'},
+        )
+        theirs.refresh_from_db()
+        self.assertFalse(theirs.is_read)
+
 
 class MailAndSchedulerTests(TestCase):
     """Mail foundation (send_templated_email + templates) and the dry-run

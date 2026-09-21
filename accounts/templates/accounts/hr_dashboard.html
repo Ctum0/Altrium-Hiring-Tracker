@@ -29,7 +29,7 @@
 <!-- Vision UI KPI Cards Row -->
 <div class="ref-kpi-row">
 
-  <a href="{% url 'candidates:list' %}" class="ref-kpi-card glass-panel vui-card vui-card-hover kpi-card-link">
+  <a href="{% url 'candidates:list' %}?active_jobs=1&all=1" class="ref-kpi-card glass-panel vui-card vui-card-hover kpi-card-link">
     <div class="ref-kpi-meta">
       <span class="ref-kpi-label">Total Applications</span>
       <span class="ref-kpi-value">{{ total_applications }}</span>
@@ -265,7 +265,7 @@
             </div>
           </div>          <!-- Action Line -->
           <div class="ai-card-action ai-action-blue">
-            <span class="ai-action-lbl">Action:</span> <a href="{% url 'candidates:list' %}?job={{ insight.job_pks }}" class="ai-action-link">{{ insight.recommendation }} &rarr;</a>
+            <span class="ai-action-lbl">Action:</span> <a href="{{ insight.action_url }}" class="ai-action-link">{{ insight.recommendation }} &rarr;</a>
           </div>
 
           {% elif insight.id == 'best_fit' %}
@@ -303,7 +303,7 @@
 
           <!-- Action Line -->
           <div class="ai-card-action ai-action-violet">
-            <span class="ai-action-lbl">Action:</span> <a href="{% url 'candidates:list' %}?job={{ insight.job_pks }}" class="ai-action-link">{{ insight.recommendation }} &rarr;</a>
+            <span class="ai-action-lbl">Action:</span> <a href="{{ insight.action_url }}" class="ai-action-link">{{ insight.recommendation }} &rarr;</a>
           </div>
 
           {% elif insight.id == 'health' %}
@@ -345,7 +345,7 @@
 
           <!-- Action Line -->
           <div class="ai-card-action ai-action-amber">
-            <span class="ai-action-lbl">Action:</span> <a href="{% url 'feedback:list' %}?status=pending" class="ai-action-link">{{ insight.recommendation }} &rarr;</a>
+            <span class="ai-action-lbl">Action:</span> <a href="{{ insight.action_url }}" class="ai-action-link">{{ insight.recommendation }} &rarr;</a>
           </div>
 
           {% elif insight.id == 'risk' %}
@@ -381,7 +381,7 @@
 
           <!-- Action Line -->
           <div class="ai-card-action ai-action-green">
-            <span class="ai-action-lbl">Action:</span> <a href="{% url 'feedback:list' %}?status=pending" class="ai-action-link">{{ insight.recommendation }} &rarr;</a>
+            <span class="ai-action-lbl">Action:</span> <a href="{{ insight.action_url }}" class="ai-action-link">{{ insight.recommendation }} &rarr;</a>
           </div>
 
           {% endif %}

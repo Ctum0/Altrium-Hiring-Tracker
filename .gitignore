@@ -41,6 +41,7 @@ requirements-dev.txt
 .artifacts/
 .impeccable/
 .zcode/
+.omp/
 
 # Node (toolkit deps for playwright a11y audits)
 node_modules/

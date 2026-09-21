@@ -356,10 +356,10 @@
     closeBtn.addEventListener('click', function() { toast.remove(); });
     toast.appendChild(closeBtn);
     stack.appendChild(toast);
-    setTimeout(function() {
-      toast.style.opacity = '0';
-      setTimeout(function() { toast.remove(); }, 200);
-    }, 5000);
+    // Error toasts persist until dismissed (GAP-008): the message is the
+    // only explanation of a blocked action (e.g. the feedback gate 409),
+    // so it must not evaporate on a timer. Success/info alerts elsewhere
+    // keep their 5s auto-dismiss.
   }
 
   // Message auto-dismiss for success/info alerts (5s)
