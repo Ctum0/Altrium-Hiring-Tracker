@@ -114,6 +114,20 @@
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           <input type="search" id="topbar-search-input" name="q" placeholder="Search candidates..." aria-label="Search candidates" autocomplete="off">
         </form>
+        <script>
+        // Mirror the page's active search term into the topbar box so the
+        // query survives back/forward navigation (the page-level filter box
+        // already restores it; the topbar previously reset to empty).
+        (function() {
+          var input = document.getElementById('topbar-search-input');
+          if (!input) return;
+          var params = new URLSearchParams(window.location.search);
+          var q = params.get('q');
+          if (q && window.location.pathname === '{% url 'candidates:list' %}') {
+            input.value = q;
+          }
+        })();
+        </script>
       </div>
       <div class="topbar-actions">
         {% include 'includes/theme_toggle.html' %}

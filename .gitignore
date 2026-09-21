@@ -41,7 +41,11 @@ requirements-dev.txt
 .artifacts/
 .impeccable/
 .zcode/
-.omp/
+# omp machine config stays local (MCP endpoints are environment-specific);
+# the project's omp skills are versioned with the repo.
+.omp/*
+!.omp/skills/
+
 
 # Node (toolkit deps for playwright a11y audits)
 node_modules/

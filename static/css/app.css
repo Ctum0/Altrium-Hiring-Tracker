@@ -292,17 +292,17 @@
   --status-shortlisted-bg: rgba(217, 119, 6, 0.14);
   --status-progress: #4f52d6;
   --status-progress-bg: rgba(99, 102, 241, 0.14);
-  --status-hired: #04815a;
+  --status-hired: #036447;  /* darkened from #04815a: 4.03:1 -> ~5.2:1 on its tinted bg (WCAG AA small text) */
   --status-hired-bg: rgba(5, 150, 105, 0.14);
   --status-rejected: #DC2626;
   --status-rejected-bg: rgba(220, 38, 38, 0.14);
   --status-hold: #3E5C7B;
   --status-hold-bg: rgba(62, 92, 123, 0.14);
-  --status-pending: #a35605;
+  --status-pending: #8a4a04;  /* darkened from #a35605: 4.18:1 -> ~5.3:1 on its tinted bg (WCAG AA small text) */
   --status-pending-bg: rgba(217, 119, 6, 0.14);
 
-  --danger: #DC2626;
-  --danger-hover: #B91C1C;
+  --danger: #B91C1C;  /* darkened from #DC2626: 4.3:1 -> ~5.9:1 on light surfaces (WCAG AA small text) */
+  --danger-hover: #991B1B;
   --danger-soft: rgba(220, 38, 38, 0.14);
   --danger-solid: #DC2626;
   --danger-solid-hover: #B91C1C;
@@ -4173,7 +4173,7 @@ body.no-scroll {
   border: 2.5px solid;
 }
 .score-ring-high { color: var(--status-hired); border-color: var(--status-hired); background: var(--status-hired-bg); }
-.score-ring-mid { color: var(--vui-warning-orange); border-color: var(--vui-warning-orange); background: var(--accent-amber-soft); }
+.score-ring-mid { color: var(--status-pending); border-color: var(--status-pending); background: var(--status-pending-bg); }
 .score-ring-low { color: var(--status-rejected); border-color: var(--status-rejected); background: var(--danger-soft); }
 .score-ring-none { color: var(--muted); border-color: var(--border-strong); background: transparent; font-size: var(--text-micro); }
 
@@ -4503,6 +4503,28 @@ body.no-scroll {
 .kanban-empty {
   padding: var(--sp-3) var(--sp-1);
   text-align: center;
+}
+/* Keyboard move menu (a11y): Enter/Space on a focused card lists the
+   destination columns; mirrors the drag drop contract. */
+.kanban-kb-menu {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: var(--sp-4);
+  min-width: 240px;
+  max-width: 320px;
+  box-shadow: var(--shadow-md);
+}
+.kanban-kb-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  max-height: 50vh;
+  overflow-y: auto;
+}
+.kanban-kb-options .btn {
+  justify-content: flex-start;
+  width: 100%;
 }
 .kanban-card {
   background: var(--surface);

@@ -14,14 +14,14 @@
       </span>
       <span class="app-summary-meta">
         {% if app.feedback_submitted %}
-        <span class="badge badge-feedback">Feedback Submitted</span>
+        <span class="badge badge-hired">Feedback Submitted</span>
         {% elif app.current_round %}
-        <span class="badge badge-feedback">Feedback Pending</span>
+        <span class="badge badge-pending">Feedback Pending</span>
         {% endif %}
         {% if app.shortlist_score is not None %}
         <span class="badge badge-in_progress" title="Auto-score vs. this job's requirements">Match: {{ app.shortlist_score }}/100</span>
         {% elif app.job.requirements.strip %}
-        <span class="badge badge-feedback" title="No auto-score yet (candidate skills not parsed)">Match pending</span>
+        <span class="badge badge-secondary" title="No auto-score yet (candidate skills not parsed)">Match pending</span>
         {% endif %}
       </span>
     </summary>

@@ -374,14 +374,17 @@ def _fallback_parse_cv(text: str) -> dict:
         result['email'] = email_match.group(0).lower()
 
     # 2. Extract Phone
-    phone_match = re.search(r'(?:\+?\d{1,4}[-.\s]?)?\(?\d{2,4}\)?[-.\s]?\d{3,4}[-.\s]?\d{3,4}', text)
+    phone_match = re.search(
+        r'(?:\+?\d{1,4}[-.\s]?)?\(?\d{2,4}\)?[-.\s]?\d{3,4}[-.\s]?\d{3,4}', text,
+    )
     if phone_match and len(re.sub(r'\D', '', phone_match.group(0))) >= 7:
         result['phone'] = phone_match.group(0).strip()
 
     # 3. Extract Name from top lines
     lines = [line.strip() for line in text.splitlines() if line.strip()]
+    _noise_markers = ('http', 'resume', 'curriculum', 'page')
     for line in lines[:6]:
-        if '@' in line or 'http' in line.lower() or 'resume' in line.lower() or 'curriculum' in line.lower() or 'page' in line.lower():
+        if '@' in line or any(m in line.lower() for m in _noise_markers):
             continue
         words = [w for w in line.split() if w.isalpha() and len(w) > 1]
         if 1 <= len(words) <= 3:
@@ -487,9 +490,14 @@ def fit_summary(candidate_skills: str, job_title: str, requirements: str) -> str
     matched = [s for s in r_skills if s in c_skills]
     missing = [s for s in r_skills if s not in c_skills]
 
-    strengths = [f'- Demonstrated proficiency in {s.title()}.' for s in matched] or ['- General candidate background matches position domain.']
-    gaps = [f'- Needs evaluation for {s.title()} requirement.' for s in missing] or ['- No critical skill gaps identified from profile.']
-    focus = [f'- Evaluate practical experience with {s.title()}.' for s in (missing[:2] or r_skills[:2] or ['core job requirements'])]
+    strengths = [f'- Demonstrated proficiency in {s.title()}.' for s in matched] or [
+        '- General candidate background matches position domain.',
+    ]
+    gaps = [f'- Needs evaluation for {s.title()} requirement.' for s in missing] or [
+        '- No critical skill gaps identified from profile.',
+    ]
+    focus_seed = missing[:2] or r_skills[:2] or ['core job requirements']
+    focus = [f'- Evaluate practical experience with {s.title()}.' for s in focus_seed]
 
     return (
         "Strengths\n" + '\n'.join(strengths) + "\n\n" +

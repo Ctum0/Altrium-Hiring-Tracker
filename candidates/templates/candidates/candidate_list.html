@@ -64,8 +64,8 @@
         <label class="form-label" for="job">Position</label>
         <select class="form-select" id="job" name="job">
           <option value="">All positions</option>
-          {% for job_id, job_title in jobs %}
-          <option value="{{ job_id }}" {% if filter_job == job_id|stringformat:'s' %}selected{% endif %}>{{ job_title }}</option>
+          {% for job_id, job_title, job_active in jobs %}
+          <option value="{{ job_id }}" {% if filter_job == job_id|stringformat:'s' %}selected{% endif %}>{{ job_title }}{% if not job_active %} (closed){% endif %}</option>
           {% endfor %}
         </select>
       </div>

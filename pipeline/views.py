@@ -7,8 +7,8 @@ from django.views import View
 
 from candidates.models import JobApplication
 from candidates.views import workload_context  # noqa: F401 (re-exported import kept)
-from notifications.mail import send_candidate_email, send_rejection_email
 from jobs.models import InterviewRound
+from notifications.mail import send_candidate_email, send_rejection_email
 
 from .models import PipelineMove
 

@@ -1,5 +1,4 @@
 import re
-
 from datetime import datetime, timedelta
 
 from django.conf import settings
@@ -15,24 +14,21 @@ from django.utils import timezone
 from django.views import View
 from django.views.generic import DetailView, ListView
 
-from ai.services import fit_summary, parse_cv
 from ai.matching import auto_apply, job_fit
-
+from ai.services import fit_summary, parse_cv
+from jobs.models import Job
 from notifications.mail import send_candidate_email
+from notifications.models import Notification
 
 from .dedup import find_fuzzy_match
+from .forms import CandidateImportForm
 from .intake import ingest_cv
 from .intake_rules import (
     apply_auto_reject,
     recompute_after_review,
     should_hold_for_review,
 )
-
-from .forms import CandidateImportForm
 from .models import Candidate, JobApplication
-from jobs.models import Job
-from notifications.models import Notification
-
 
 User = get_user_model()
 
@@ -154,8 +150,13 @@ class CandidateListView(LoginRequiredMixin, ListView):
             or context['filter_stage'] or context['filter_min_score']
             or context['show_all']
         )
+        # Position dropdown: include closed jobs (marked) so deep links from
+        # closed-job contexts (retention report, talent pool) can be reflected
+        # and re-applied — closed-job data is searchable by design (GAP-012).
         context['jobs'] = (
-            Job.objects.filter(is_active=True).values_list('id', 'title').distinct()
+            Job.objects.order_by('-is_active', 'title')
+            .values_list('id', 'title', 'is_active')
+            .distinct()
         )
         context['stages'] = JobApplication.Status.choices
         context['is_hr'] = self.request.user.is_hr()

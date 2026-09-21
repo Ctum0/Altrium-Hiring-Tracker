@@ -63,7 +63,6 @@ def compute_score(candidate: Candidate, job: Job) -> int:
     candidate_skills = _parse_skills(candidate.skills)
     if not candidate_skills:
         return 0
-    haystack = ' '.join(candidate_skills)
     matched = sum(1 for req in required if _skill_matched(req, candidate_skills))
 
     return int((matched / len(required)) * 100 + 0.5)

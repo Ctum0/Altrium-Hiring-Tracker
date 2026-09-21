@@ -75,7 +75,7 @@ class JobCreateView(LoginRequiredMixin, CreateView):
 
     def form_valid(self, form):
         form.instance.created_by = self.request.user
-        response = super().form_valid(form)
+        super().form_valid(form)
         messages.success(self.request, f'Job "{form.instance.title}" created.')
         return redirect('jobs:rounds_setup', pk=form.instance.pk)
 
@@ -137,6 +137,8 @@ class JobCloseView(LoginRequiredMixin, View):
             # this loop should move to the async wrapper
             # (send_templated_email_async) / a queue.
             emailed = set()
+            emailed_count = 0
+            failed_count = 0
             for app in (
                 job.applications.select_related('candidate')
                 .exclude(status=JobApplication.Status.HIRED)
@@ -152,12 +154,36 @@ class JobCloseView(LoginRequiredMixin, View):
                         {'job_title': job.title},
                         candidate,
                     )
+                    emailed_count += 1
                 except Exception:
+                    failed_count += 1
                     logging.getLogger(__name__).exception(
                         'Closure rejection email failed for candidate %s '
                         '(job %s); closure succeeded.',
                         candidate.pk, job.pk,
                     )
+            if failed_count:
+                messages.error(
+                    request,
+                    f'{failed_count} rejection email(s) could not be sent '
+                    f'due to a mail-service problem. The candidates are not '
+                    f'lost — they stay in this job\'s pipeline and can be '
+                    f'notified individually.',
+                )
+            if emailed_count:
+                messages.success(
+                    request,
+                    f'Job "{job.title}" closed. Existing candidates are '
+                    f'unchanged; {emailed_count} active candidate(s) were '
+                    f'emailed rejection notices.',
+                )
+            elif not failed_count:
+                messages.success(
+                    request,
+                    f'Job "{job.title}" closed. Existing candidates are '
+                    f'unchanged; no active candidates needed a rejection '
+                    f'notice.',
+                )
             return redirect('jobs:detail', pk=job.pk)
         else:
             messages.info(request, f'Job "{job.title}" is already closed.')
@@ -412,7 +438,9 @@ class RoundReorderView(LoginRequiredMixin, View):
     @staticmethod
     def _safe_next(request):
         next_url = request.POST.get('next')
-        if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
+        if next_url and url_has_allowed_host_and_scheme(
+            next_url, allowed_hosts={request.get_host()},
+        ):
             return next_url
         return None
 
@@ -462,7 +490,9 @@ class RoundCreateView(LoginRequiredMixin, CreateView):
 
     def get_success_url(self):
         next_url = self.request.POST.get('next')
-        if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={self.request.get_host()}):
+        if next_url and url_has_allowed_host_and_scheme(
+            next_url, allowed_hosts={self.request.get_host()},
+        ):
             return next_url
         return reverse('jobs:detail', kwargs={'pk': self.object.job_id})
 
@@ -497,6 +527,8 @@ class RoundDeleteView(LoginRequiredMixin, DeleteView):
 
     def get_success_url(self):
         next_url = self.request.POST.get('next')
-        if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={self.request.get_host()}):
+        if next_url and url_has_allowed_host_and_scheme(
+            next_url, allowed_hosts={self.request.get_host()},
+        ):
             return next_url
         return reverse('jobs:detail', kwargs={'pk': self.object.job_id})

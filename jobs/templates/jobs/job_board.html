@@ -125,6 +125,110 @@
     return urlTemplate.replace(/\/0\/$/, '/' + appId + '/');
   }
 
+  // ---- Keyboard move (a11y): Enter/Space on a focused card opens a menu
+  // of destination columns; confirming performs the same POST as a drag.
+  var kbDialog = null;
+  var kbCard = null;
+  var kbSourceBody = null;
+
+  function columnTargets() {
+    return Array.prototype.map.call(
+      board.querySelectorAll('.kanban-column-body[data-stage]'),
+      function(body) {
+        return {
+          stage: body.dataset.stage,
+          label: body.closest('.kanban-column').querySelector('h3').textContent.trim(),
+          body: body,
+        };
+      }
+    );
+  }
+
+  function openKeyboardMenu(card) {
+    if (!card.hasAttribute('draggable')) return;  // terminal states are not movable
+    kbCard = card;
+    kbSourceBody = card.closest('.kanban-column-body');
+    if (!kbDialog) {
+      kbDialog = document.createElement('dialog');
+      kbDialog.className = 'kanban-kb-menu';
+      kbDialog.innerHTML =
+        '<form method="dialog">' +
+        '<h3 class="text-sm strong" style="margin:0 0 var(--sp-3)">Move candidate to…</h3>' +
+        '<div class="kanban-kb-options"></div>' +
+        '<div class="flex gap-2" style="margin-top:var(--sp-4)">' +
+        '<button type="button" class="btn btn-secondary btn-sm" data-kb-cancel>Cancel</button>' +
+        '</div></form>';
+      document.body.appendChild(kbDialog);
+      kbDialog.querySelector('[data-kb-cancel]').addEventListener('click', function() { kbDialog.close(); });
+      kbDialog.addEventListener('close', function() { kbCard = null; kbSourceBody = null; });
+    }
+    var list = kbDialog.querySelector('.kanban-kb-options');
+    list.innerHTML = '';
+    var currentStage = kbSourceBody ? kbSourceBody.dataset.stage : '';
+    columnTargets().forEach(function(target) {
+      if (target.stage === currentStage) return;  // same column = no-op
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn btn-secondary btn-sm kanban-kb-option';
+      btn.textContent = target.label;
+      btn.addEventListener('click', function() {
+        // Capture the card BEFORE close(): the dialog's close handler nulls
+        // kbCard/kbSourceBody, and close() fires that event synchronously.
+        var card = kbCard;
+        var sourceBody = kbSourceBody;
+        kbDialog.close();
+        performMove(card, sourceBody, target.body);
+      });
+      list.appendChild(btn);
+    });
+    kbDialog.showModal();
+  }
+
+  function performMove(card, sourceBody, columnBody) {
+    var appId = card.dataset.appId;
+    var stage = columnBody.dataset.stage;
+    var body = new URLSearchParams();
+    body.set('stage', stage);
+    body.set('source', 'board');
+    fetch(moveUrl(appId), {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': csrfToken,
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+      body: body,
+    }).then(function(resp) {
+      if (resp.ok) {
+        clearEmptyMessage(columnBody);
+        columnBody.appendChild(card);
+        updateCount(sourceBody, -1);
+        updateCount(columnBody, 1);
+        maybeShowEmptyMessage(sourceBody);
+        if (stage.indexOf('status:') === 0) {
+          card.removeAttribute('draggable');
+        }
+        card.focus();
+        return;
+      }
+      return resp.text().then(function(text) {
+        showBoardToast(text && text.indexOf('<') !== 0 ? text : ('Request failed (' + resp.status + ').'));
+      });
+    }).catch(function() {
+      showBoardToast('Network error - check your connection and retry.');
+    });
+  }
+
+  board.addEventListener('keydown', function(e) {
+    var card = e.target.closest('.kanban-card');
+    if (!card) return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      // Let links inside the card keep their native activation.
+      if (e.target.closest('a')) return;
+      e.preventDefault();
+      openKeyboardMenu(card);
+    }
+  });
+
   function updateCount(columnBody, delta) {
     var column = columnBody.closest('.kanban-column');
     if (!column) return;
@@ -194,42 +298,8 @@
     if (!card || !sourceBody) return;
     if (sourceBody === columnBody) return;
 
-    var appId = card.dataset.appId;
-    var stage = columnBody.dataset.stage;
-    var body = new URLSearchParams();
-    body.set('stage', stage);
-    body.set('source', 'board');
-
-    // The card is left in its current column until the server confirms the
-    // move: this is the exact same feedback-gate/RBAC endpoint the
-    // candidate list's stage-select dropdown posts to (pipeline:move), so
-    // an illegal move (e.g. missing feedback) never has to be visually
-    // "undone" - it simply never left.
-    fetch(moveUrl(appId), {
-      method: 'POST',
-      headers: {
-        'X-CSRFToken': csrfToken,
-        'X-Requested-With': 'XMLHttpRequest',
-      },
-      body: body,
-    }).then(function(resp) {
-      if (resp.ok) {
-        clearEmptyMessage(columnBody);
-        columnBody.appendChild(card);
-        updateCount(sourceBody, -1);
-        updateCount(columnBody, 1);
-        maybeShowEmptyMessage(sourceBody);
-        if (stage.indexOf('status:') === 0) {
-          card.removeAttribute('draggable');
-        }
-        return;
-      }
-      return resp.text().then(function(text) {
-        showBoardToast(text && text.indexOf('<') !== 0 ? text : ('Request failed (' + resp.status + ').'));
-      });
-    }).catch(function() {
-      showBoardToast('Network error - check your connection and retry.');
-    });
+    // Same POST path as the keyboard menu (single move implementation).
+    performMove(card, sourceBody, columnBody);
   });
 
   function showBoardToast(message) {

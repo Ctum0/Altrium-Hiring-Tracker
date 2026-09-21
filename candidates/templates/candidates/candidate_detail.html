@@ -86,7 +86,7 @@
       <div class="cd-profile-grid">
         {% if candidate.extracted_education %}
         <div class="cd-inset-panel">
-          <h3 class="section-label">Education</h3>
+          <h2 class="section-label">Education</h2>
           <ul class="cd-fact-list">
             {% for edu in candidate.extracted_education %}
             <li>{{ edu }}</li>
@@ -97,7 +97,7 @@
 
         {% if candidate.extracted_highlights %}
         <div class="cd-inset-panel">
-          <h3 class="section-label">Key Highlights</h3>
+          <h2 class="section-label">Key Highlights</h2>
           <ul class="cd-fact-list">
             {% for hl in candidate.extracted_highlights %}
             <li>{{ hl }}</li>
@@ -110,7 +110,7 @@
 
       {% if candidate.skills %}
       <div class="cd-skills-block">
-        <h3 class="section-label">Skills &amp; Competencies</h3>
+        <h2 class="section-label">Skills &amp; Competencies</h2>
         <div class="flex gap-1 cd-wrap-row">
           {% for skill in candidate.skills_list|slice:":10" %}
           <span class="badge badge-role">{{ skill }}</span>
@@ -121,7 +121,7 @@
 
       {% if candidate.resume_text %}
       <div class="cd-skills-block">
-        <h3 class="section-label">CV Summary</h3>
+        <h2 class="section-label">CV Summary</h2>
         <p class="cd-cv-summary">{{ candidate.resume_preview_snippet }}</p>
         <button type="button" class="btn btn-secondary btn-sm" onclick="openCvOverlay()">View full extracted CV text &rarr;</button>
       </div>

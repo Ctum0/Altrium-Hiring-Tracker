@@ -11,12 +11,16 @@ from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.views.generic import (
-    CreateView, DetailView, ListView, RedirectView, TemplateView, View,
+    CreateView,
+    DetailView,
+    ListView,
+    RedirectView,
+    TemplateView,
+    View,
 )
 
 from accounts.forms import AvailabilityWindowForm, InterviewerProfileForm, OnboardUserForm
 from accounts.models import InterviewerAvailability, Role
-
 from candidates.models import Candidate, JobApplication
 from feedback.models import InterviewFeedback
 from jobs.models import InterviewRound, Job
@@ -781,7 +785,8 @@ class DeactivateInterviewerView(LoginRequiredMixin, View):
             messages.error(request, 'You cannot deactivate your own account.')
             return redirect('accounts:interviewer_roster')
         if not user.is_active:
-            messages.info(request, f'{user.get_full_name() or user.username} is already deactivated.')
+            name = user.get_full_name() or user.username
+            messages.info(request, f'{name} is already deactivated.')
             return redirect('accounts:interviewer_roster')
         user.is_active = False
         user.save(update_fields=['is_active'])
@@ -855,7 +860,6 @@ class MyAvailabilityView(LoginRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         windows = self.get_windows()
-        weekdays = InterviewerAvailability.Weekday
         grouped = [
             (label, list(rows))
             for label, rows in groupby(windows, key=lambda w: w.get_weekday_display())

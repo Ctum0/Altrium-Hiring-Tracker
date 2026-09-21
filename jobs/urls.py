@@ -10,7 +10,11 @@ urlpatterns = [
     path('<int:pk>/', views.JobDetailView.as_view(), name='detail'),
     path('<int:pk>/board/', views.JobBoardView.as_view(), name='board'),
     path('<int:pk>/rounds-setup/', views.RoundsSetupView.as_view(), name='rounds_setup'),
-    path('<int:pk>/talent-pool-add/<int:application_pk>/', views.TalentPoolAddView.as_view(), name='talent_pool_add'),
+    path(
+        '<int:pk>/talent-pool-add/<int:application_pk>/',
+        views.TalentPoolAddView.as_view(),
+        name='talent_pool_add',
+    ),
     path('<int:pk>/edit/', views.JobEditView.as_view(), name='edit'),
     path('<int:pk>/close/', views.JobCloseView.as_view(), name='close'),
     path('<int:pk>/reopen/', views.JobReopenView.as_view(), name='reopen'),

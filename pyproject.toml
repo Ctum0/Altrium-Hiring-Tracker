@@ -8,3 +8,8 @@ ignore = [
     "BLE001",   # blind except is intentional for AI fallback robustness
     "RUF012",   # Django Meta ordering/constraints use mutable class attrs by design
 ]
+
+[tool.ruff.lint.per-file-ignores]
+# Legacy long lines (URL paths, message strings) predate the 100-char gate;
+# new code in this file must stay within the limit.
+"candidates/views.py" = ["E501"]
