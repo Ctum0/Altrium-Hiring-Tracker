@@ -7,9 +7,8 @@ databases:
 services:
   - type: web
     name: altrium-tracker
-    runtime: python
+    runtime: docker
     plan: free
-    buildCommand: pip install -r requirements.txt
     # seed_users creates demo accounts with a hardcoded password
     # (testpass123). Never run it unconditionally on a prod boot -- only
     # opt in explicitly (e.g. for a disposable demo/staging deploy) via
@@ -90,6 +89,32 @@ services:
     schedule: '30 8 * * *' # daily 08:30 UTC
     buildCommand: pip install -r requirements.txt
     startCommand: python manage.py dispatch_escalations --send
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: altrium-tracker-db
+          property: connectionString
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DJANGO_DEBUG
+        value: "false"
+      - key: EMAIL_HOST
+        sync: false
+      - key: EMAIL_HOST_USER
+        sync: false
+      - key: EMAIL_HOST_PASSWORD
+        sync: false
+
+  # Weekly management digest: same aggregates as the HR dashboard KPI
+  # cards, one email per active Management account (MANAGERS fallback).
+  # Snapshot report, no sent-markers -- a repeat run just re-reports the
+  # current numbers. Monday 09:00 UTC.
+  - type: cron
+    name: altrium-weekly-digest
+    runtime: python
+    schedule: '0 9 * * 1' # Mondays 09:00 UTC
+    buildCommand: pip install -r requirements.txt
+    startCommand: python manage.py weekly_digest --send
     envVars:
       - key: DATABASE_URL
         fromDatabase:

@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load feedback_extras %}
 {% block title %}Feedback: {{ application.candidate.full_name }} | Altrium Tracker{% endblock %}
 {% block breadcrumb %}<a class="breadcrumb-link" href="{% url 'feedback:list' %}">Feedback</a><span class="breadcrumb-sep">/</span>{{ application.candidate.full_name }}{% endblock %}
 {% block page_title %}
@@ -99,4 +100,52 @@
 
   </div>
 </form>
+
+{% if own_prior_feedback %}
+<div class="panel panel-pad" style="margin-top:var(--sp-4)">
+  <h3 class="section-label" style="margin-bottom:var(--sp-2)">Your earlier feedback</h3>
+  <p class="text-xs text-muted" style="margin:0 0 var(--sp-3)">
+    Your own submissions for earlier rounds of this application.
+  </p>
+  {% for fb in own_prior_feedback %}
+  <div style="padding:var(--sp-3) 0{% if not forloop.last %};border-bottom:1px solid var(--glass-border){% endif %}">
+    <div class="flex items-center justify-between" style="gap:var(--sp-3)">
+      <span class="text-sm" style="font-weight:600">{{ fb.round.name }}</span>
+      <span class="score-ring {{ fb.score|score_ring_class }}">{{ fb.score }}</span>
+    </div>
+    <div class="text-xs text-muted" style="margin-top:var(--sp-1)">
+      {% for entry in fb.criteria_display %}{% if entry.score is not None %}{{ entry.criterion }} {{ entry.score }}{% if not forloop.last %} &middot; {% endif %}{% endif %}{% endfor %}
+    </div>
+    <div style="white-space:pre-line;margin-top:var(--sp-2);font-size:var(--text-sm);color:var(--ink-secondary)">
+      {{ fb.notes|truncatechars:300 }}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if other_feedback %}
+<div class="panel panel-pad" style="margin-top:var(--sp-4)">
+  <h3 class="section-label" style="margin-bottom:var(--sp-2)">Other evaluators</h3>
+  <p class="text-xs text-muted" style="margin:0 0 var(--sp-3)">
+    Visible after you submit this round &mdash; you submitted feedback for this round, so their evaluations are unlocked.
+  </p>
+  {% for fb in other_feedback %}
+  <div style="padding:var(--sp-3) 0{% if not forloop.last %};border-bottom:1px solid var(--glass-border){% endif %}">
+    <div class="flex items-center justify-between" style="gap:var(--sp-3)">
+      <span class="text-sm" style="font-weight:600">
+        {{ fb.round.name }} &middot; {{ fb.interviewer.get_full_name|default:fb.interviewer.username }}
+      </span>
+      <span class="score-ring {{ fb.score|score_ring_class }}">{{ fb.score }}</span>
+    </div>
+    <div class="text-xs text-muted" style="margin-top:var(--sp-1)">
+      {% for entry in fb.criteria_display %}{% if entry.score is not None %}{{ entry.criterion }} {{ entry.score }}{% if not forloop.last %} &middot; {% endif %}{% endif %}{% endfor %}
+    </div>
+    <div style="white-space:pre-line;margin-top:var(--sp-2);font-size:var(--text-sm);color:var(--ink-secondary)">
+      {{ fb.notes|truncatechars:300 }}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
 {% endblock %}

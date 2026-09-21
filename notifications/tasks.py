@@ -40,13 +40,17 @@ Documented limits of the marker approach:
 import logging
 
 from django.conf import settings
+from django.db.models import Count
+from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
 
 from accounts.models import Role
 from candidates.models import JobApplication
-from notifications.mail import send_templated_email
+from jobs.models import Job
+from notifications.mail import TEMPLATE_DIR, send_templated_email
 from notifications.models import Notification
+from pipeline.models import PipelineMove
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +64,7 @@ ESCALATION_MARKER_PREFIX = 'Email sent: Escalation: application'
 
 REMINDER_DIGEST_TEMPLATE = 'feedback_reminder_digest.txt'
 ESCALATION_DIGEST_TEMPLATE = 'escalation_digest.txt'
+WEEKLY_DIGEST_TEMPLATE = 'weekly_digest.txt'
 
 
 def send_feedback_reminders(now=None, emit=None, send=False):
@@ -390,6 +395,214 @@ def dispatch_escalations(now=None, emit=None, send=False):
         count, skipped_recent,
     )
     return {'count': count, 'would_send': results, 'skipped_recent': skipped_recent}
+
+
+# ---------------------------------------------------------------------------
+# Weekly management digest
+# ---------------------------------------------------------------------------
+
+def _management_recipients():
+    """All active Management accounts that actually have an email address.
+
+    Mirrors :func:`_hr_recipients` for the Management role; callers apply
+    the same MANAGERS fallback as :func:`dispatch_escalations` when the
+    list comes back empty.
+    """
+    from django.contrib.auth import get_user_model
+
+    return list(
+        get_user_model().objects.filter(role=Role.MANAGEMENT, is_active=True)
+        .exclude(email='')
+        .order_by('pk')
+    )
+
+
+def _build_weekly_digest(now=None):
+    """Compute the same pipeline aggregates the HR dashboard KPI cards show.
+
+    Scoped to active jobs where the dashboard scopes them (stage
+    distribution, stalled), mirroring ``accounts.views.HRDashboardView``:
+
+    - ``total_active``: non-terminal applications on active jobs — the
+      dashboard's "Total Applications / Active pipeline" KPI population.
+    - ``stage_counts``: per-status counts over that same population.
+    - ``jobs_open``: active jobs (the dashboard's "Open Positions" KPI).
+    - ``stalled``: same stage >7 days on active jobs (Risk Monitor).
+    - ``feedback_pending``: assigned evaluators with feedback outstanding
+      in their current round (dashboard "Pending Feedback" KPI).
+    - ``hires_this_week``: applications whose earliest
+      PipelineMove(to_status='hired') landed inside the window — no move
+      history (seeded/legacy hires) cannot be dated, so those are excluded
+      rather than miscounted into an arbitrary week.
+
+    Returns a context dict for the ``weekly_digest`` template.
+    """
+    now = now or timezone.now()
+    week_ago = now - timezone.timedelta(days=7)
+
+    active_apps = (
+        JobApplication.objects.filter(job__is_active=True)
+        .exclude(status__in=TERMINAL_STATUSES)
+    )
+    stage_counts = dict(
+        active_apps.values('status').annotate(count=Count('id'))
+        .values_list('status', 'count')
+    )
+    stage_rows = [
+        (label, stage_counts.get(value, 0))
+        for value, label in JobApplication.Status.choices
+        if stage_counts.get(value, 0)
+    ]
+
+    stalled = (
+        JobApplication.objects.filter(
+            job__is_active=True, stage_entered_at__lt=week_ago,
+        )
+        .exclude(status__in=TERMINAL_STATUSES)
+        .count()
+    )
+    feedback_pending = (
+        JobApplication.objects.filter(
+            job__is_active=True,
+            current_round__isnull=False,
+            feedback_submitted=False,
+        )
+        .exclude(assigned_to__isnull=True, panel_interviewers__isnull=True)
+        .count()
+    )
+    hires_this_week = (
+        PipelineMove.objects.filter(
+            to_status='hired', moved_at__gte=week_ago, moved_at__lt=now,
+        )
+        .values('application_id').distinct().count()
+    )
+
+    return {
+        'generated_at': timezone.localtime(now),
+        'dashboard_url': _dashboard_url(),
+        'total_active': active_apps.count(),
+        'stage_counts': stage_counts,
+        'stage_rows': stage_rows,
+        'jobs_open': Job.objects.filter(is_active=True).count(),
+        'stalled': stalled,
+        'feedback_pending': feedback_pending,
+        'hires_this_week': hires_this_week,
+    }
+
+
+def _dashboard_url():
+    """Absolute dashboard link for the email footer, or '' when the
+    deployment has no externally-reachable host configured (local dev,
+    tests, cron without RENDER_EXTERNAL_HOSTNAME)."""
+    hostname = getattr(settings, 'RENDER_EXTERNAL_HOSTNAME', '')
+    if not hostname:
+        return ''
+    try:
+        return f'https://{hostname}{reverse("accounts:hr_dashboard")}'
+    except Exception:
+        return ''
+
+
+def send_weekly_digest(now=None, emit=None, send=False):
+    """Email management a weekly pipeline digest (dashboard KPI snapshot).
+
+    Args:
+        now: Override "now" (for tests / deterministic runs).
+        emit: Callable receiving one report line each (defaults to print).
+            Management commands pass their stdout here.
+        send: False (default) = dry-run, sends nothing. True = actually
+            email one digest per active Management account with an email
+            address (``weekly_digest`` template). When no such account
+            exists, falls back to one digest to ``settings.MANAGERS``
+            (same fallback as :func:`dispatch_escalations`).
+
+    Unlike the reminder/escalation jobs there are no sent-markers: the
+    digest is a weekly snapshot, so every run re-reports the current
+    numbers and a repeat run is inherently harmless.
+
+    Returns a dict: ``{'count': <emails sent>, 'would_send':
+    [<per-email entries with a 'status' key>], 'recipients':
+    [<email addresses>]}``. Dry-run populates ``count``/``recipients``
+    with the WOULD-send values and sends nothing.
+    """
+    emit = emit or print
+    now = now or timezone.now()
+    context = _build_weekly_digest(now=now)
+
+    managers = _management_recipients()
+    fallback = False
+    if managers:
+        recipients = [m.email for m in managers]
+    else:
+        manager_email = _manager_email()
+        if not manager_email:
+            logger.warning(
+                'send_weekly_digest: no active Management accounts and no '
+                'MANAGERS configured; nothing sent'
+            )
+            emit(
+                "[skip] No active Management accounts and no MANAGERS "
+                "configured; no digest recipients."
+            )
+            return {
+                'count': 0, 'would_send': [], 'recipients': [],
+            }
+        recipients = [manager_email]
+        fallback = True
+
+    subject = (
+        f"Weekly hiring digest - {context['total_active']} active, "
+        f"{context['hires_this_week']} hire(s) this week"
+    )
+
+    if not send:
+        for r in recipients:
+            emit(
+                f"[dry-run] Would send '{WEEKLY_DIGEST_TEMPLATE}' to {r}"
+                + (' (MANAGERS fallback)' if fallback else '')
+            )
+        logger.info(
+            'send_weekly_digest: %d digest(s) would be sent', len(recipients),
+        )
+        return {
+            'count': len(recipients),
+            'would_send': [
+                {
+                    'to': r,
+                    'recipient': 'MANAGERS' if fallback else None,
+                    'template': WEEKLY_DIGEST_TEMPLATE,
+                    'status': 'would_send',
+                }
+                for r in recipients
+            ],
+            'recipients': recipients,
+        }
+
+    results = []
+    for r in recipients:
+        sent = _safe_send(WEEKLY_DIGEST_TEMPLATE, context, [r], subject=subject)
+        results.append({
+            'to': r,
+            'recipient': 'MANAGERS' if fallback else None,
+            'template': WEEKLY_DIGEST_TEMPLATE,
+            'status': 'sent' if sent else 'failed',
+        })
+        emit(
+            f"[sent] Weekly digest to {r}"
+            + (' (MANAGERS fallback)' if fallback else '')
+            + f": {context['total_active']} active application(s)"
+        )
+    count = sum(1 for res in results if res['status'] == 'sent')
+    logger.info('send_weekly_digest: %d digest email(s) sent', count)
+    return {'count': count, 'would_send': results, 'recipients': recipients}
+
+
+def render_weekly_digest_text(context):
+    """Render the plain-text weekly digest body (shared by the management
+    command's dry-run preview and the email path)."""
+    return render_to_string(
+        f'{TEMPLATE_DIR}/{WEEKLY_DIGEST_TEMPLATE}', context
+    ).strip()
 
 
 # ---------------------------------------------------------------------------

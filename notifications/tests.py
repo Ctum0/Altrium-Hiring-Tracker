@@ -651,3 +651,242 @@ class CandidateEmailHelperTests(TestCase):
         sent = send_rejection_email(self.cand, self.job.title)
         self.assertIsNone(sent)
         self.assertEqual(len(mail.outbox), 0)
+
+
+class WeeklyDigestTests(TestCase):
+    """Weekly management digest: dashboard aggregates, recipients, dry-run
+    command output, and the --send path."""
+
+    def setUp(self):
+        self.mgmt = User.objects.create_user(
+            username='digest_mgmt', password='pass12345', role=Role.MANAGEMENT,
+            email='mgmt@example.com', first_name='Mara', last_name='Quill',
+        )
+        self.hr = User.objects.create_user(
+            username='digest_hr', password='pass12345', role=Role.HR,
+            email='digest_hr@example.com', first_name='Hilda', last_name='Reyes',
+        )
+        self.interviewer = User.objects.create_user(
+            username='digest_iv', password='pass12345', role=Role.INTERVIEWER,
+            email='digest_iv@example.com', first_name='Iris', last_name='Vance',
+        )
+        self.job = Job.objects.create(title='Platform Engineer', created_by=self.hr)
+
+    def _make_application(self, first_name, status=None, **kwargs):
+        """Each application needs its own candidate: (candidate, job) is
+        unique. Distinct emails avoid the unique candidate email too."""
+        cand = Candidate.objects.create(
+            email=f'digest_{first_name.lower()}@example.com', first_name=first_name
+        )
+        return JobApplication.objects.create(
+            candidate=cand, job=self.job,
+            status=status or JobApplication.Status.IN_PROGRESS,
+            **kwargs,
+        )
+
+    def _age_stage(self, app, days):
+        JobApplication.objects.filter(pk=app.pk).update(
+            stage_entered_at=timezone.now() - timedelta(days=days)
+        )
+
+    def _pipeline_move(self, app, to_status, days_ago):
+        from pipeline.models import PipelineMove
+        # moved_at is auto_now_add: create first, then backdate.
+        move = PipelineMove.objects.create(
+            application=app, from_round=None, from_status=app.status,
+            to_round=None, to_status=to_status,
+        )
+        PipelineMove.objects.filter(pk=move.pk).update(
+            moved_at=timezone.now() - timedelta(days=days_ago),
+        )
+
+    def test_aggregates_match_dashboard_semantics(self):
+        active = self._make_application('Rae')  # in_progress on active job
+        shortlisted = self._make_application(
+            'Finn', status=JobApplication.Status.SHORTLISTED,
+        )
+        hired = self._make_application('Mia', status=JobApplication.Status.HIRED)
+        rejected = self._make_application('Zoe', status=JobApplication.Status.REJECTED)
+        on_hold = self._make_application('Tess', status=JobApplication.Status.ON_HOLD)
+        stalled = self._make_application('Nia', status=JobApplication.Status.SHORTLISTED)
+        self._age_stage(stalled, days=9)
+
+        context = tasks._build_weekly_digest()
+
+        # Active pipeline: non-terminal on active jobs (on_hold counts as
+        # pipeline; hired/rejected are terminal and excluded).
+        self.assertEqual(context['total_active'], 4)
+        self.assertEqual(
+            context['stage_counts'],
+            {
+                JobApplication.Status.IN_PROGRESS: 1,
+                JobApplication.Status.SHORTLISTED: 2,
+                JobApplication.Status.ON_HOLD: 1,
+            },
+        )
+        self.assertEqual(context['jobs_open'], 1)
+        self.assertEqual(context['stalled'], 1)
+        self.assertEqual(context['feedback_pending'], 0)
+        self.assertEqual(context['hires_this_week'], 0)
+        # Not a rendering concern here, but the template context must be
+        # complete for the email path too.
+        self.assertIsNotNone(context['generated_at'])
+
+    def test_hires_this_week_counts_distinct_hires_in_window(self):
+        mia = self._make_application('Mia', status=JobApplication.Status.HIRED)
+        self._pipeline_move(mia, 'hired', days_ago=2)
+        # Two moves into 'hired' for one application -> one hire.
+        self._pipeline_move(mia, 'hired', days_ago=1)
+        # Hired last month: outside the window.
+        old = self._make_application('Otto', status=JobApplication.Status.HIRED)
+        self._pipeline_move(old, 'hired', days_ago=40)
+        # No move history (seeded/legacy): undatable, excluded.
+        self._make_application('Uma', status=JobApplication.Status.HIRED)
+
+        context = tasks._build_weekly_digest()
+        self.assertEqual(context['hires_this_week'], 1)
+
+    def test_feedback_pending_counts_assigned_apps_in_round(self):
+        waiting = self._make_application(
+            'Rae', assigned_to=self.interviewer, feedback_submitted=False,
+        )
+        JobApplication.objects.filter(pk=waiting.pk).update(
+            stage_entered_at=timezone.now(),
+        )
+        # refresh current_round via save path
+        waiting.refresh_from_db()
+        submitted = self._make_application(
+            'Finn', assigned_to=self.interviewer, feedback_submitted=True,
+        )
+        JobApplication.objects.filter(pk=submitted.pk).update(
+            stage_entered_at=timezone.now(),
+        )
+        submitted.refresh_from_db()
+        # Unassigned: nobody's work, matches the dashboard KPI exclusion.
+        self._make_application('Zoe', feedback_submitted=False)
+
+        context = tasks._build_weekly_digest()
+        self.assertEqual(context['feedback_pending'], 1)
+
+    def test_recipients_are_active_management_with_managers_fallback(self):
+        result = tasks.send_weekly_digest()
+        self.assertEqual(result['recipients'], ['mgmt@example.com'])
+        self.assertEqual(result['count'], 1)
+        self.assertEqual(result['would_send'][0]['status'], 'would_send')
+
+        # Inactive or non-management accounts never receive it.
+        User.objects.create_user(
+            username='digest_mgmt2', password='pass12345', role=Role.MANAGEMENT,
+            email='mgmt2@example.com', is_active=False,
+        )
+        User.objects.create_user(
+            username='digest_iv2', password='pass12345', role=Role.INTERVIEWER,
+            email='iv2@example.com', is_active=True,
+        )
+        result = tasks.send_weekly_digest()
+        self.assertEqual(result['recipients'], ['mgmt@example.com'])
+
+        # No active Management accounts -> MANAGERS fallback.
+        User.objects.filter(role=Role.MANAGEMENT).update(is_active=False)
+        with self.settings(MANAGERS=[('Ops', 'ops@example.com')]):
+            result = tasks.send_weekly_digest()
+        self.assertEqual(result['recipients'], ['ops@example.com'])
+        self.assertEqual(result['would_send'][0]['recipient'], 'MANAGERS')
+
+        # Neither Management accounts nor MANAGERS: nothing to send.
+        result = tasks.send_weekly_digest()
+        self.assertEqual(result['count'], 0)
+        self.assertEqual(result['recipients'], [])
+
+    def test_command_dry_run_prints_digest_and_recipients(self):
+        rae = self._make_application('Rae')
+        self._age_stage(rae, days=9)
+
+        out = StringIO()
+        call_command('weekly_digest', stdout=out)
+        output = out.getvalue()
+
+        # The digest body itself: one line per metric + dashboard link line.
+        self.assertIn('Active applications (pipeline): 1', output)
+        self.assertIn('Open positions: 1', output)
+        self.assertIn('Stalled >7 days: 1', output)
+        self.assertIn('Pending feedback: 0', output)
+        self.assertIn('Hires this week: 0', output)
+        self.assertIn('View the full dashboard:', output)
+        # Footer + command summary.
+        self.assertIn('Altrium Hiring Tracker', output)
+        self.assertIn('dry-run complete', output)
+        self.assertIn('mgmt@example.com', output)
+        self.assertEqual(len(mail.outbox), 0)  # dry-run sends nothing
+
+    def test_command_send_uses_mail_backend(self):
+        rae = self._make_application('Rae')
+        self._age_stage(rae, days=9)
+
+        out = StringIO()
+        call_command('weekly_digest', '--send', stdout=out)
+        output = out.getvalue()
+
+        self.assertEqual(len(mail.outbox), 1)
+        msg = mail.outbox[0]
+        self.assertEqual(msg.to, ['mgmt@example.com'])
+        self.assertEqual(
+            msg.subject,
+            'Weekly hiring digest - 1 active, 0 hire(s) this week',
+        )
+        # Same body as the dry-run preview: one line per metric.
+        self.assertIn('Active applications (pipeline): 1', msg.body)
+        self.assertIn('Stalled >7 days: 1', msg.body)
+        self.assertIn('Hires this week: 0', msg.body)
+        self.assertIn('weekly_digest sent: 1 digest email(s) sent', output)
+
+        # Idempotent snapshot: a repeat run re-reports the same numbers.
+        call_command('weekly_digest', '--send', stdout=StringIO())
+        self.assertEqual(len(mail.outbox), 2)
+        self.assertEqual(mail.outbox[1].body, msg.body)
+
+    def test_command_send_without_recipients_sends_nothing(self):
+        User.objects.filter(role=Role.MANAGEMENT).update(is_active=False)
+        out = StringIO()
+        call_command('weekly_digest', '--send', stdout=out)
+        self.assertEqual(len(mail.outbox), 0)
+        self.assertIn('no recipients', out.getvalue())
+
+    def test_send_weekly_digest_sends_one_per_manager(self):
+        User.objects.create_user(
+            username='digest_mgmt3', password='pass12345', role=Role.MANAGEMENT,
+            email='mgmt3@example.com', first_name='Milo', last_name='Quinn',
+        )
+        self._make_application('Rae')
+
+        result = tasks.send_weekly_digest(send=True)
+
+        self.assertEqual(result['count'], 2)
+        self.assertEqual(
+            sorted(m.to[0] for m in mail.outbox),
+            ['mgmt3@example.com', 'mgmt@example.com'],
+        )
+        for msg in mail.outbox:
+            self.assertIn('Active applications (pipeline): 1', msg.body)
+
+    def test_template_renders_with_reasonable_context(self):
+        self._make_application('Rae')
+        shortlisted = self._make_application(
+            'Finn', status=JobApplication.Status.SHORTLISTED,
+        )
+        context = tasks._build_weekly_digest()
+        rendered = render_to_string('email_templates/weekly_digest.txt', context)
+        self.assertIn('Active applications (pipeline): 2', rendered)
+        # Per-stage lines actually render (regression: stage_rows was
+        # missing from the context, so the loop silently emitted nothing).
+        self.assertIn('- In Progress: 1', rendered)
+        self.assertIn('- Shortlisted: 1', rendered)
+        # Empty stages are skipped, not zero-padded.
+        self.assertNotIn('- New:', rendered)
+        self.assertIn('Altrium Hiring Tracker', rendered)
+        # Every metric line is present exactly once.
+        for line in (
+            'Open positions:', 'Stalled >7 days:',
+            'Pending feedback:', 'Hires this week:',
+        ):
+            self.assertEqual(rendered.count(line), 1, line)

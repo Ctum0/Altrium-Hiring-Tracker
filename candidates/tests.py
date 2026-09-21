@@ -12,6 +12,7 @@ from django.utils import timezone as django_timezone
 
 
 from accounts.models import InterviewerAvailability, Role
+from ai import cv_parser as ai_cv_parser
 from candidates.models import Candidate, JobApplication
 from candidates.dedup import find_fuzzy_match
 from jobs.models import InterviewRound, Job
@@ -2418,3 +2419,67 @@ class IntakeHelperTests(CandidatesBaseTestCase):
         self.assertTrue(outcome['duplicate'])
         self.assertFalse(outcome['created'])
         self.assertEqual(outcome['candidate'].pk, existing.pk)
+
+
+def _build_image_pdf(text: str) -> bytes:
+    """Build a PDF whose only content is a rasterized image (a scan).
+
+    Draws ``text`` on a white page with PIL and wraps it in a minimal
+    single-page PDF embedding the image — no text layer at all.
+    """
+    from PIL import Image, ImageDraw
+    img = Image.new('RGB', (600, 300), 'white')
+    ImageDraw.Draw(img).text((30, 130), text, fill='black')
+    buf = BytesIO()
+    img.save(buf, format='PDF')
+    return buf.getvalue()
+
+
+class OcrFallbackTests(CandidatesBaseTestCase):
+    """extract_text OCR fallback: scanned-style PDFs (no text layer) go
+    through pdf2image + pytesseract when available, and degrade gracefully
+    (no crash, short text returned) when OCR tooling is missing."""
+
+    def _scanned_pdf_file(self):
+        return SimpleUploadedFile(
+            'scan.pdf', _build_image_pdf('Jane Smith, jane@example.com'),
+            content_type='application/pdf',
+        )
+
+    def test_ocr_success_parses_scanned_pdf(self):
+        """With OCR tooling installed, a no-text-layer PDF is recovered via
+        OCR (image_to_string mocked to a known CV) and ingests normally."""
+        import pdf2image
+        import pytesseract
+        from candidates.intake import ingest_cv
+        with patch.object(pytesseract, 'image_to_string',
+                          return_value='Jane Smith\nEmail: jane@example.com\nSkills: Python, Django'), \
+                patch.object(pdf2image, 'convert_from_bytes', return_value=['img1', 'img2']):
+            outcome = ingest_cv(self._scanned_pdf_file(), self.job, source='upload')
+        self.assertIsNone(outcome['failed'])
+        self.assertTrue(outcome['created'])
+        self.assertEqual(outcome['candidate'].email, 'jane@example.com')
+        self.assertIn('Python', outcome['candidate'].resume_text)
+
+    def test_ocr_missing_tooling_degrades_gracefully(self):
+        """Without the OCR modules (import fails), the scanned PDF falls
+        back to the short/empty text layer and intake reports the usual
+        no-readable-text failure instead of crashing."""
+        from candidates.intake import ingest_cv
+        with patch.dict('sys.modules', {'pytesseract': None, 'pdf2image': None}):
+            outcome = ingest_cv(self._scanned_pdf_file(), self.job, source='upload')
+        self.assertIsNotNone(outcome['failed'])
+        self.assertIn('OCR', outcome['failed'])
+        self.assertIsNone(outcome['candidate'])
+
+    def test_ocr_runtime_error_returns_short_text_no_crash(self):
+        """A mid-OCR failure (e.g. tesseract binary missing) is swallowed:
+        extract_text returns the original short text, ingest fails cleanly."""
+        import pytesseract
+        from candidates.intake import ingest_cv
+        with patch.object(pytesseract, 'image_to_string',
+                          side_effect=OSError('tesseract binary not found')), \
+                patch('pdf2image.convert_from_bytes', return_value=['img1']):
+            outcome = ingest_cv(self._scanned_pdf_file(), self.job, source='upload')
+        self.assertIsNotNone(outcome['failed'])
+        self.assertIsNone(outcome['candidate'])

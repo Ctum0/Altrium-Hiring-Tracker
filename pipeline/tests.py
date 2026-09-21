@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 from django.core import mail
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 from accounts.models import Role
 from candidates.models import Candidate, JobApplication
 from feedback.models import InterviewFeedback
@@ -397,3 +398,63 @@ class PipelineMailTriggerTests(TestCase):
         r = self._move('status:on_hold')
         self.assertEqual(r.status_code, 200)
         self.assertEqual(len(mail.outbox), 0)
+
+
+class QuickActionRowTests(TestCase):
+    """Quick-action affordances on the collapsed summary row: HR-only,
+    state-aware labels, and stable ids the row script targets."""
+
+    def setUp(self):
+        self.hr = User.objects.create_user(
+            username='hr', password='pass12345', role=Role.HR
+        )
+        self.iv = User.objects.create_user(
+            username='iv', password='pass12345', role=Role.INTERVIEWER
+        )
+        self.job = Job.objects.create(title='Dev', created_by=self.hr)
+        self.cand = Candidate.objects.create(email='a@example.com', first_name='Anna')
+        self.app = JobApplication.objects.create(candidate=self.cand, job=self.job)
+        self.client.login(username='hr', password='pass12345')
+
+    def _detail(self):
+        return self.client.get(reverse('candidates:detail', args=[self.cand.pk]))
+
+    def test_hr_sees_assign_and_schedule_quick_actions(self):
+        r = self._detail()
+        self.assertContains(r, 'app-summary-actions')
+        self.assertContains(r, 'data-qa-target="assign-group-%d"' % self.app.pk)
+        self.assertContains(r, 'data-qa-target="interview-group-%d"' % self.app.pk)
+        # Unassigned, unscheduled state
+        self.assertContains(r, 'aria-label="Assign interviewer for')
+        self.assertContains(r, 'aria-label="Schedule interview for')
+
+    def test_labels_flip_to_reassign_and_reschedule(self):
+        self.app.assigned_to = self.iv
+        self.app.interview_at = timezone.now() + timezone.timedelta(days=1)
+        self.app.save()
+        r = self._detail()
+        self.assertContains(r, 'aria-label="Reassign interviewer for')
+        self.assertContains(r, 'aria-label="Reschedule interview for')
+
+    def test_terminal_status_hides_assign_action(self):
+        """No Assign affordance for hired/rejected apps — matches the hidden
+        assign form in the expanded row."""
+        self.app.status = JobApplication.Status.HIRED
+        self.app.save()
+        r = self._detail()
+        self.assertNotContains(r, 'data-qa-target="assign-group-%d"' % self.app.pk)
+        # Schedule action still offered
+        self.assertContains(r, 'data-qa-target="interview-group-%d"' % self.app.pk)
+
+    def test_control_groups_have_stable_ids(self):
+        r = self._detail()
+        self.assertContains(r, 'id="assign-group-%d"' % self.app.pk)
+        self.assertContains(r, 'id="interview-group-%d"' % self.app.pk)
+
+    def test_non_hr_sees_no_quick_actions(self):
+        # RBAC: interviewers only see the detail page of their own apps
+        self.app.assigned_to = self.iv
+        self.app.save()
+        self.client.login(username='iv', password='pass12345')
+        r = self._detail()
+        self.assertNotContains(r, 'app-summary-actions')

@@ -66,13 +66,15 @@ def ingest_cv(f, job, *, source='upload'):
 
     needs_review, review_reasons = should_hold_for_review(parsed, text)
     if len(text.strip()) < 10:
-        # Distinguish the two common causes so users can act: scanned/image
-        # PDFs and password-protected files yield no extractable text.
+        # Distinguish the common causes so users can act. Scanned/image
+        # PDFs are already retried via OCR in extract_text, so reaching
+        # this point means OCR produced nothing usable (truly unreadable
+        # scan) or the file is password-protected.
         if name.endswith('.pdf'):
             result['failed'] = (
-                'no readable text — this looks like a scanned/image PDF or a '
-                'password-protected file. Export it as a text-based PDF or '
-                'DOCX and try again.'
+                'no readable text — we also tried OCR, so this PDF is likely '
+                'a very low-quality scan or password-protected. Export it as '
+                'a text-based PDF or DOCX and try again.'
             )
         elif name.endswith('.doc'):
             result['failed'] = (

@@ -93,6 +93,7 @@ def _default_subject(template_name):
         'acceptance.txt': 'Welcome to Altrium - offer next steps',
         'feedback_reminder.txt': 'Feedback reminder',
         'escalation.txt': 'Application stalled - action needed',
+        'weekly_digest.txt': 'Weekly hiring digest',
     }
     base = subjects.get(template_name, template_name.rsplit('/', 1)[-1].replace('.txt', '').replace('_', ' '))
     return f'{base} - Altrium Hiring Tracker'

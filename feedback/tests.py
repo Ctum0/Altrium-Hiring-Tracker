@@ -866,3 +866,119 @@ class TestScorecardDisplay(FeedbackBaseTestCase):
         self.assertIn('Scorecard', content)
         self.assertIn('Technical Skill', content)
 
+
+# ---------------------------------------------------------------------------
+# 14. Prior-round visibility on the feedback form (bias-balanced policy)
+# ---------------------------------------------------------------------------
+class TestPriorRoundVisibility(FeedbackBaseTestCase):
+    """Interviewers see their OWN earlier feedback always; other evaluators'
+    feedback only AFTER submitting for the current round."""
+
+    def _make_feedback(self, interviewer, rnd, score, notes):
+        return InterviewFeedback.objects.create(
+            application=self.app, round=rnd, interviewer=interviewer,
+            score=score, notes=notes,
+        )
+
+    def _get_form(self, rnd):
+        self.client.login(username='interviewer1', password='testpass123')
+        return self.client.get(f'/feedback/{self.app.pk}/{rnd.pk}/')
+
+    def test_own_prior_feedback_visible_before_submitting(self):
+        """Earlier-round own feedback shows on the form, with the label."""
+        self._make_feedback(self.interviewer, self.round1, 72, 'My own earlier take.')
+        # App has since moved to round 2.
+        self.app.current_round = self.round2
+        self.app.save(update_fields=['current_round', 'updated_at'])
+
+        resp = self._get_form(self.round2)
+        self.assertEqual(resp.status_code, 200)
+        content = resp.content.decode()
+        self.assertIn('Your earlier feedback', content)
+        self.assertIn('My own earlier take.', content)
+        self.assertIn('Technical Screen', content)
+
+    def test_other_feedback_hidden_before_submitting(self):
+        """Other evaluators' feedback is NOT shown before this user submits."""
+        self._make_feedback(self.other_interviewer, self.round1, 55, 'Someone else wrote this.')
+        self._make_feedback(self.interviewer2, self.round1, 60, 'Panel member wrote this.')
+        self.app.current_round = self.round2
+        self.app.save(update_fields=['current_round', 'updated_at'])
+
+        resp = self._get_form(self.round2)
+        self.assertEqual(resp.status_code, 200)
+        content = resp.content.decode()
+        self.assertNotIn('Someone else wrote this.', content)
+        self.assertNotIn('Panel member wrote this.', content)
+        self.assertNotIn('Other evaluators', content)
+
+    def test_other_feedback_unlocked_after_submitting(self):
+        """After submitting for the current round, others' feedback appears."""
+        self._make_feedback(self.interviewer, self.round1, 72, 'My own earlier take.')
+        others_r1 = self._make_feedback(
+            self.other_interviewer, self.round1, 55, 'Someone else wrote this.',
+        )
+        # App in round 2; interviewer has already submitted for round 2.
+        self._make_feedback(self.interviewer, self.round2, 80, 'My current round submission.')
+        self.app.current_round = self.round2
+        self.app.feedback_submitted = True
+        self.app.save(update_fields=['current_round', 'feedback_submitted', 'updated_at'])
+
+        resp = self._get_form(self.round2)
+        self.assertEqual(resp.status_code, 200)
+        content = resp.content.decode()
+        # Others' earlier-round feedback unlocked, labeled and attributed.
+        self.assertIn('Other evaluators', content)
+        self.assertIn('Someone else wrote this.', content)
+        self.assertIn(others_r1.round.name, content)
+        self.assertIn('other_iv', content)
+        # Own prior feedback still present.
+        self.assertIn('Your earlier feedback', content)
+        self.assertIn('My own earlier take.', content)
+
+    def test_other_feedback_scoped_to_same_application(self):
+        """Feedback on other applications never leaks into the context."""
+        other_app = JobApplication.objects.create(
+            candidate=Candidate.objects.create(
+                first_name='Sam', last_name='Other', email='sam@example.com',
+            ),
+            job=self.job, assigned_to=self.interviewer,
+            status=JobApplication.Status.IN_PROGRESS,
+            current_round=self.round1,
+        )
+        InterviewFeedback.objects.create(
+            application=other_app, round=self.round1,
+            interviewer=self.other_interviewer, score=55,
+            notes='Different application.',
+        )
+        InterviewFeedback.objects.create(
+            application=other_app, round=self.round1,
+            interviewer=self.interviewer, score=70,
+            notes='Mine on the other application.',
+        )
+
+        resp = self._get_form(self.round1)
+        self.assertEqual(resp.status_code, 200)
+        content = resp.content.decode()
+        self.assertNotIn('Different application.', content)
+        self.assertNotIn('Mine on the other application.', content)
+
+    def test_current_round_own_feedback_not_duplicated_as_prior(self):
+        """The current round's own row is an edit, not 'earlier feedback'."""
+        self._make_feedback(self.interviewer, self.round2, 80, 'Current round row.')
+        self.app.current_round = self.round2
+        self.app.save(update_fields=['current_round', 'updated_at'])
+
+        resp = self._get_form(self.round2)
+        self.assertEqual(resp.status_code, 200)
+        content = resp.content.decode()
+        self.assertNotIn('Your earlier feedback', content)
+
+    def test_hr_read_view_unchanged_sees_everything(self):
+        """HR detail view still renders any feedback row (unchanged scope)."""
+        fb = self._make_feedback(self.other_interviewer, self.round1, 55, 'HR can read this.')
+        self.client.login(username='hr_user', password='testpass123')
+        resp = self.client.get(f'/feedback/{fb.pk}/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'HR can read this.')
+

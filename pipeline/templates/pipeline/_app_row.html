@@ -12,6 +12,27 @@
         <span class="badge badge-{{ app.status }}">{{ app.get_status_display }}</span>
         {% if app.current_round %}<span class="badge badge-in_progress">{{ app.current_round.name }}</span>{% endif %}
       </span>
+      {% if is_hr %}
+      <!-- Quick actions: jump straight into the expanded row at the right
+           control group (expand + scroll + focus); the forms themselves are
+           NOT duplicated here. -->
+      <span class="app-summary-actions">
+        {% if app.status != 'rejected' and app.status != 'hired' %}
+        <button type="button" class="app-quick-action"
+                data-qa-target="assign-group-{{ app.pk }}"
+                data-qa-focus='select[name="interviewer"]'
+                aria-label="{% if app.assigned_to %}Reassign{% else %}Assign{% endif %} interviewer for {{ app.candidate.full_name }} — {{ app.job.title }}">
+          {% if app.assigned_to %}Reassign{% else %}Assign{% endif %}
+        </button>
+        {% endif %}
+        <button type="button" class="app-quick-action"
+                data-qa-target="interview-group-{{ app.pk }}"
+                data-qa-focus='input[name="interview_at"]'
+                aria-label="{% if app.interview_at %}Reschedule{% else %}Schedule{% endif %} interview for {{ app.candidate.full_name }} — {{ app.job.title }}">
+          {% if app.interview_at %}Reschedule{% else %}Schedule{% endif %}
+        </button>
+      </span>
+      {% endif %}
       <span class="app-summary-meta">
         {% if app.feedback_submitted %}
         <span class="badge badge-hired">Feedback Submitted</span>
@@ -29,7 +50,7 @@
     <!-- Expanded body: full control set, grouped into labeled sections -->
     <div class="app-card-body">
       <!-- Meeting Link / Interview Details -->
-      <div class="app-card-control-group">
+      <div class="app-card-control-group" id="interview-group-{{ app.pk }}">
         <label class="app-card-control-label">Interview Link / Notes</label>
         {% if is_hr %}
         <form method="post" action="{% url 'candidates:interview_details' app.pk %}" class="cd-control-form">
@@ -55,7 +76,7 @@
       </div>
 
       <!-- Interviewer Assignment -->
-      <div class="app-card-control-group">
+      <div class="app-card-control-group" id="assign-group-{{ app.pk }}">
         <label class="app-card-control-label">Assigned Interviewer</label>
         {% if is_hr and app.status != 'rejected' and app.status != 'hired' %}
         <form method="post" action="{% url 'candidates:assign' app.pk %}" class="cd-control-form" id="assign-form-{{ app.pk }}">
@@ -144,3 +165,35 @@
     </div>
   </details>
 </div>
+<script>
+  // Quick actions on the summary row: expand this <details>, scroll to the
+  // target control group, focus its first input. Delegated on the row so it
+  // survives HTMX row swaps (this whole fragment is re-rendered on move).
+  (function () {
+    var card = document.getElementById('app-row-{{ app.pk }}');
+    if (!card) return;
+    card.addEventListener('click', function (e) {
+      var btn = e.target.closest('.app-quick-action');
+      if (!btn || !card.contains(btn)) return;
+      e.preventDefault();
+      var group = document.getElementById(btn.getAttribute('data-qa-target'));
+      var details = card.querySelector('details.app-disclosure');
+      if (!group || !details) return;
+      details.open = true;
+      // Wait a frame so the browser has laid out the newly expanded body.
+      requestAnimationFrame(function () {
+        group.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        var focusSel = btn.getAttribute('data-qa-focus');
+        var first = focusSel ? group.querySelector(focusSel) : null;
+        if (first && !first.disabled) {
+          first.focus();
+        } else {
+          // Scheduling is disabled until an interviewer is assigned — land
+          // focus on the group itself so keyboard users stay oriented.
+          group.setAttribute('tabindex', '-1');
+          group.focus();
+        }
+      });
+    });
+  })();
+</script>

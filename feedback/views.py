@@ -151,6 +151,31 @@ class FeedbackFormView(LoginRequiredMixin, View):
             for i, name in enumerate(InterviewFeedback.DEFAULT_CRITERIA)
         ]
         form = FeedbackForm(instance=existing)
+
+        # Bias-balanced prior-round context:
+        # - The interviewer always sees their OWN earlier feedback for this
+        #   application (consistency across rounds; their own words carry no
+        #   cross-evaluator bias).
+        # - Other evaluators' feedback is unlocked ONLY after this user has
+        #   submitted for the current round (post-hoc, never pre-hoc).
+        own_prior_feedback = list(
+            InterviewFeedback.objects.filter(
+                application=self.application,
+                interviewer=request.user,
+            ).exclude(round_id=self.round_obj.pk)
+            .select_related('round')
+            .order_by('round__order', 'submitted_at')
+        )
+        other_feedback = InterviewFeedback.objects.none()
+        if existing is not None:
+            other_feedback = list(
+                InterviewFeedback.objects.filter(
+                    application=self.application,
+                ).exclude(interviewer=request.user)
+                .select_related('round', 'interviewer')
+                .order_by('round__order', 'submitted_at')
+            )
+
         # ?next= lets entry points (candidate detail, dashboard) return the
         # interviewer to where they came from after submit or cancel.
         next_url = request.GET.get('next') or ''
@@ -163,6 +188,8 @@ class FeedbackFormView(LoginRequiredMixin, View):
             'round': self.round_obj,
             'is_edit': existing is not None,
             'criteria_rows': criteria_rows,
+            'own_prior_feedback': own_prior_feedback,
+            'other_feedback': other_feedback,
             'next_url': next_url,
         })
 

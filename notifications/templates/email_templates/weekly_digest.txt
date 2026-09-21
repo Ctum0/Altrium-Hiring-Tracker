@@ -1,0 +1,14 @@
+{% extends "email_templates/base.txt" %}
+{% block greeting %}Hello Management Team,{% endblock %}
+{% block content %}
+Weekly hiring pipeline summary for the week ending {{ generated_at|date:"F j, Y" }}:
+
+- Active applications (pipeline): {{ total_active }}
+{% for label, count in stage_rows %}- {{ label }}: {{ count }}
+{% endfor %}- Open positions: {{ jobs_open }}
+- Stalled >7 days: {{ stalled }}
+- Pending feedback: {{ feedback_pending }}
+- Hires this week: {{ hires_this_week }}
+
+View the full dashboard: {{ dashboard_url|default:"(log in to the tracker to open the dashboard)" }}
+{% endblock %}
