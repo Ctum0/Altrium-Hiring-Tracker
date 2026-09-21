@@ -97,9 +97,14 @@ class CandidateListView(LoginRequiredMixin, ListView):
 
         if job_pk:
             if ',' in job_pk:
-                qs = qs.filter(job_id__in=[int(p) for p in job_pk.split(',') if p.isdigit()])
+                pks = [int(p) for p in job_pk.split(',') if p.strip().isdigit()]
+                qs = qs.filter(job_id__in=pks) if pks else qs
+            elif job_pk.strip().isdigit():
+                qs = qs.filter(job_id=int(job_pk))
             else:
-                qs = qs.filter(job_id=job_pk)
+                # Malformed ?job= value (e.g. '[97]'): ignore the filter
+                # rather than crash — show the unfiltered list.
+                pass
         if stage:
             qs = qs.filter(status=stage)
         if min_score:
@@ -385,7 +390,7 @@ class PublicApplyView(View):
         if outcome['failed']:
             return self._render(
                 request, job,
-                error='We could not read that file. Please try a different PDF or DOCX.',
+                error=f'We could not read that file: {outcome["failed"]}',
                 **form_values,
             )
 

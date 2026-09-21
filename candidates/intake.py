@@ -56,6 +56,7 @@ def ingest_cv(f, job, *, source='upload'):
     f.name = get_valid_filename(f.name)
     result['filename'] = f.name
 
+    name = (f.name or '').lower()
     try:
         text = extract_text(f)
         parsed = parse_cv(text)
@@ -65,7 +66,21 @@ def ingest_cv(f, job, *, source='upload'):
 
     needs_review, review_reasons = should_hold_for_review(parsed, text)
     if len(text.strip()) < 10:
-        result['failed'] = 'file contains no readable text'
+        # Distinguish the two common causes so users can act: scanned/image
+        # PDFs and password-protected files yield no extractable text.
+        if name.endswith('.pdf'):
+            result['failed'] = (
+                'no readable text — this looks like a scanned/image PDF or a '
+                'password-protected file. Export it as a text-based PDF or '
+                'DOCX and try again.'
+            )
+        elif name.endswith('.doc'):
+            result['failed'] = (
+                'old .doc format is not supported — save it as .docx or PDF '
+                'and try again.'
+            )
+        else:
+            result['failed'] = 'file contains no readable text'
         return result
 
     result['parsed'] = parsed

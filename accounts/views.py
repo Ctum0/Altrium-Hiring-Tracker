@@ -424,7 +424,13 @@ class HRDashboardView(LoginRequiredMixin, ListView):
                 'job_pks': ','.join(str(pk) for pk in best_role['pks']),
                 'reason': 'Most common skills among current candidates',
                 'recommendation': 'Prioritize technical interview scheduling',
-                'action_url': f'{reverse("candidates:list")}?job={best_role["pks"]}',
+                # pks is a list; interpolating it directly rendered
+                # '?job=[97]' which 500s the candidate list (int('[97]')
+                # ValueError). Join comma-separated like the top_role card.
+                'action_url': (
+                    f'{reverse("candidates:list")}'
+                    f'?job={",".join(str(pk) for pk in best_role["pks"])}'
+                ),
                 'action_accent': 'violet',
             })
 

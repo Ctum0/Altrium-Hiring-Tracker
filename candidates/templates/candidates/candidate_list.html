@@ -209,7 +209,11 @@
 {% if has_filters %}
 <div class="empty-state">
   <p class="empty-state-title">No candidates match your filters</p>
+  {% if user.is_interviewer %}
+  <p class="empty-state-body">Your search covers only candidates <strong>assigned to you</strong> — that's by design, so you never see other interviewers' candidates. Try a different spelling, or check your assigned list below/above.</p>
+  {% else %}
   <p class="empty-state-body">Try widening the search, removing the score threshold, or clearing filters.</p>
+  {% endif %}
   <a href="{% url 'candidates:list' %}" class="btn btn-secondary">Clear filters</a>
 </div>
 {% else %}
