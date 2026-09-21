@@ -263,6 +263,72 @@ Edge entry format:
 - feedback: success toast
 - known gaps: none (verified live 2026-09-21 cycle 2)
 
+#### Retention Report → Candidates List (closed job)
+- user goal: review a closed job's retained candidates
+- expected next action: "View candidates →" lands filtered, dropdown reflects the closed job
+- actual next action: same ✓ (GAP-012 fixed: dropdown now lists closed jobs marked "(closed)")
+- state passed: job pk
+- context preserved: filter reflected in the select
+- navigation: direct
+- feedback: —
+- known gaps: none (verified cycle 2)
+
+#### Job Detail → Talent Pool Add
+- user goal: re-engage a strong past candidate for a new role
+- expected next action: suggestions section on job detail → "Add to this job" → application created
+- actual next action: same ✓ (toast names the candidate; the new application is visible on the job)
+- state passed: old application pk → new application on target job
+- context preserved: stays on job detail
+- navigation: direct
+- feedback: success toast
+- known gaps: none (verified cycle 2)
+
+#### Availability → Interview Scheduling (HR side)
+- user goal: book an interview inside the interviewer's real availability
+- expected next action: slot preview shows role match + windows + next free slots; HR picks a slot inside a window
+- actual next action: same ✓; server VALIDATES window membership — an out-of-window time is rejected with "not available at that time. Check their availability and pick a slot inside a weekly window."
+- state passed: interview_at; eligibility + windows
+- context preserved: row-level form
+- navigation: stays on detail
+- feedback: success toast with the scheduled time; clear rejection copy
+- known gaps: none (verified cycle 2)
+
+#### Interview Scheduling → Interviewer Calendar/Dashboard
+- user goal: interviewer sees the booked interview
+- expected next action: dashboard row shows the time; calendar groups by day; entry clickable
+- actual next action: same ✓ (calendar entries are now links to the candidate — 1.2d)
+- state passed: interview_at → both surfaces
+- context preserved: —
+- navigation: calendar → candidate detail
+- feedback: —
+- known gaps: none (verified cycle 2)
+
+#### Notifications → Mark-all-read / Unread filter
+- user goal: manage notification backlog
+- expected next action: filter unread; mark all read; badge syncs
+- actual next action: same ✓ (badge drops to 0 after mark-all)
+- state passed: read state
+- context preserved: —
+- navigation: —
+- feedback: badge count
+- known gaps: none (verified cycle 2)
+
+#### Public Apply (E2E submit)
+- user goal: apply with a real CV
+- expected next action: submit → thanks → parsed candidate in the job's pipeline
+- actual next action: same ✓ (consent required; parse extracted name/skills correctly; status new)
+- state passed: CV file → parsed fields; fallback contact merges only gaps
+- context preserved: —
+- navigation: thanks → "Browse other open roles"
+- feedback: thanks page
+- known gaps: none (verified cycle 2)
+
+#### Small affordances (score reset, reopen, rounds delete)
+- score reset: confirm modal with accurate copy ("fall back to their auto-score") → "Score cleared." toast ✓
+- job reopen: button appears immediately on closed jobs ✓
+- rounds delete: confirm modal with consequence copy ✓
+- known gaps: none (verified cycle 2)
+
 ### Public chain
 
 #### Careers → Public Apply → Thanks
@@ -278,6 +344,23 @@ Edge entry format:
 ## Known gaps
 
 See `PRODUCT_GAP_LEDGER.md` — GAP-001 … GAP-010 as of 2026-09-21. Linked per-edge above.
+
+## Test infrastructure (Phase 3)
+
+- `make qa-all` = lint gate + Django suite (467 tests) + 18 Playwright transition specs
+- Specs in `tests/feature-transitions/`, seeded by `qa/scripts/e2e_seed.py` (idempotent, `--json` for specs, `--clean` to remove)
+- CI: `.github/workflows/qa.yml` — ruff → Django suite → Playwright specs on push/PR; fails if `qa/` session state is staged
+- `altrium_tracker/ci_settings.py`: sqlite/MD5-hasher/no-secrets profile for CI
+- Auth in specs: programmatic login via the real form (no storage-state dependency)
+
+## Accessibility status (Phase 4 sweep)
+
+axe-core over the five core journey surfaces (HR dashboard, candidate detail,
+Kanban board, IV dashboard, public careers): **zero violations** after fixes:
+- Light-theme status tokens darkened for WCAG AA small text: pending #a35605→#8a4a04, hired #04815a→#036447, danger #DC2626→#B91C1C
+- `.score-ring-mid` now uses the theme-scoped pending tokens (was a fixed orange)
+- IV dashboard gained the standard page-header h1; candidate-detail section labels promoted h3→h2 (no level skips)
+- Re-scan tooling: `node qa/scripts/axe_journey_scan.js` (add surfaces as journeys grow)
 
 ## UI patterns section (from ui-consistency-inventory, first pass)
 

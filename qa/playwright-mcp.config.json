@@ -1,0 +1,32 @@
+{
+  "browser": {
+    "browserName": "chromium",
+    "isolated": true,
+    "launchOptions": {
+      "headless": true,
+      "executablePath": "/home/ctum/.cache/ms-playwright/chromium-1243/chrome-linux64/chrome"
+    },
+    "contextOptions": {
+      "viewport": { "width": 1440, "height": 900 },
+      "deviceScaleFactor": 1,
+      "locale": "en-US",
+      "timezoneId": "Europe/Berlin"
+    }
+  },
+  "capabilities": ["network", "storage", "testing", "vision", "devtools"],
+  "isolated": true,
+  "outputDir": "qa/evidence",
+  "console": { "level": "info" },
+  "imageResponses": "allow",
+  "filePaths": "relative",
+  "timeouts": {
+    "action": 8000,
+    "navigation": 30000,
+    "expect": 5000,
+    "settle": 750,
+    "idle": 1800000
+  },
+  "snapshot": { "mode": "full" },
+  "testIdAttribute": "data-testid",
+  "codegen": "typescript"
+}

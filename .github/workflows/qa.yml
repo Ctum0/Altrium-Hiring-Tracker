@@ -1,0 +1,64 @@
+name: QA
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  guard-suite:
+    runs-on: ubuntu-latest
+    env:
+      DJANGO_SETTINGS_MODULE: altrium_tracker.ci_settings
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install Python dependencies
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install -r requirements.txt ruff
+
+      - name: Install Node dependencies
+        run: npm ci || npm install
+
+      - name: Install Playwright Chromium
+        run: .venv/bin/python -m playwright install chromium --with-deps || npx playwright install --with-deps chromium
+
+      - name: Migrate (sqlite)
+        run: .venv/bin/python manage.py migrate --noinput
+
+      - name: Lint gate
+        run: make qa-lint
+
+      - name: Django test suite + gap regressions
+        run: make qa-unit
+
+      - name: Playwright feature-transition specs
+        run: |
+          .venv/bin/python qa/scripts/e2e_seed.py
+          npx playwright test --config qa/playwright.config.js tests/feature-transitions
+
+      - name: Guard against committed credentials
+        run: |
+          # Storage states and evidence must never be committed (Part 26).
+          if git diff --cached --name-only | grep -qE '^qa/(storage-states|evidence|screenshots|traces|videos)/'; then
+            echo "::error::QA session state or evidence staged for commit"
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-artifacts
+          path: tests/feature-transitions/artifacts/
+          retention-days: 7

@@ -430,6 +430,42 @@ ROOT CAUSE: The close view performs the email batch but never aggregates the out
 
 PROPOSED FIX: Count emailed/failed in the loop and append to the toast: "…; N active candidates were emailed rejection notices." (+ warning if failures > 0). STATUS: OPEN.
 
-STATUS: OPEN
+STATUS: VERIFIED
 
-REGRESSION TEST: — (write after fix: close-with-applicants toast mentions email count)
+REGRESSION TEST: tests/test_gap_regressions.py::Gap011CloseEmailBatchFeedbackTest (3 tests: count, failure surfacing, none-needed)
+
+---
+
+## GAP-012
+
+TITLE: Position dropdown omits closed jobs, hiding deep-linked closed-job filters
+
+CATEGORY: State Handoff
+
+SOURCE FEATURE: Retention Report ("View candidates →") / any closed-job context
+
+DESTINATION FEATURE: Candidates List (job filter)
+
+USER GOAL: From a closed job's context, see and re-filter its retained candidates.
+
+EXPECTED EXPERIENCE: The Position dropdown reflects the incoming closed-job filter and lets the user pick closed jobs manually (closed-job data is searchable by design per the retention policy).
+
+ACTUAL EXPERIENCE: The dropdown listed only active jobs, so a `?job=<closed_pk>` deep link produced a filtered list with an unmarked, apparently-unfiltered select; closed jobs were unselectable.
+
+WHY IT IS A GAP: The filter state exists in the URL but is not reflected in the control (state handoff failure), and a documented capability (searching closed-job data) has no UI entry point.
+
+REPRODUCTION: Retention report → "View candidates →" on a closed job → observe the Position select shows "All positions" while the list is filtered.
+
+EVIDENCE: Live walk 2026-09-21 cycle 2 (`/candidates/?job=94&all=1`, select value ""); `candidates/views.py:157` (active-only dropdown).
+
+IMPACT: Closed-job candidate review requires manual URL editing.
+
+PRIORITY: P2
+
+ROOT CAUSE: `CandidateListView.get_context_data` scoped the dropdown queryset to active jobs.
+
+PROPOSED FIX: Include closed jobs in the dropdown, ordered active-first, with a "(closed)" marker.
+
+STATUS: VERIFIED
+
+REGRESSION TEST: tests/test_gap_regressions.py::Gap012ClosedJobsInPositionFilterTest

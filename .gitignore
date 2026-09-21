@@ -67,8 +67,13 @@ wireframes_figma/
 qa/**
 !qa/reports/
 !qa/journeys/
+!qa/scripts/
+!qa/*.py
+!qa/*.js
+!qa/*.json
 !qa/reports/**
 !qa/journeys/**
+!qa/scripts/**
 tests/feature-transitions/artifacts/
 playwright-report/
 test-results/
