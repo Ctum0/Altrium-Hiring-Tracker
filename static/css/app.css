@@ -2446,6 +2446,45 @@ a:hover {
   color: var(--accent);
 }
 
+/* Pending/attention callout — amber status notice (interviewer dashboard,
+   availability, profile). Class-based so static analysis resolves the
+   padding/background; uses the --status-pending token pair (theme-aware). */
+.callout-pending {
+  padding: var(--sp-4);
+  border-radius: var(--radius);
+  background: var(--status-pending-bg);
+  border: 1px solid var(--status-pending);
+  color: var(--status-pending);
+}
+
+/* Uppercase panel section heading (type-scale discipline: no inline
+   font-size in templates). */
+.panel-heading {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  margin: 0 0 var(--sp-3);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* CV upload drag & drop target (extracted from inline styles so static
+   analysis resolves the padding; keeps the dashed brand affordance). */
+.upload-dropzone {
+  border: 2px dashed var(--glass-border);
+  border-radius: var(--radius-lg);
+  padding: var(--sp-6);
+  text-align: center;
+  background: var(--surface-2);
+  transition: border-color 200ms ease;
+}
+.upload-dropzone-title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0 0 4px;
+}
+
 /* ===== Empty states ===== */
 .empty-state {
   padding: var(--sp-12) var(--sp-6);
@@ -4405,6 +4444,10 @@ body.no-scroll {
   font-weight: 700;
   color: var(--ink);
 }
+.upcoming-card-time-unit {
+  font-size: 0.7em;
+  color: var(--muted);
+}
 .upcoming-card-sub {
   font-size: var(--text-xs);
   color: var(--muted);
@@ -5268,3 +5311,4 @@ body.no-scroll {
 .panel-pad {
   padding: var(--sp-6);
 }
+

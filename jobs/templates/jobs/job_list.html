@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load accounts_extras %}
 {% block title %}Jobs | Altrium Tracker{% endblock %}
 {% block page_title %}Jobs{% endblock %}
 {% block content %}
@@ -50,7 +51,16 @@
     </div>
     <div class="job-card-meta">
       <span class="job-card-count">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle;margin-right:3px"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+        {% if job.num_applications %}
+        <span class="avatar-cluster" aria-hidden="true">
+          {% for app in job.recent_apps|slice:':3' %}
+          <span class="cand-avatar cand-avatar-{{ app.candidate.full_name|avatar_index }}">{{ app.candidate.full_name|initials }}</span>
+          {% endfor %}
+          {% if job.num_applications > 3 %}
+          <span class="avatar-cluster-more">+{{ job.num_applications|add:'-3' }}</span>
+          {% endif %}
+        </span>
+        {% endif %}
         {{ job.num_applications }} candidate{{ job.num_applications|pluralize }}
         {% if job.num_openings > 1 %}
         <span style="font-size:var(--text-micro);color:var(--vui-text-muted);margin-left:4px">({{ job.hires_made }}/{{ job.num_openings }} hired)</span>

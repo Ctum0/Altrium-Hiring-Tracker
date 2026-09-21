@@ -42,9 +42,9 @@
 </div>
 
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-4)">
-  <div class="glass-panel" style="padding:var(--sp-4)">
-    <h2 style="font-size:var(--text-xs);font-weight:700;margin:0 0 var(--sp-3);letter-spacing:0.05em;text-transform:uppercase;color:var(--muted)">Matching Profile</h2>
-    <div style="display:grid;grid-template-columns:auto 1fr;gap:var(--sp-2) var(--sp-4);font-size:var(--text-sm)">
+  <div class="panel panel-pad glass-panel">
+    <h2 class="panel-heading">Matching Profile</h2>
+    <div class="text-sm" style="display:grid;grid-template-columns:auto 1fr;gap:var(--sp-2) var(--sp-4)">
       <span class="text-muted">Role</span>
       <span>{{ interviewer.get_role_display }}</span>
       <span class="text-muted">Specialty</span>
@@ -103,8 +103,8 @@
     {% endif %}
   </div>
 
-  <div class="glass-panel" style="padding:var(--sp-4)">
-    <h2 style="font-size:var(--text-xs);font-weight:700;margin:0 0 var(--sp-3);letter-spacing:0.05em;text-transform:uppercase;color:var(--muted)">Weekly Availability</h2>
+  <div class="panel panel-pad glass-panel">
+    <h2 class="panel-heading">Weekly Availability</h2>
     {% if availability_windows %}
       {% for w in availability_windows %}
       <div class="text-sm" style="white-space:nowrap;margin-bottom:var(--sp-1)">
@@ -112,15 +112,15 @@
       </div>
       {% endfor %}
     {% else %}
-      <div style="padding:var(--sp-4);border-radius:8px;background:var(--status-pending-bg);border:1px solid var(--status-pending)">
+      <div class="callout-pending">
         <span class="text-xs" style="color:var(--status-pending)"><strong>Not yet available.</strong> No weekly windows declared. Scheduling is blocked until at least one window exists.</span>
       </div>
     {% endif %}
   </div>
 </div>
 
-<div class="glass-panel" style="padding:var(--sp-4);margin-top:var(--sp-4)">
-  <h2 style="font-size:var(--text-xs);font-weight:700;margin:0 0 var(--sp-3);letter-spacing:0.05em;text-transform:uppercase;color:var(--muted)">Upcoming Interviews</h2>
+<div class="panel panel-pad glass-panel" style="margin-top:var(--sp-4)">
+  <h2 class="panel-heading">Upcoming Interviews</h2>
   {% if upcoming_interviews %}
   <div class="table-wrap">
     <table class="table">

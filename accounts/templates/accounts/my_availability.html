@@ -11,13 +11,13 @@
 </div>
 
 {% if not has_availability %}
-<div class="glass-panel" style="padding:var(--sp-4);margin-bottom:var(--sp-5);background:var(--status-pending-bg);border:1px solid var(--status-pending)">
+<div class="callout-pending" style="margin-bottom:var(--sp-5)">
   <p class="text-xs" style="margin:0"><strong>No availability declared.</strong> HR cannot schedule interviews for you until you have at least one weekly window.</p>
 </div>
 {% endif %}
 
-<div class="glass-panel" style="padding:var(--sp-4);margin-bottom:var(--sp-5)">
-  <h2 style="font-size:var(--text-xs);font-weight:700;margin:0 0 var(--sp-3);letter-spacing:0.05em;text-transform:uppercase;color:var(--muted)">Add a window</h2>
+<div class="panel panel-pad glass-panel" style="margin-bottom:var(--sp-5)">
+  <h2 class="panel-heading">Add a window</h2>
   <form method="post" novalidate>
     {% csrf_token %}
     {% if form.non_field_errors %}
@@ -47,8 +47,8 @@
 </div>
 
 {% if weekday_groups %}
-<div class="glass-panel" style="padding:var(--sp-4)">
-  <h2 style="font-size:var(--text-xs);font-weight:700;margin:0 0 var(--sp-3);letter-spacing:0.05em;text-transform:uppercase;color:var(--muted)">Declared windows</h2>
+<div class="panel panel-pad glass-panel">
+  <h2 class="panel-heading">Declared windows</h2>
   {% for label, windows in weekday_groups %}
   <div style="margin-bottom:var(--sp-3)">
     <div style="font-weight:600;margin-bottom:var(--sp-1)">{{ label }}</div>

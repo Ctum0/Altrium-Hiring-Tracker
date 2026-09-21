@@ -1,11 +1,12 @@
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core import mail
 from django.db.models import Count
 from django.test import TestCase, override_settings
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 
@@ -1023,3 +1024,85 @@ class JobClosureReasonTests(JobsBaseTestCase):
         r = self.client.get(reverse('jobs:detail', args=[job.pk]))
         self.assertContains(r, 'Closed')
         self.assertContains(r, 'Cancelled')
+
+
+class JobListAvatarClusterTests(JobsBaseTestCase):
+    """Avatar clusters on the jobs list: recent-3 initial chips + '+N'
+    overflow, backed by a single prefetch query on JobListView."""
+
+    @staticmethod
+    def _candidate(name, n):
+        first, _, last = name.partition(' ')
+        return Candidate.objects.create(
+            email=f'{name.lower().replace(" ", ".")}{n}@example.com',
+            first_name=first,
+            last_name=last,
+        )
+
+    def _apply(self, job, candidate, minutes_old=0):
+        app = JobApplication(job=job, candidate=candidate)
+        app.save()
+        # auto_now_add pins created_at to now; shift it so recency order is
+        # deterministic for the most-recent-3 slice.
+        JobApplication.objects.filter(pk=app.pk).update(
+            created_at=timezone.now() - timedelta(minutes=minutes_old)
+        )
+        return app
+
+    def test_cluster_renders_initials_overflow_and_count(self):
+        job = Job.objects.create(title='Cluster Job', created_by=self.hr)
+        names = ['Ann Oldmaker', 'Bob Oldmaker', 'Cid Oldmaker', 'Dee Oldmaker']
+        for i, name in enumerate(names):
+            self._apply(job, self._candidate(name, i), minutes_old=60 * (i + 1))
+        self.login('hr')
+        r = self.client.get(reverse('jobs:list'))
+        html = r.content.decode()
+        # Most recent 3 only: Ann (1h ago) then Bob (2h), Cid (3h); Dee (4h) is overflow.
+        self.assertIn('avatar-cluster', html)
+        self.assertRegex(html, r'cand-avatar[^>]*>\s*AO\s*<')
+        self.assertRegex(html, r'cand-avatar[^>]*>\s*BO\s*<')
+        self.assertRegex(html, r'cand-avatar[^>]*>\s*CO\s*<')
+        self.assertNotRegex(html, r'cand-avatar[^>]*>\s*DO\s*<')
+        self.assertRegex(html, r'avatar-cluster-more[^>]*>\s*\+1\s*<')
+        self.assertContains(r, '4 candidates')
+
+    def test_zero_candidate_job_has_no_cluster(self):
+        Job.objects.create(title='Empty Job', created_by=self.hr)
+        self.login('hr')
+        r = self.client.get(reverse('jobs:list'))
+        self.assertNotContains(r, 'avatar-cluster')
+        self.assertContains(r, '0 candidates')
+
+    def test_list_adds_exactly_one_query_for_prefetch(self):
+        """The cluster prefetch must cost exactly one additional query on
+        the list view, regardless of how many jobs are on the page."""
+        job = Job.objects.create(title='Query Job', created_by=self.hr)
+        for i in range(5):
+            self._apply(job, self._candidate(f'Q Candidate {i}', i), minutes_old=i)
+
+        def hit():
+            self.client.get(reverse('jobs:list'))
+
+        self.login('hr')
+        hit()  # warm caches so only query-count differences remain
+        from django.db import connection
+
+        with CaptureQueriesContext(connection) as before_ctx:
+            hit()
+        # Temporarily drop the prefetch to measure the baseline.
+        from jobs import views as jobs_views
+
+        orig_get_queryset = jobs_views.JobListView.get_queryset
+
+        def no_prefetch(view):
+            qs = orig_get_queryset(view)
+            return qs.prefetch_related(None)
+
+        jobs_views.JobListView.get_queryset = no_prefetch
+        try:
+            with CaptureQueriesContext(connection) as base_ctx:
+                hit()
+        finally:
+            jobs_views.JobListView.get_queryset = orig_get_queryset
+        added = len(before_ctx) - len(base_ctx)
+        self.assertEqual(added, 1)

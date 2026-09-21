@@ -2,7 +2,7 @@ import logging
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import Count, Max
+from django.db.models import Count, Max, Prefetch
 from django.db.utils import IntegrityError
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
@@ -48,6 +48,13 @@ class JobListView(LoginRequiredMixin, ListView):
         qs = (
             Job.objects.select_related('hiring_manager', 'created_by')
             .annotate(num_applications=Count('applications'))
+            .prefetch_related(
+                Prefetch(
+                    'applications',
+                    queryset=JobApplication.objects.select_related('candidate').order_by('-created_at'),
+                    to_attr='recent_apps',
+                )
+            )
             .order_by('-created_at')
         )
         if self.request.GET.get('inactive') != '1':
