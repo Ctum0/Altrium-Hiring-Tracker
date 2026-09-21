@@ -10,7 +10,7 @@
   <div>
     <p class="page-sub">
       {{ application.job.title }} &middot; {{ round.name }}
-      &middot; Assigned to {{ application.assigned_to.get_full_name|default:application.assigned_to.username }}
+      &middot; {% if application.assigned_to %}Assigned to {{ application.assigned_to.get_full_name|default:application.assigned_to.username }}{% else %}Assigned to: panel evaluators{% endif %}
     </p>
   </div>
   <div class="page-actions">
@@ -134,7 +134,7 @@
   <div style="padding:var(--sp-3) 0{% if not forloop.last %};border-bottom:1px solid var(--glass-border){% endif %}">
     <div class="flex items-center justify-between" style="gap:var(--sp-3)">
       <span class="text-sm" style="font-weight:600">
-        {{ fb.round.name }} &middot; {{ fb.interviewer.get_full_name|default:fb.interviewer.username }}
+        {{ fb.round.name }} &middot; {% if fb.interviewer %}{{ fb.interviewer.get_full_name|default:fb.interviewer.username }}{% else %}Unknown interviewer{% endif %}
       </span>
       <span class="score-ring {{ fb.score|score_ring_class }}">{{ fb.score }}</span>
     </div>

@@ -1017,3 +1017,22 @@ class FeedbackCompleteNudgeTests(FeedbackBaseTestCase):
         after = Notification.objects.filter(
             message__contains='ready to move').count()
         self.assertEqual(after, before)  # one evaluator still outstanding
+
+
+class TestUnassignedPanelFeedbackForm(FeedbackBaseTestCase):
+    """Regression: the feedback form 500'd for panel-assigned applications
+    with no single assigned_to user — the template's
+    `{{ application.assigned_to.get_full_name|default:application.assigned_to.username }}`
+    evaluates its `default:` argument EAGERLY, so `None.username` raised
+    'Failed lookup for key [username] in None' during rendering."""
+
+    def test_form_renders_200_for_panel_assigned_unassigned_app(self):
+        self.app.assigned_to = None
+        self.app.save()
+        self.app.panel_interviewers.add(self.interviewer)
+        self.client.force_login(self.interviewer)
+        r = self.client.get(
+            reverse('feedback:form', args=[self.app.pk, self.round1.pk])
+        )
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'panel evaluators')
