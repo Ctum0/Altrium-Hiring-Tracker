@@ -222,10 +222,10 @@
 :root[data-theme='light'] {
   color-scheme: light;
 
-  --vui-primary-blue: #036fa8;
-  --vui-primary-blue-hover: #0369A1;
-  --vui-primary-blue-gradient: linear-gradient(135deg, #036fa8 0%, #0369A1 100%);
-  --vui-primary-blue-glow: 0 4px 14px rgba(2, 132, 199, 0.20);
+  --vui-primary-blue: #2563eb;
+  --vui-primary-blue-hover: #1d4ed8;
+  --vui-primary-blue-gradient: #2563eb;
+  --vui-primary-blue-glow: none;
 
   /* Soft lavender-grey ambient canvas behind the elevated surfaces (matches
      the "floating card on a tinted background" reference), not a flat white. */
@@ -244,16 +244,16 @@
   --vui-active-item-bg: rgba(2, 132, 199, 0.10);
 
 
-  --brand: #036fa8;
-  --brand-hover: #0369A1;
-  --brand-active: #075985;
-  --brand-strong: #036fa8;
-  --brand-soft: rgba(2, 132, 199, 0.14);
-  --brand-border: rgba(2, 132, 199, 0.28);
+  --brand: #2563eb;
+  --brand-hover: #1d4ed8;
+  --brand-active: #1e40af;
+  --brand-strong: #1d4ed8;
+  --brand-soft: rgba(37, 99, 235, 0.10);
+  --brand-border: rgba(37, 99, 235, 0.28);
   --on-brand: #ffffff;
-  --brand-gradient: linear-gradient(135deg, #036fa8 0%, #0369A1 100%);
-  --brand-gradient-hover: linear-gradient(135deg, #0369A1 0%, #075985 100%);
-  --brand-glow: 0 4px 14px rgba(2, 132, 199, 0.20);
+  --brand-gradient: #2563eb; /* one-accent discipline: flat solid fill, no gradient chrome */
+  --brand-gradient-hover: #1d4ed8;
+  --brand-glow: none;
 
   --accent: #0D9488;
   --accent-soft: rgba(13, 148, 136, 0.14);
@@ -286,8 +286,8 @@
   --vui-border-glass-subtle: oklch(0.90 0.012 260);
   --vui-border-glass-highlight: linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0) 100%);
 
-  --status-new: #036fa8;
-  --status-new-bg: rgba(2, 132, 199, 0.14);
+  --status-new: #1d4ed8;
+  --status-new-bg: rgba(37, 99, 235, 0.12);
   --status-shortlisted: #a35605;
   --status-shortlisted-bg: rgba(217, 119, 6, 0.14);
   --status-progress: #4f52d6;
@@ -309,15 +309,17 @@
 
   /* Soft tinted elevation — offset + blur, tinted toward the cool canvas
      hue rather than pure black, per craft-floor shadow guidance. */
-  --shadow-sm: 0 1px 2px rgba(30,41,59,0.05), 0 2px 8px rgba(30,41,59,0.06);
-  --shadow-md: 0 2px 4px rgba(30,41,59,0.06), 0 8px 20px rgba(30,41,59,0.08);
-  --shadow-lg: 0 4px 10px rgba(30,41,59,0.07), 0 18px 40px rgba(30,41,59,0.11);
-  --shadow-xl: 0 8px 20px rgba(30,41,59,0.08), 0 28px 56px rgba(30,41,59,0.14);
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.04), 0 2px 8px rgba(16, 24, 40, 0.04);
+  --shadow-md: 0 1px 3px rgba(16, 24, 40, 0.05), 0 8px 24px rgba(16, 24, 40, 0.06);
+  --shadow-lg: 0 2px 6px rgba(16, 24, 40, 0.05), 0 18px 44px rgba(16, 24, 40, 0.09);
+  --shadow-xl: 0 4px 10px rgba(16, 24, 40, 0.06), 0 28px 64px rgba(16, 24, 40, 0.12);
+  /* Soft-clay card feel: 1px white inner highlight on elevated surfaces. */
+  --card-inset-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.9);
   --shadow-dashboard: 0 2px 4px rgba(30,41,59,0.05), 0 12px 28px rgba(30,41,59,0.07);
 
   --glass-bg: oklch(1.000 0.000 0);
   --glass-border: oklch(0.90 0.012 260);
-  --glass-shadow: 0 2px 4px rgba(30,41,59,0.06), 0 8px 20px rgba(30,41,59,0.08);
+  --glass-shadow: var(--shadow-md), var(--card-inset-highlight);
   --glass-highlight: linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0) 100%);
 
   --fg: var(--ink);
@@ -732,7 +734,7 @@ a:hover {
 }
 .ref-card-link {
   color: var(--brand);
-  font-weight: 700;
+  font-weight: 600;
   text-decoration: none;
   white-space: nowrap;
 }
@@ -753,14 +755,14 @@ a:hover {
 .main-content.dashboard-single-screen .stage-label-text { font-size: var(--text-xs); font-weight: 600; color: var(--ink); white-space: nowrap; }
 
 .main-content.dashboard-single-screen .ref-bar-track { height: 7px; border-radius: 9999px; background: rgba(0, 180, 216, 0.15); overflow: hidden; }
-.main-content.dashboard-single-screen .ref-bar-count { font-size: var(--text-xs); font-weight: 700; color: var(--ink); text-align: right; }
+.main-content.dashboard-single-screen .ref-bar-count { font-size: var(--text-xs); font-weight: 600; color: var(--ink); text-align: right; }
 
 .main-content.dashboard-single-screen .ref-feedback-analytics { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4); flex: 1; align-content: center; }
 .main-content.dashboard-single-screen .ref-feedback-col { display: flex; flex-direction: column; gap: var(--sp-1); }
 .main-content.dashboard-single-screen .feedback-metric-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-2); }
-.main-content.dashboard-single-screen .ref-feedback-num { font-size: 26px; font-weight: 800; line-height: 1; }
-.main-content.dashboard-single-screen .feedback-pct { font-size: var(--text-xs); font-weight: 700; opacity: 0.9; }
-.main-content.dashboard-single-screen .ref-feedback-label { font-size: var(--text-micro); font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px; }
+.main-content.dashboard-single-screen .ref-feedback-num { font-size: 26px; font-weight: 700; line-height: 1; }
+.main-content.dashboard-single-screen .feedback-pct { font-size: var(--text-xs); font-weight: 600; opacity: 0.9; }
+.main-content.dashboard-single-screen .ref-feedback-label { font-size: var(--text-micro); font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px; }
 .main-content.dashboard-single-screen .ref-feedback-col .ref-bar-track { height: 7px; border-radius: 9999px; margin-top: 2px; }
 
 .main-content.dashboard-single-screen .activity-timeline { flex: 1; overflow: hidden; }
@@ -808,7 +810,7 @@ a:hover {
 }
 .velocity-val {
   font-size: 11.5px;
-  font-weight: 700;
+  font-weight: 600;
 }
 .velocity-bar-track {
   height: 5px;
@@ -871,17 +873,19 @@ a:hover {
     grid-template-columns: 1fr;
   }
 }
-/* AI Insights — Compact AI Analysis Panels */
+/* AI Insights — Compact AI Analysis Panels.
+   Dark: frosted glass via shared tokens (identity preserved); light: the
+   global :root[data-theme='light'] rule (~line 380) forces solid white. */
 .ai-insight-card {
   display: flex;
   flex-direction: column;
   padding: 14px 16px;
   border-radius: var(--radius-md, 14px);
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0.03) 100%), rgba(10, 10, 12, 0.38);
-  backdrop-filter: blur(50px) saturate(140%) brightness(105%);
-  -webkit-backdrop-filter: blur(50px) saturate(140%) brightness(105%);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.25), 0 20px 50px rgba(0, 0, 0, 0.30);
+  background: var(--vui-glass-card-bg);
+  backdrop-filter: var(--vui-blur-card);
+  -webkit-backdrop-filter: var(--vui-blur-card);
+  border: 1px solid var(--vui-border-glass-subtle);
+  box-shadow: var(--vui-shadow-card);
   position: relative;
   overflow: hidden;
   transition: transform 200ms ease, background 200ms ease, border-color 200ms ease, box-shadow 200ms ease;
@@ -890,9 +894,9 @@ a:hover {
 
 .ai-insight-card:hover {
   transform: translateY(-3px);
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.05) 100%), rgba(14, 14, 16, 0.50);
-  border-color: rgba(255, 255, 255, 0.28);
-  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.38), 0 28px 65px rgba(0, 0, 0, 0.40);
+  background: var(--vui-glass-hover-bg);
+  border-color: var(--vui-border-glass-highlight, var(--vui-border-glass-subtle));
+  box-shadow: var(--vui-shadow-card);
 }
 
 /* Section 1: Insight Header */
@@ -908,7 +912,7 @@ a:hover {
 }
 .ai-sec-cat {
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--muted);
@@ -920,7 +924,7 @@ a:hover {
 }
 .ai-main-title {
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 700;
   color: var(--ink);
   line-height: 1.25;
   letter-spacing: -0.01em;
@@ -941,7 +945,7 @@ a:hover {
   color: var(--muted);
 }
 .ai-score-val {
-  font-weight: 800;
+  font-weight: 700;
   font-size: 12px;
 }
 
@@ -970,19 +974,19 @@ a:hover {
   flex-shrink: 0;
   background: var(--brand);
 }
-.ai-dot-violet { background: var(--vui-violet-500, #818cf8); }
-.ai-dot-amber { background: var(--status-pending, #f59e0b); }
-.ai-dot-green { background: var(--status-hired, #34d399); }
-.ai-dot-blue { background: var(--brand, #22d3ee); }
+/* Insight dots: brand accent by default; amber/green/red only where the
+   content is a state indicator (pipeline health, risk monitor). */
+.ai-dot-amber { background: var(--status-pending); }
+.ai-dot-green { background: var(--status-hired); }
 
-.ai-skills-detected, .ai-factors-list {
+.ai-skills-detected {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 .ai-skills-label, .ai-factors-label {
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.03em;
@@ -994,15 +998,13 @@ a:hover {
 }
 .ai-skill-chip {
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   padding: 2.5px 8px;
   border-radius: 9999px;
   white-space: nowrap;
-}
-.ai-skill-blue {
-  background: rgba(34, 211, 238, 0.12);
+  background: var(--brand-soft);
   color: var(--brand);
-  border: 1px solid rgba(34, 211, 238, 0.2);
+  border: 1px solid var(--brand-border);
 }
 
 .ai-factors-grid {
@@ -1034,8 +1036,6 @@ a:hover {
   height: 100%;
   border-radius: 9999px;
 }
-.ai-fill-violet { background: var(--vui-violet-500, #818cf8); }
-
 /* Section 4: Visualizations */
 .ai-card-sec-vis {
   margin-top: auto;
@@ -1044,7 +1044,7 @@ a:hover {
 }
 .ai-vis-header {
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -1081,57 +1081,13 @@ a:hover {
 .ai-dist-fill {
   height: 100%;
   border-radius: 9999px;
+  background: var(--brand);
 }
 .ai-dist-val {
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 700;
   color: var(--ink);
   text-align: right;
-}
-
-/* Radial Gauge Meter (Card 2) */
-.ai-vis-radial-wrap {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.ai-radial-gauge {
-  width: 36px;
-  height: 36px;
-  position: relative;
-  flex-shrink: 0;
-}
-.ai-radial-svg {
-  width: 100%;
-  height: 100%;
-  transform: rotate(-90deg);
-}
-.ai-radial-bg {
-  fill: none;
-  stroke: rgba(255, 255, 255, 0.1);
-  stroke-width: 3.8;
-}
-.ai-radial-stroke {
-  fill: none;
-  stroke-width: 3.8;
-  stroke-linecap: round;
-  transition: stroke-dasharray 0.6s ease;
-}
-.ai-stroke-violet { stroke: var(--vui-violet-500, #818cf8); }
-.ai-radial-text {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 800;
-  color: var(--ink);
-}
-.ai-radial-label {
-  font-size: 11.5px;
-  font-weight: 600;
-  color: var(--muted);
 }
 
 /* Stage Flow (Card 3) */
@@ -1144,7 +1100,7 @@ a:hover {
 }
 .ai-flow-step {
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   padding: 2.5px 7px;
   border-radius: var(--radius-sm, 6px);
   background: rgba(255, 255, 255, 0.06);
@@ -1154,7 +1110,6 @@ a:hover {
   background: var(--status-rejected-bg) !important;
   color: var(--status-rejected) !important;
   border: 1px solid var(--status-rejected);
-  box-shadow: 0 0 8px rgba(248, 113, 113, 0.2);
 }
 .ai-flow-step-arrow {
   font-size: 11px;
@@ -1170,14 +1125,14 @@ a:hover {
 /* Risk Gauge (Card 4) */
 .ai-status-badge, .ai-risk-badge {
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 700;
   padding: 3px 8px;
   border-radius: 9999px;
   display: inline-block;
 }
 .ai-badge-amber {
   background: rgba(245, 158, 11, 0.15);
-  color: #f59e0b;
+  color: var(--status-pending);
   border: 1px solid rgba(245, 158, 11, 0.25);
 }
 .ai-risk-badge-green {
@@ -1210,7 +1165,7 @@ a:hover {
 }
 .ai-risk-segment {
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 700;
   text-align: center;
   padding: 3.5px 0;
   border-radius: 4px;
@@ -1222,7 +1177,6 @@ a:hover {
   background: rgba(52, 211, 153, 0.25);
   color: var(--status-hired);
   opacity: 1;
-  box-shadow: 0 0 6px rgba(52, 211, 153, 0.2);
 }
 .ai-risk-seg-amber.active {
   background: rgba(245, 158, 11, 0.25);
@@ -1252,13 +1206,13 @@ a:hover {
   opacity: 0.95;
 }
 .ai-action-lbl {
-  font-weight: 700;
+  font-weight: 600;
   opacity: 0.75;
   margin-right: 3px;
 }
 .ai-action-link {
   color: inherit;
-  font-weight: 700;
+  font-weight: 600;
   text-decoration: none;
   transition: opacity 0.15s ease, text-decoration 0.15s ease;
 }
@@ -1266,24 +1220,28 @@ a:hover {
   text-decoration: underline;
   opacity: 1;
 }
-.ai-action-blue { color: rgba(34, 211, 238, 0.95); }
-.ai-action-violet { color: rgba(129, 140, 248, 0.95); }
-.ai-action-amber { color: rgba(245, 158, 11, 0.95); }
-.ai-action-green { color: rgba(52, 211, 153, 0.95); }
+/* Action-line accent: brand for informational cards; amber/green kept as
+   state semantics on the health/risk cards. */
+.ai-action-amber { color: var(--status-pending); }
+.ai-action-green { color: var(--status-hired); }
+.ai-text-amber { color: var(--status-pending); }
+.ai-action-brand { color: var(--brand); }
+.ai-text-brand { color: var(--brand); }
 
-/* Light Theme Overrides */
-[data-theme="light"] .ai-insight-card {
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.88) 0%, rgba(255, 255, 255, 0.65) 100%), var(--surface-2, #ffffff);
-  border-color: rgba(0, 0, 0, 0.08);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+/* Light Theme Overrides — airy: pure white cards, new shadow scale,
+   inset highlight. (Global :root[data-theme='light'] rule at ~line 380
+   already forces solid white + shadow-md via !important; this refines.) */
+:root[data-theme='light'] .ai-insight-card {
+  background: #ffffff;
+  border-color: var(--border);
+  box-shadow: var(--shadow-md), var(--card-inset-highlight) !important;
 }
-[data-theme="light"] .ai-insight-card:hover {
-  border-color: rgba(0, 0, 0, 0.14);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 1);
+:root[data-theme='light'] .ai-insight-card:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-lg), var(--card-inset-highlight) !important;
 }
 [data-theme="light"] .ai-dist-track,
 [data-theme="light"] .ai-factor-track,
-[data-theme="light"] .ai-radial-bg,
 [data-theme="light"] .ai-risk-meter-bar {
   background: rgba(0, 0, 0, 0.06);
 }
@@ -1293,18 +1251,9 @@ a:hover {
 [data-theme="light"] .ai-card-action {
   border-top-color: rgba(0, 0, 0, 0.06);
 }
-[data-theme="light"] .ai-action-blue,
-[data-theme="light"] .ai-text-blue { color: #0284c7; }
-[data-theme="light"] .ai-action-violet,
-[data-theme="light"] .ai-text-violet { color: #6366f1; }
 [data-theme="light"] .ai-action-amber,
-[data-theme="light"] .ai-text-amber { color: #d97706; }
-[data-theme="light"] .ai-action-green { color: #059669; }
-[data-theme="light"] .ai-skill-blue {
-  background: rgba(2, 132, 199, 0.1);
-  color: #0284c7;
-  border-color: rgba(2, 132, 199, 0.25);
-}
+[data-theme="light"] .ai-text-amber { color: var(--status-pending); }
+[data-theme="light"] .ai-action-green { color: var(--status-hired); }
 
 /* Light Theme Card & List Item Borders (Fixes invisible gray/white lines & missing borders) */
 :root[data-theme='light'] .main-content.dashboard-single-screen .ref-card,
@@ -1382,7 +1331,7 @@ a:hover {
 }
 
 .brand-name {
-  font-weight: 700;
+  font-weight: 600;
   font-size: var(--text-base);
   color: var(--ink);
   letter-spacing: -0.01em;
@@ -1415,7 +1364,7 @@ a:hover {
   align-items: center;
   gap: var(--sp-3);
   padding: var(--sp-2) var(--sp-3);
-  border-radius: var(--radius);
+  border-radius: var(--radius-pill);
   color: var(--muted);
   font-size: var(--text-sm);
   font-weight: 500;
@@ -1431,11 +1380,16 @@ a:hover {
 }
 
 .nav-link.active {
-  background: var(--vui-active-item-bg);
-  color: var(--ink);
-  font-weight: 700;
-  border: 1px solid var(--brand-border);
+  background: var(--brand);
+  color: var(--on-brand);
+  font-weight: 600;
+  border: 1px solid transparent;
   box-shadow: var(--shadow-sm);
+}
+
+.nav-link.active:hover {
+  background: var(--brand-hover);
+  color: var(--on-brand);
 }
 
 .nav-link .nav-icon-tile {
@@ -1456,29 +1410,29 @@ a:hover {
   transition: opacity 200ms ease;
 }
 
-/* Each workspace section carries its own icon-tile hue, reused nowhere else,
-   so the sidebar reads as a set of distinct destinations rather than one
-   flat solid fill (matches the colored-icon-per-category SaaS reference).
-   Colors are flat literals rather than the shared --grad-* and --brand-gradient
-   tokens because those are two-stop gradients tuned for glow surfaces, not
-   solid-fill contrast; each value below is a single hue-family flat that
-   holds >=4.5:1 against its icon color in both themes (values don't need
-   per-theme variants since the fill no longer depends on the page canvas). */
-.nav-icon-tile-blue   { background: #0369A1; color: #ffffff; }
-.nav-icon-tile-violet { background: #8D4DDE; color: #ffffff; }
-.nav-icon-tile-teal   { background: #00A5A6; color: #062b29; }
-.nav-icon-tile-cyan   { background: #00B079; color: #04371f; }
-.nav-icon-tile-amber  { background: #D19000; color: #3b2a00; }
-.nav-icon-tile-rose   { background: #D23337; color: #ffffff; }
-
-.nav-link .nav-icon-tile {
-  opacity: 0.9;
-  transform: scale(0.96);
+/* One-accent nav discipline (EduMate pattern): nav icons are neutral muted
+   glyphs; the active destination is the solid brand pill. The legacy
+   nav-icon-tile-* hue classes remain as no-op aliases so any template that
+   still names them keeps rendering, but they carry no color. */
+.nav-icon-tile-blue,
+.nav-icon-tile-violet,
+.nav-icon-tile-teal,
+.nav-icon-tile-cyan,
+.nav-icon-tile-amber,
+.nav-icon-tile-rose {
+  background: transparent;
+  color: var(--muted);
 }
+
 .nav-link.active .nav-icon-tile,
-.nav-link:hover .nav-icon-tile {
+.nav-link.active .nav-icon {
+  color: var(--on-brand);
   opacity: 1;
-  transform: scale(1);
+}
+
+.nav-link:hover .nav-icon-tile {
+  color: var(--ink);
+  opacity: 1;
 }
 
 /* Sidebar footer (user) */
@@ -1499,7 +1453,7 @@ a:hover {
   color: var(--brand);
   display: grid;
   place-items: center;
-  font-weight: 700;
+  font-weight: 600;
   font-size: var(--text-sm);
   flex-shrink: 0;
 }
@@ -1571,7 +1525,7 @@ a:hover {
 
 .topbar-title {
   font-size: var(--text-base);
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--ink);
   white-space: nowrap;
@@ -1634,7 +1588,7 @@ a:hover {
   color: var(--on-brand);
   display: grid;
   place-items: center;
-  font-weight: 700;
+  font-weight: 600;
   font-size: var(--text-xs);
   flex-shrink: 0;
   box-shadow: var(--brand-glow);
@@ -1657,7 +1611,7 @@ a:hover {
   background: var(--danger-solid);
   color: white;
   font-size: var(--text-xs);
-  font-weight: 700;
+  font-weight: 600;
   display: grid;
   place-items: center;
   line-height: 1;
@@ -1731,7 +1685,7 @@ a:hover {
 
 .notif-popover-title {
   font-size: var(--text-xs);
-  font-weight: 700;
+  font-weight: 600;
   color: var(--ink);
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -1829,7 +1783,7 @@ a:hover {
 
 .kpi-danger-pill {
   font-size: var(--text-xs);
-  font-weight: 700;
+  font-weight: 600;
   color: var(--status-rejected);
   background: var(--status-rejected-bg);
   border: 1px solid var(--status-rejected);
@@ -1851,7 +1805,7 @@ a:hover {
 
 .page-title {
   font-size: var(--text-2xl);
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.02em;
   color: var(--ink);
   line-height: 1.25;
@@ -1878,10 +1832,10 @@ a:hover {
   justify-content: center;
   gap: var(--sp-2);
   padding: 10px 20px;
-  border-radius: var(--radius-button);
+  border-radius: var(--radius-pill);
   border: 1px solid transparent;
   font-size: var(--text-sm);
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
   text-decoration: none;
   white-space: nowrap;
@@ -2785,7 +2739,7 @@ a:hover {
   border-radius: 5px;
   background: var(--brand);
   color: var(--on-brand);
-  font-weight: 700;
+  font-weight: 600;
   font-size: var(--text-micro);
 }
 
@@ -2992,7 +2946,7 @@ a:hover {
 
 .auth-title {
   font-size: var(--text-xl);
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.02em;
   margin-bottom: var(--sp-1);
   color: var(--ink);
@@ -3093,7 +3047,7 @@ a:hover {
   border-radius: var(--radius);
   background: var(--brand-gradient);
   color: var(--on-brand);
-  font-weight: 700;
+  font-weight: 600;
   font-size: var(--text-base);
 }
 
@@ -3114,7 +3068,7 @@ a:hover {
 .section-label {
   display: block;
   font-size: var(--text-xs);
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--muted);
@@ -3378,7 +3332,18 @@ a.ref-kpi-card.kpi-card-link:focus-visible {
    restrained, non-glowing elevation token already used elsewhere for small
    elevated elements (theme-aware via its own :root/:root[data-theme='light']
    definitions, so no per-theme override needed here). */
-.ref-kpi-icon-blue {
+/* MODERNIZATION PHASE 2/3 — one-accent discipline: KPI icon tiles are all
+   the single brand accent; differentiation comes from the SVG glyph, not hue.
+   Light theme: --brand #2563eb vs white icon = 5.12:1 (>= 4.5 AA ✓).
+   Dark theme: --brand #22D3EE vs white is 1.81:1 (fails), and --brand-active
+   #0284C7 is 4.11:1 (fails), so dark keeps its established darker brand
+   variant #0a7080 vs white = 5.77:1 (✓). .ref-kpi-icon-danger is the ONE
+   exception: it marks a genuine alert state (needs review / overdue
+   feedback), not decoration, so it stays --danger-solid (4.83:1 vs white). */
+.ref-kpi-icon-blue,
+.ref-kpi-icon-teal,
+.ref-kpi-icon-violet,
+.ref-kpi-icon-pending {
   /* dark-theme default: --brand (#22D3EE) is too light for white text
      (1.81:1); hue-matched, darkened flat cyan-blue instead (5.77:1). */
   background: #0a7080;
@@ -3386,37 +3351,21 @@ a.ref-kpi-card.kpi-card-link:focus-visible {
   box-shadow: var(--shadow-sm);
 }
 
-:root[data-theme='light'] .ref-kpi-icon-blue {
-  /* light theme's flat --brand (#036fa8) already passes 5.46:1 vs white. */
+:root[data-theme='light'] .ref-kpi-icon-blue,
+:root[data-theme='light'] .ref-kpi-icon-teal,
+:root[data-theme='light'] .ref-kpi-icon-violet,
+:root[data-theme='light'] .ref-kpi-icon-pending {
+  /* light theme's --brand (#2563eb) passes 5.12:1 vs white. */
   background: var(--brand);
-}
-
-.ref-kpi-icon-teal {
-  /* flat stop of former --grad-teal light end: 6.73:1 vs #062b29 text. */
-  background: #00c0c2;
-  color: #062b29;
-  box-shadow: var(--shadow-sm);
-}
-
-.ref-kpi-icon-violet {
-  /* flat stop of former --grad-violet dark end: 6.65:1 vs white text. */
-  background: #773ac1;
-  color: #ffffff;
-  box-shadow: var(--shadow-sm);
+  color: var(--on-brand);
 }
 
 .ref-kpi-icon-danger {
   /* existing flat --danger-solid token (identical value in both theme
-     blocks): 4.83:1 vs white text. */
+     blocks): 4.83:1 vs white text. Semantic alert state — intentionally
+     NOT brand-washed. */
   background: var(--danger-solid);
   color: #ffffff;
-  box-shadow: var(--shadow-sm);
-}
-
-.ref-kpi-icon-pending {
-  /* flat stop of former --grad-amber light end: 7.34:1 vs #3b2a00 text. */
-  background: #edb417;
-  color: #3b2a00;
   box-shadow: var(--shadow-sm);
 }
 
@@ -3431,7 +3380,7 @@ a.ref-kpi-card.kpi-card-link:focus-visible {
 .ref-kpi-label {
   display: block;
   font-size: var(--text-micro);
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.09em;
   text-transform: uppercase;
   color: var(--muted);
@@ -3442,7 +3391,7 @@ a.ref-kpi-card.kpi-card-link:focus-visible {
 .ref-kpi-value {
   display: block;
   font-size: var(--text-3xl);
-  font-weight: 800;
+  font-weight: 700;
   color: var(--ink);
   line-height: 1.05;
   letter-spacing: -0.03em;
@@ -3481,7 +3430,7 @@ a.ref-kpi-card.kpi-card-link:focus-visible {
 
 .ref-card-title {
   font-size: var(--text-base);
-  font-weight: 700;
+  font-weight: 600;
   color: var(--ink);
   margin: 0;
   line-height: 1.3;
@@ -3545,7 +3494,7 @@ a.ref-kpi-card.kpi-card-link:focus-visible {
 
 .ref-feedback-num {
   font-size: var(--text-2xl);
-  font-weight: 700;
+  font-weight: 600;
   font-family: var(--font-mono);
   line-height: 1;
   font-variant-numeric: tabular-nums;
@@ -3590,7 +3539,7 @@ a.ref-kpi-card.kpi-card-link:focus-visible {
 
 .ref-job-title {
   font-size: var(--text-xs);
-  font-weight: 700;
+  font-weight: 600;
   color: var(--ink);
   margin: 0;
   white-space: nowrap;
@@ -3856,7 +3805,7 @@ a.ref-kpi-card.kpi-card-link:focus-visible {
 .fit-panel h3 {
   margin: 0 0 8px;
   font-size: var(--text-sm);
-  font-weight: 700;
+  font-weight: 600;
   color: var(--ink);
 }
 
@@ -3882,7 +3831,7 @@ a.ref-kpi-card.kpi-card-link:focus-visible {
 .fit-col h4 {
   margin: 0;
   font-size: var(--text-xs);
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--muted);
@@ -3980,7 +3929,7 @@ a.ref-kpi-card.kpi-card-link:focus-visible {
 
 .cv-overlay-header h2 {
   font-size: var(--text-lg);
-  font-weight: 700;
+  font-weight: 600;
   color: var(--ink);
   margin: 0;
 }
@@ -4102,7 +4051,7 @@ body.no-scroll {
   align-items: center;
   gap: 3px;
   font-size: var(--text-micro);
-  font-weight: 700;
+  font-weight: 600;
   margin-top: 8px;
 }
 .kpi-trend-up { color: var(--status-hired); }
@@ -4117,7 +4066,7 @@ body.no-scroll {
   border-radius: 50%;
   display: grid;
   place-items: center;
-  font-weight: 700;
+  font-weight: 600;
   font-size: var(--text-xs);
   color: #ffffff;
   flex-shrink: 0;
@@ -4168,7 +4117,7 @@ body.no-scroll {
   height: 36px;
   border-radius: 50%;
   font-size: var(--text-micro);
-  font-weight: 800;
+  font-weight: 700;
   font-family: var(--font-mono);
   border: 2.5px solid;
 }
@@ -4217,7 +4166,7 @@ body.no-scroll {
 }
 .dash-chart-title {
   font-size: var(--text-base);
-  font-weight: 700;
+  font-weight: 600;
   color: var(--ink);
   margin: 0;
   line-height: 1.3;
@@ -4242,7 +4191,7 @@ body.no-scroll {
 }
 .cand-name-main {
   font-size: var(--text-sm);
-  font-weight: 700;
+  font-weight: 600;
   color: var(--ink);
   line-height: 1.3;
 }
@@ -4292,7 +4241,7 @@ body.no-scroll {
 .activity-content { flex: 1; min-width: 0; padding-bottom: 4px; }
 .activity-name {
   font-size: var(--text-sm);
-  font-weight: 700;
+  font-weight: 600;
   color: var(--ink);
   white-space: nowrap;
   overflow: hidden;
@@ -4360,7 +4309,7 @@ body.no-scroll {
 }
 .job-card-title {
   font-size: var(--text-sm);
-  font-weight: 700;
+  font-weight: 600;
   color: var(--ink);
   margin: 0 0 4px;
   white-space: nowrap;
@@ -4453,7 +4402,7 @@ body.no-scroll {
 }
 .upcoming-card-time {
   font-size: var(--text-base);
-  font-weight: 800;
+  font-weight: 700;
   color: var(--ink);
 }
 .upcoming-card-sub {
@@ -4484,7 +4433,7 @@ body.no-scroll {
 }
 .kanban-column-header h3 {
   font-size: var(--text-sm);
-  font-weight: 700;
+  font-weight: 600;
   color: var(--ink);
 }
 .kanban-column-body {
@@ -4607,7 +4556,7 @@ body.no-scroll {
 }
 .cd-page-title {
   font-size: var(--text-xl);
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: -0.02em;
   margin: 0;
 }
@@ -4630,7 +4579,7 @@ body.no-scroll {
   flex-shrink: 0;
   font-size: var(--text-base);
   padding: 4px 12px;
-  font-weight: 800;
+  font-weight: 700;
 }
 .cd-review-flag {
   display: inline-flex;
@@ -4707,7 +4656,7 @@ body.no-scroll {
 }
 .cd-apps-title {
   font-size: var(--text-lg);
-  font-weight: 800;
+  font-weight: 700;
   color: var(--ink);
   margin: 0;
 }
@@ -4928,7 +4877,7 @@ body.no-scroll {
 }
 .app-card-control-label {
   font-size: var(--text-micro);
-  font-weight: 700;
+  font-weight: 600;
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -5042,7 +4991,7 @@ body.no-scroll {
 }
 .consensus-title {
   font-size: var(--text-sm);
-  font-weight: 800;
+  font-weight: 700;
   color: var(--ink);
   margin: 0;
   line-height: 1.2;
@@ -5067,7 +5016,7 @@ body.no-scroll {
 }
 .consensus-metric-label {
   font-size: var(--text-micro);
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--muted);
@@ -5075,7 +5024,7 @@ body.no-scroll {
 .consensus-metric-value {
   font-family: var(--font-mono);
   font-size: var(--text-xl);
-  font-weight: 800;
+  font-weight: 700;
   color: var(--ink);
   line-height: 1.1;
   margin-top: 2px;
@@ -5103,16 +5052,16 @@ body.no-scroll {
   gap: var(--sp-2);
   flex-wrap: wrap;
   font-size: var(--text-micro);
-  font-weight: 700;
+  font-weight: 600;
   color: var(--ink);
 }
 .consensus-vote-tally {
   display: inline-flex;
   gap: var(--sp-2);
 }
-.consensus-vote-hire { color: var(--status-hired); font-weight: 800; }
-.consensus-vote-hold { color: var(--status-pending); font-weight: 800; }
-.consensus-vote-reject { color: var(--status-rejected); font-weight: 800; }
+.consensus-vote-hire { color: var(--status-hired); font-weight: 700; }
+.consensus-vote-hold { color: var(--status-pending); font-weight: 700; }
+.consensus-vote-reject { color: var(--status-rejected); font-weight: 700; }
 .consensus-vote-bar {
   display: flex;
   height: 6px;
@@ -5127,7 +5076,7 @@ body.no-scroll {
 .consensus-divergence-note {
   font-size: var(--text-micro);
   color: var(--status-rejected);
-  font-weight: 700;
+  font-weight: 600;
 }
 .consensus-grid {
   display: grid;
@@ -5160,7 +5109,7 @@ body.no-scroll {
 }
 .consensus-box-label {
   font-size: var(--text-micro);
-  font-weight: 800;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.03em;
   margin: 0 0 var(--sp-1);
@@ -5237,4 +5186,85 @@ body.no-scroll {
   .app-summary-meta {
     margin-left: 28px;
   }
+}
+
+/* ===== MODERNIZATION PHASE 2/3 ===== */
+
+/* -- Score progress bars (candidates list, EduMate pattern) -- */
+.score-cell {
+  min-width: 120px;
+}
+.score-ring + .score-bar {
+  margin-top: 6px;
+}
+.score-bar {
+  display: block;
+  width: 100%;
+  max-width: 120px;
+  height: 5px;
+  margin-top: 6px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.score-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+}
+/* Fill hue must reuse the EXACT score-ring bucket mapping used elsewhere:
+   low -> --status-rejected, mid -> --status-pending, high -> --status-hired. */
+.score-bar-fill.score-bar-low { background: var(--status-rejected); }
+.score-bar-fill.score-bar-mid { background: var(--status-pending); }
+.score-bar-fill.score-bar-high { background: var(--status-hired); }
+
+/* -- Avatar clusters (stacked candidate-initial chips) -- */
+.avatar-cluster {
+  display: flex;
+  align-items: center;
+}
+.avatar-cluster .cand-avatar {
+  width: 26px;
+  height: 26px;
+  font-size: 10px;
+  border: 2px solid var(--card, var(--bg));
+  margin-left: -8px;
+}
+.avatar-cluster .cand-avatar:first-child {
+  margin-left: 0;
+}
+.avatar-cluster .cand-avatar:last-child {
+  z-index: 1;
+}
+.avatar-cluster-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  margin-left: -8px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  border: 2px solid var(--card, var(--bg));
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+  z-index: 2;
+}
+
+/* -- Generous row rhythm (page-scoped) -- */
+.page-candidates .table td {
+  padding-top: var(--sp-4);
+  padding-bottom: var(--sp-4);
+}
+
+/* ===== MODERNIZATION: panel inset floor =====
+   Detector: children flush against card borders on panels that lack
+   .panel-pad. Give every glass-panel a minimum inset so content never
+   touches the card edge; .panel-pad pages keep their larger padding. */
+.glass-panel {
+  padding: var(--sp-4);
+}
+.panel-pad {
+  padding: var(--sp-6);
 }

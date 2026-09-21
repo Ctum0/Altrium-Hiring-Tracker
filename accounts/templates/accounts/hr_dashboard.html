@@ -233,18 +233,18 @@
           <!-- Section 2: Main Finding -->
           <div class="ai-card-sec-finding">
             <h3 class="ai-main-title" title="{{ insight.finding }}">{{ insight.finding }}</h3>
-            <div class="ai-sub-score"><span class="ai-score-label">Candidates:</span> <span class="ai-score-val ai-text-blue">{{ insight.distribution.0.count }}</span></div>
+            <div class="ai-sub-score"><span class="ai-score-label">Candidates:</span> <span class="ai-score-val ai-text-brand">{{ insight.distribution.0.count }}</span></div>
           </div>
 
           <!-- Section 3: Supporting Intelligence -->
           <div class="ai-card-sec-intel">
-            <div class="ai-intel-text"><span class="ai-intel-dot ai-dot-blue"></span>{{ insight.ai_finding }}</div>
+            <div class="ai-intel-text"><span class="ai-intel-dot"></span>{{ insight.ai_finding }}</div>
             {% if insight.skills %}
             <div class="ai-skills-detected">
               <span class="ai-skills-label">Skills detected:</span>
               <div class="ai-skill-chips">
                 {% for s in insight.skills %}
-                <span class="ai-skill-chip ai-skill-blue">{{ s }}</span>
+                <span class="ai-skill-chip">{{ s }}</span>
                 {% endfor %}
               </div>
             </div>
@@ -258,13 +258,13 @@
               {% for item in insight.distribution %}
               <div class="ai-dist-row">
                 <span class="ai-dist-label" title="{{ item.label }}">{{ item.label }}</span>
-                <div class="ai-dist-track"><div class="ai-dist-fill ai-fill-blue" style="width: {{ item.pct }}%;"></div></div>
+                <div class="ai-dist-track"><div class="ai-dist-fill" style="width: {{ item.pct }}%;"></div></div>
                 <span class="ai-dist-val">{{ item.count }}</span>
               </div>
               {% endfor %}
             </div>
           </div>          <!-- Action Line -->
-          <div class="ai-card-action ai-action-blue">
+          <div class="ai-card-action ai-action-brand">
             <span class="ai-action-lbl">Action:</span> <a href="{{ insight.action_url }}" class="ai-action-link">{{ insight.recommendation }} &rarr;</a>
           </div>
 
@@ -272,7 +272,7 @@
           <!-- Section 1: Insight Header -->
           <div class="ai-card-sec-head">
             <span class="ai-sec-icon" aria-hidden="true">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--vui-violet-500, #818cf8)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ai-head-svg"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ai-head-svg"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
             </span>
             <span class="ai-sec-cat">AI Candidate Matching</span>
           </div>
@@ -297,12 +297,12 @@
               </div>
             </div>
             {% else %}
-            <div class="ai-intel-text"><span class="ai-intel-dot ai-dot-violet"></span>No candidate skill data yet for this role.</div>
+            <div class="ai-intel-text"><span class="ai-intel-dot"></span>No candidate skill data yet for this role.</div>
             {% endif %}
           </div>
 
           <!-- Action Line -->
-          <div class="ai-card-action ai-action-violet">
+          <div class="ai-card-action ai-action-brand">
             <span class="ai-action-lbl">Action:</span> <a href="{{ insight.action_url }}" class="ai-action-link">{{ insight.recommendation }} &rarr;</a>
           </div>
 
@@ -310,7 +310,7 @@
           <!-- Section 1: Insight Header -->
           <div class="ai-card-sec-head">
             <span class="ai-sec-icon" aria-hidden="true">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ai-head-svg"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ai-head-svg"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>
             </span>
             <span class="ai-sec-cat">Recruitment Pipeline Intelligence</span>
           </div>
@@ -352,7 +352,7 @@
           <!-- Section 1: Insight Header -->
           <div class="ai-card-sec-head">
             <span class="ai-sec-icon" aria-hidden="true">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ai-head-svg"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ai-head-svg"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
             </span>
             <span class="ai-sec-cat">Recruitment Risk Monitor</span>
           </div>
@@ -439,7 +439,7 @@
     <div class="panel panel-pad ref-card">
       <div class="ref-card-header">
         <h2 class="ref-card-title">Escalations: Stalled &gt; 7 Days</h2>
-        <span class="badge badge-secondary">{{ stalled_applications|length }} shown</span>
+        <span class="badge badge-secondary">{{ stalled_count }} stalled</span>
       </div>
       <div class="ref-jobs-list">
         {% for app in stalled_applications %}

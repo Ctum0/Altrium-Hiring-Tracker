@@ -2,7 +2,7 @@
 {% load accounts_extras %}
 {% block title %}Candidates | Altrium Tracker{% endblock %}
 {% block page_title %}Candidates{% endblock %}
-{% block content_class %}scrollable{% endblock %}
+{% block content_class %}scrollable page-candidates{% endblock %}
 {% block content %}
 <div class="page-header" style="margin-bottom:var(--sp-4)">
   <div>
@@ -131,13 +131,19 @@
         </td>
         <td>
           {% if app.candidate.score is not None %}
-            {% if app.candidate.score >= 75 %}
-            <span class="score-ring score-ring-high">{{ app.candidate.score }}</span>
-            {% elif app.candidate.score >= 50 %}
-            <span class="score-ring score-ring-mid">{{ app.candidate.score }}</span>
-            {% else %}
-            <span class="score-ring score-ring-low">{{ app.candidate.score }}</span>
-            {% endif %}
+            <div class="score-cell">
+              {% if app.candidate.score >= 75 %}
+              <span class="score-ring score-ring-high">{{ app.candidate.score }}</span>
+              {% elif app.candidate.score >= 50 %}
+              <span class="score-ring score-ring-mid">{{ app.candidate.score }}</span>
+              {% else %}
+              <span class="score-ring score-ring-low">{{ app.candidate.score }}</span>
+              {% endif %}
+              <span class="score-bar" role="presentation">
+                <span class="score-bar-fill {% if app.candidate.score >= 75 %}score-bar-high{% elif app.candidate.score >= 50 %}score-bar-mid{% else %}score-bar-low{% endif %}"
+                      style="width: {{ app.candidate.score }}%"></span>
+              </span>
+            </div>
           {% else %}
           <span class="score-ring score-ring-none">N/A</span>
           {% endif %}

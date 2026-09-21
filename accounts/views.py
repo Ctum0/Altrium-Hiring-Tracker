@@ -495,7 +495,10 @@ class HRDashboardView(LoginRequiredMixin, ListView):
             'candidate', 'job', 'assigned_to'
         ).order_by('stage_entered_at')
         stalled_count = stalled_qs.count()
-        context['stalled_applications'] = stalled_qs
+        # Cap the rendered list: the right column is a scan surface, not a
+        # worklist — 750 rows made the dashboard ~31,000px tall. Show the
+        # 10 most-stalled; the count badge carries the full number.
+        context['stalled_applications'] = stalled_qs[:10]
         context['stalled_count'] = stalled_count
 
         if stalled_count >= 3:
