@@ -5312,3 +5312,20 @@ body.no-scroll {
   padding: var(--sp-6);
 }
 
+
+/* ===== DISCOVERABILITY: board shortcut on job cards =====
+   Kanban was 2 levels deep (Jobs -> job -> Board). Surface it directly
+   on each active job card as a secondary action next to View. */
+.job-card-board-link {
+  font-size: 11px;
+  color: var(--brand);
+  text-decoration: none;
+  font-weight: 600;
+  padding: 2px 10px;
+  border: 1px solid var(--brand-border);
+  border-radius: var(--radius-pill);
+  transition: background-color 150ms ease, color 150ms ease;
+}
+.job-card-board-link:hover {
+  background: var(--brand-soft);
+}

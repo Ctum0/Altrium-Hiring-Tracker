@@ -19,6 +19,10 @@
       New job
     </a>
     {% endif %}
+    <a href="{% url 'careers' %}" class="btn btn-secondary" target="_blank" rel="noopener" aria-label="Open the public careers page in a new tab">
+      Public careers page
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+    </a>
     {% if show_inactive and user.is_hr or show_inactive and user.is_management %}
     <a href="{% url 'accounts:retention_report' %}" class="btn btn-secondary">Retention report</a>
     {% endif %}
@@ -66,7 +70,12 @@
         <span style="font-size:var(--text-micro);color:var(--vui-text-muted);margin-left:4px">({{ job.hires_made }}/{{ job.num_openings }} hired)</span>
         {% endif %}
       </span>
-      <span style="font-size:11px;color:var(--brand)">View &rarr;</span>
+      <span style="display:inline-flex;align-items:center;gap:var(--sp-2)">
+        <span style="font-size:11px;color:var(--brand)">View &rarr;</span>
+        {% if job.is_active %}
+        <a href="{% url 'jobs:board' job.pk %}" class="job-card-board-link" onclick="event.stopPropagation()" aria-label="Open Kanban board for {{ job.title }}">Board</a>
+        {% endif %}
+      </span>
     </div>
   </a>
   {% endfor %}

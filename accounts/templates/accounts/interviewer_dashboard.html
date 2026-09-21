@@ -62,6 +62,24 @@
   </div>
 </div>
 
+{% if pending_feedback %}
+<!-- Pending Feedback Action Queue: the interviewer's #1 daily action,
+     surfaced as one-click CTAs instead of requiring navigation into
+     each candidate profile. -->
+<div class="callout-pending" style="margin-bottom:var(--sp-5)">
+  <p class="text-xs" style="margin:0 0 var(--sp-2) 0"><strong>{{ pending_feedback }} candidate{{ pending_feedback|pluralize }} waiting for your feedback.</strong> Submitting feedback unlocks their progression to the next round.</p>
+  <div class="flex gap-2" style="flex-wrap:wrap">
+    {% for app in assigned_apps %}
+      {% if not app.feedback_submitted and app.current_round %}
+      <a href="{% url 'feedback:form' app.pk app.current_round.pk %}?next={% url 'accounts:interviewer_dashboard' %}" class="btn btn-primary btn-sm">
+        {{ app.candidate.full_name }} &middot; {{ app.job.title|truncatechars:24 }}
+      </a>
+      {% endif %}
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
 {% if assigned_apps %}
 <div class="table-wrap">
   <table class="table">

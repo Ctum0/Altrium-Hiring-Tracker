@@ -172,6 +172,9 @@
 
     <div class="cd-apps-heading">
       <h3 class="cd-apps-title">Applications ({{ applications|length }})</h3>
+      {% if applications %}
+      <button type="button" class="btn btn-ghost btn-sm" id="apps-expand-toggle" aria-expanded="false">Expand all</button>
+      {% endif %}
       {% if is_hr %}
       <a href="{% url 'candidates:import' %}" class="btn btn-secondary btn-sm" title="Opens the paste-profile import form; the candidate is matched by the email in the pasted text.">Import to another job</a>
       {% endif %}
@@ -204,6 +207,32 @@
 {% block scripts %}
 {% if candidate.resume_text %}
 <script>
+  // Expand-all / collapse-all for the collapsed application rows.
+  // Satisfies the first-use affordance gap: a hint that rows expand,
+  // plus a bulk path for multi-application candidates.
+  (function () {
+    var toggle = document.getElementById('apps-expand-toggle');
+    if (!toggle) return;
+    var rows = document.querySelectorAll('details.app-disclosure');
+    function anyOpen() {
+      return Array.prototype.some.call(rows, function (d) { return d.open; });
+    }
+    function sync() {
+      var open = anyOpen();
+      toggle.textContent = open ? 'Collapse all' : 'Expand all';
+      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+    toggle.addEventListener('click', function () {
+      var open = anyOpen();
+      rows.forEach(function (d) { d.open = !open; });
+      sync();
+    });
+    rows.forEach(function (d) {
+      d.addEventListener('toggle', sync);
+    });
+    sync();
+  })();
+
   var cvOverlay = document.getElementById('cv-overlay');
   window.openCvOverlay = function () {
     cvOverlay.classList.add('open');
