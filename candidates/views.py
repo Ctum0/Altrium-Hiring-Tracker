@@ -155,6 +155,13 @@ class CandidateListView(LoginRequiredMixin, ListView):
             or context['filter_stage'] or context['filter_min_score']
             or context['show_all']
         )
+        # Audit gap: detail pages hard-link back to the bare list, stranding
+        # any search/filter context. Remember the current querystring so
+        # detail pages can offer "Back to results" that restores it.
+        if context['has_filters']:
+            self.request.session['candidates_list_qs'] = get_params.urlencode()
+        else:
+            self.request.session.pop('candidates_list_qs', None)
         # Position dropdown: include closed jobs (marked) so deep links from
         # closed-job contexts (retention report, talent pool) can be reflected
         # and re-applied — closed-job data is searchable by design (GAP-012).
@@ -165,6 +172,12 @@ class CandidateListView(LoginRequiredMixin, ListView):
         )
         context['stages'] = JobApplication.Status.choices
         context['is_hr'] = self.request.user.is_hr()
+        # Bulk-assign bar: active interviewers only (assignment checks
+        # availability/eligibility per row at POST time).
+        if self.request.user.is_hr():
+            context['bulk_interviewers'] = User.objects.filter(
+                role='IV', is_active=True,
+            ).order_by('first_name', 'last_name')
         # Count flagged APPLICATIONS (not candidates) so the badge matches
         # the rows the Needs Review tab renders - one flagged candidate
         # applied to N jobs shows N rows, and terminal-status applications
@@ -206,6 +219,26 @@ class CandidateDetailView(LoginRequiredMixin, DetailView):
         context['is_hr'] = self.request.user.is_hr()
         context['is_management'] = self.request.user.is_management()
 
+        # Perf audit N+1 #2: _app_row.html reads app.eligible_interviewers
+        # per row — one full interviewer-table query + N Python eligibility
+        # checks PER application. Interviewers are filtered once here and
+        # grouped per job; the template consumes the precomputed list.
+        if context['is_hr']:
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            interviewers = list(
+                User.objects.filter(role='IV', is_active=True)
+                .order_by('first_name', 'last_name')
+            )
+            eligible_by_job = {}
+            for app in applications:
+                job = app.job
+                if job.pk not in eligible_by_job:
+                    eligible_by_job[job.pk] = [
+                        u for u in interviewers if u.is_fully_eligible_for(job)
+                    ]
+            context['eligible_by_job'] = eligible_by_job
+
         # Panel consensus is rendered via the app.panel_consensus property
         # inside the row partial; no precompute here.
 
@@ -214,6 +247,15 @@ class CandidateDetailView(LoginRequiredMixin, DetailView):
             (app, job_fit(self.object, app.job))
             for app in applications
         ]
+        # Audit trail of system-sent candidate emails (rejection,
+        # acceptance, invitation, confirmation). HR-facing visibility for
+        # the automation that previously wrote to the console only.
+        context['outbound_emails'] = self.object.outbound_emails.all()[:10]
+        # Restore-the-search link: present when the user arrived from a
+        # filtered candidates list (querystring remembered by the list view).
+        list_qs = self.request.session.get('candidates_list_qs')
+        if list_qs:
+            context['list_return_url'] = f'{reverse("candidates:list")}?{list_qs}'
         context.update(workload_context())
         return context
 
@@ -740,8 +782,8 @@ class AssignApplicationView(LoginRequiredMixin, View):
             messages.error(
                 request,
                 f'{interviewer.get_full_name() or interviewer.username} has no '
-                f'availability on file. Add their weekly availability before '
-                f'assigning.',
+                f'availability on file. They can add their weekly windows at '
+                f'/my-availability/ — assignment is blocked until then.',
             )
             return redirect('candidates:detail', pk=app.candidate_id)
 
@@ -1241,3 +1283,92 @@ class BulkMarkReviewedView(LoginRequiredMixin, View):
         messages.success(request, f'Marked {count} candidate{"s" if count != 1 else ""} as reviewed.')
         return redirect('candidates:list')
 
+
+
+class BulkAssignView(LoginRequiredMixin, View):
+    """HR only: assign several applications to one interviewer in one POST.
+
+    Audit gap: the shortlist→assign loop cost one page-load + one control
+    interaction per candidate. This endpoint applies the same role-match,
+    seniority, and availability rules as AssignApplicationView per row and
+    reports per-row outcomes; rows that fail any check are left untouched.
+    """
+
+    def post(self, request):
+        if request.user.is_management():
+            return HttpResponse('Management has read-only access.', status=403)
+        if not request.user.is_hr():
+            messages.error(request, 'Only HR can assign candidates.')
+            return redirect('candidates:list')
+
+        interviewer_id = request.POST.get('interviewer', '')
+        app_ids = [
+            p.strip() for p in request.POST.get('applications', '').split(',')
+            if p.strip().isdigit()
+        ]
+        if not app_ids:
+            messages.error(request, 'Select at least one candidate to assign.')
+            return redirect(request.POST.get('next') or 'candidates:list')
+
+        try:
+            interviewer = User.objects.get(pk=interviewer_id, role='IV', is_active=True)
+        except (User.DoesNotExist, ValueError):
+            messages.error(request, 'Choose an interviewer to assign.')
+            return redirect(request.POST.get('next') or 'candidates:list')
+
+        assignee = interviewer.get_full_name() or interviewer.username
+        assigned, skipped = [], []
+        apps = (
+            JobApplication.objects.filter(pk__in=app_ids)
+            .select_related('candidate', 'job')
+        )
+        for app in apps:
+            if app.status in ('hired', 'rejected'):
+                skipped.append((app, 'final decision already recorded'))
+                continue
+            if not interviewer.is_eligible_interviewer_for(app.job):
+                skipped.append((app, f'not qualified for {app.job.department or app.job.title}'))
+                continue
+            if not interviewer.meets_seniority_for(app.job):
+                skipped.append((app, 'seniority below the role requirement'))
+                continue
+            if not interviewer.has_availability():
+                skipped.append((app, 'interviewer has no availability on file'))
+                continue
+
+            previous = app.assigned_to
+            with transaction.atomic():
+                app.assigned_to = interviewer
+                app.panel_interviewers.add(interviewer)
+                if previous and previous != interviewer:
+                    app.panel_interviewers.remove(previous)
+                    Notification.objects.create(
+                        recipient=previous,
+                        message=(
+                            f'You were unassigned from {app.candidate.full_name} '
+                            f'({app.job.title}).'
+                        ),
+                        link=reverse('candidates:detail', kwargs={'pk': app.candidate_id}),
+                    )
+                app.save(update_fields=['assigned_to', 'updated_at'])
+            if previous != interviewer:
+                Notification.objects.create(
+                    recipient=interviewer,
+                    message=(
+                        f'New candidate assigned to you: {app.candidate.full_name} '
+                        f'for {app.job.title}.'
+                    ),
+                    link=reverse('candidates:detail', kwargs={'pk': app.candidate_id}),
+                )
+            assigned.append(app)
+
+        if assigned:
+            names = ', '.join(a.candidate.full_name for a in assigned[:3])
+            more = f' and {len(assigned) - 3} more' if len(assigned) > 3 else ''
+            messages.success(request, f'Assigned {len(assigned)} candidate(s) to {assignee}: {names}{more}.')
+        for app, reason in skipped[:5]:
+            messages.warning(request, f'Skipped {app.candidate.full_name}: {reason}.')
+        if len(skipped) > 5:
+            messages.warning(request, f'{len(skipped) - 5} more skipped.')
+
+        return redirect(request.POST.get('next') or 'candidates:list')

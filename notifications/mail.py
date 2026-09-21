@@ -12,6 +12,8 @@ from django.conf import settings
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
 
+from .models import OutboundEmail
+
 logger = logging.getLogger(__name__)
 
 # Text templates for plain-text email live here (APP_DIRS picks this up for
@@ -132,14 +134,36 @@ def send_candidate_email(template_name, context, candidate):
             '%s: candidate %s has no email on file; skipping send',
             template_name, candidate.pk,
         )
+        OutboundEmail.objects.create(
+            template_name=template_name,
+            recipient_email='',
+            candidate=candidate,
+            subject='',
+            success=False,
+        )
         return None
     context = {'candidate_name': candidate.full_name, **context}
     try:
-        return send_templated_email(template_name, context, [recipient])
+        count = send_templated_email(template_name, context, [recipient])
+        OutboundEmail.objects.create(
+            template_name=template_name,
+            recipient_email=recipient,
+            candidate=candidate,
+            subject=_default_subject(template_name),
+            success=bool(count),
+        )
+        return count
     except Exception:
         logger.exception(
             '%s: send to candidate %s failed; the triggering HR action is unaffected',
             template_name, candidate.pk,
+        )
+        OutboundEmail.objects.create(
+            template_name=template_name,
+            recipient_email=recipient,
+            candidate=candidate,
+            subject=_default_subject(template_name),
+            success=False,
         )
         return None
 

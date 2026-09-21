@@ -35,12 +35,12 @@
     <table class="table">
       <thead>
         <tr>
-          <th>Candidate</th>
-          <th>Position</th>
-          <th>Current Round</th>
-          <th>Assigned Interviewer</th>
-          <th>Status</th>
-          <th>Action</th>
+          <th scope="col">Candidate</th>
+          <th scope="col">Position</th>
+          <th scope="col">Current Round</th>
+          <th scope="col">Assigned Interviewer</th>
+          <th scope="col">Status</th>
+          <th scope="col">Action</th>
         </tr>
       </thead>
       <tbody>
@@ -97,12 +97,12 @@
     <table class="table">
       <thead>
         <tr>
-          <th>Candidate</th>
-          <th>Position</th>
-          <th>Round</th>
-          <th>Score</th>
-          {% if not is_interviewer %}<th>Interviewer</th>{% endif %}
-          <th>Submitted</th>
+          <th scope="col">Candidate</th>
+          <th scope="col">Position</th>
+          <th scope="col">Round</th>
+          <th scope="col">Score</th>
+          {% if not is_interviewer %}<th scope="col">Interviewer</th>{% endif %}
+          <th scope="col">Submitted</th>
         </tr>
       </thead>
       <tbody>
@@ -138,7 +138,7 @@
     {% endif %}
     {% for num in page_obj.paginator.page_range %}
       {% if num == page_obj.number %}
-      <span class="page-link current">{{ num }}</span>
+      <span class="page-link current" aria-current="page">{{ num }}</span>
       {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
       <a class="page-link" href="?page={{ num }}{% if request.GET.application %}&application={{ request.GET.application }}{% endif %}">{{ num }}</a>
       {% endif %}

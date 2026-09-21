@@ -982,3 +982,38 @@ class TestPriorRoundVisibility(FeedbackBaseTestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, 'HR can read this.')
 
+
+
+class FeedbackCompleteNudgeTests(FeedbackBaseTestCase):
+    """Audit regression: when every panel evaluator submitted, HR went
+    silent until the 7-day escalation. A 'ready to move' notification must
+    land on the job creator the moment the panel completes."""
+
+    def _submit_as(self, user, score=80):
+        self.client.force_login(user)
+        return self.client.post(
+            f'/feedback/{self.app.pk}/{self.round1.pk}/',
+            data={'score': score, 'notes': 'x', 'raw_notes': ''},
+        )
+
+    def test_nudge_fires_when_panel_completes(self):
+        from notifications.models import Notification
+        # Both interviewer and interviewer2 are on the panel.
+        self.app.panel_interviewers.add(self.interviewer, self.interviewer2)
+        self._submit_as(self.interviewer)
+        before = Notification.objects.filter(
+            message__contains='ready to move').count()
+        self._submit_as(self.interviewer2)
+        after = Notification.objects.filter(
+            message__contains='ready to move').count()
+        self.assertEqual(after, before + 1)
+
+    def test_no_nudge_while_panel_incomplete(self):
+        from notifications.models import Notification
+        self.app.panel_interviewers.add(self.interviewer, self.interviewer2)
+        before = Notification.objects.filter(
+            message__contains='ready to move').count()
+        self._submit_as(self.interviewer)
+        after = Notification.objects.filter(
+            message__contains='ready to move').count()
+        self.assertEqual(after, before)  # one evaluator still outstanding

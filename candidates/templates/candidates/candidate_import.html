@@ -19,19 +19,19 @@
     <div class="form-field">
       <label class="form-label" for="{{ form.job.id_for_label }}">Position</label>
       {{ form.job }}
-      {% if form.job.errors %}<p class="form-error">{{ form.job.errors.0 }}</p>{% endif %}
+      {% if form.job.errors %}<p class="form-error" id="{{ form.job.id_for_label }}_error" role="alert">{{ form.job.errors.0 }}</p>{% endif %}
     </div>
 
     <div class="form-field">
       <label class="form-label" for="{{ form.source.id_for_label }}">Source</label>
       {{ form.source }}
-      {% if form.source.errors %}<p class="form-error">{{ form.source.errors.0 }}</p>{% endif %}
+      {% if form.source.errors %}<p class="form-error" id="{{ form.source.id_for_label }}_error" role="alert">{{ form.source.errors.0 }}</p>{% endif %}
     </div>
 
     <div class="form-field">
       <label class="form-label" for="{{ form.profile_text.id_for_label }}">Profile text</label>
       {{ form.profile_text }}
-      {% if form.profile_text.errors %}<p class="form-error">{{ form.profile_text.errors.0 }}</p>{% endif %}
+      {% if form.profile_text.errors %}<p class="form-error" id="{{ form.profile_text.id_for_label }}_error" role="alert">{{ form.profile_text.errors.0 }}</p>{% endif %}
       <p class="form-help">{{ form.profile_text.help_text }}</p>
     </div>
 

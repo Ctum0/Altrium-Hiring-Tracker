@@ -304,6 +304,35 @@ class FeedbackFormView(LoginRequiredMixin, View):
                 link=reverse('candidates:detail', kwargs={'pk': self.application.candidate_id}),
             )
 
+        # All-evaluators-submitted nudge: when the current round's panel has
+        # fully reported, HR's next action is the pipeline move — say so
+        # instead of going silent until the 7-day escalation digest.
+        if (
+            self.round_obj.pk == self.application.current_round_id
+            and self.application.feedback_submitted
+            and self.application.job.created_by
+            and self.application.job.created_by != request.user
+        ):
+            panel = set(
+                self.application.panel_interviewers.values_list('pk', flat=True)
+            )
+            if self.application.assigned_to_id:
+                panel.add(self.application.assigned_to_id)
+            panel.discard(request.user.pk)
+            if panel and not panel - set(
+                InterviewFeedback.objects.filter(
+                    application=self.application, round=self.round_obj,
+                ).values_list('interviewer_id', flat=True)
+            ):
+                Notification.objects.create(
+                    recipient=self.application.job.created_by,
+                    message=(
+                        f'All feedback in for {self.application.candidate.full_name} '
+                        f'({self.round_obj.name}) — ready to move.'
+                    ),
+                    link=reverse('candidates:detail', kwargs={'pk': self.application.candidate_id}),
+                )
+
         messages.success(
             request,
             f'Feedback {action} for {self.application.candidate.full_name} '

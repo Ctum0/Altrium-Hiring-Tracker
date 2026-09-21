@@ -94,22 +94,46 @@
 
 {% if applications %}
 <div class="panel panel-pad glass-panel" style="box-shadow:var(--shadow-md)">
+  {% if user.is_hr %}
+  {# Audit gap: shortlist→assign cost one page-load per candidate. Bulk bar assigns all checked rows in one POST. #}
+  <form method="post" action="{% url 'candidates:bulk_assign' %}" id="bulk-assign-form" class="flex items-center gap-2" style="margin-bottom:var(--sp-2)">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+    <label class="text-xs text-muted" for="bulk-interviewer">Assign selected to</label>
+    <select class="form-select" id="bulk-interviewer" name="interviewer" style="max-width:220px" required>
+      <option value="">Choose interviewer…</option>
+      {% for iv in bulk_interviewers %}
+      <option value="{{ iv.pk }}">{{ iv.get_full_name|default:iv.username }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="btn btn-primary btn-sm">Assign selected</button>
+    <span class="text-xs text-muted">Same eligibility rules as single assignment apply per row.</span>
+  </form>
+  {% endif %}
   <div class="table-wrap" style="max-height:calc(100vh - 360px);overflow-y:auto">
   <table class="table">
     <thead>
       <tr>
-        <th>Candidate</th>
-        <th>Position</th>
-        <th>Stage</th>
-        <th>Score</th>
-        <th>Assigned to</th>
-        <th>Applied</th>
-        {% if user.is_hr %}<th>Move</th>{% endif %}
+        {% if user.is_hr %}<th scope="col"><input type="checkbox" id="check-all" aria-label="Select all candidates on this page"></th>{% endif %}
+        <th scope="col">Candidate</th>
+        <th scope="col">Position</th>
+        <th scope="col">Stage</th>
+        <th scope="col">Score</th>
+        <th scope="col">Assigned to</th>
+        <th scope="col">Applied</th>
+        {% if user.is_hr %}<th scope="col">Move</th>{% endif %}
       </tr>
     </thead>
     <tbody>
       {% for app in applications %}
       <tr id="app-row-{{ app.pk }}" class="cand-row">
+        {% if user.is_hr %}
+        <td>
+          {% if app.status != 'hired' and app.status != 'rejected' %}
+          <input type="checkbox" name="applications" value="{{ app.pk }}" form="bulk-assign-form" aria-label="Select {{ app.candidate.full_name }}">
+          {% endif %}
+        </td>
+        {% endif %}
         <td>
           <div class="cand-name-cell">
             <div class="cand-avatar cand-avatar-{{ app.candidate.full_name|avatar_index }}" aria-hidden="true">
@@ -153,29 +177,10 @@
         </td>
         <td class="text-muted text-xs">{{ app.created_at|date:'M j, Y' }}</td>
         {% if user.is_hr %}
-        <td style="min-width:140px">
+        <td>
+          {# Audit P0: 52 per-row stage dropdowns made the list a 143-control minefield. Stage moves now live on candidate detail (and the board); the row action is a single link. #}
           {% if app.status != 'hired' and app.status != 'rejected' and app.status != 'on_hold' %}
-          <select class="stage-select" name="stage"
-                  aria-label="Move {{ app.candidate.full_name }} to another stage"
-                  onchange="confirmStageMove(this)"
-                  hx-post="{% url 'pipeline:move' app.pk %}"
-                  hx-vals='{"source": "list"}'
-                  hx-target="#app-row-{{ app.pk }}"
-                  hx-swap="outerHTML"
-                  hx-trigger="stagechange"
-                  style="width:100%">
-            <option value="">Move to…</option>
-            <optgroup label="Advance to round">
-            {% for round in app.job.rounds.all %}
-            <option value="round:{{ round.pk }}">{{ round.name }}</option>
-            {% endfor %}
-            </optgroup>
-            <optgroup label="End candidacy">
-            <option value="status:hired">Hired</option>
-            <option value="status:rejected">Rejected</option>
-            <option value="status:on_hold">On Hold</option>
-            </optgroup>
-          </select>
+          <a href="{% url 'candidates:detail' app.candidate.pk %}" class="btn btn-secondary btn-xs">Move →</a>
           {% else %}
           <span class="text-xs text-muted">Final state</span>
           {% endif %}
@@ -195,7 +200,7 @@
   {% endif %}
   {% for num in page_obj.paginator.page_range %}
     {% if num == page_obj.number %}
-    <span class="page-link current">{{ num }}</span>
+    <span class="page-link current" aria-current="page">{{ num }}</span>
     {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
     <a class="page-link" href="?{{ qs_base }}&page={{ num }}">{{ num }}</a>
     {% endif %}
@@ -243,5 +248,15 @@
       }
     }
   });
+  // Bulk-assign: header checkbox toggles every row checkbox on this page.
+  (function () {
+    var checkAll = document.getElementById('check-all');
+    if (!checkAll) return;
+    checkAll.addEventListener('change', function () {
+      document.querySelectorAll('input[name="applications"]').forEach(function (cb) {
+        cb.checked = checkAll.checked;
+      });
+    });
+  })();
 </script>
 {% endblock %}

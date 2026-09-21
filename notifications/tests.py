@@ -890,3 +890,43 @@ class WeeklyDigestTests(TestCase):
             'Pending feedback:', 'Hires this week:',
         ):
             self.assertEqual(rendered.count(line), 1, line)
+
+
+class OutboundEmailLogTests(TestCase):
+    """Audit regression: candidate-facing emails wrote to the console only —
+    HR could not verify the system communicated on its behalf. Every
+    send/skip/failure must land in the OutboundEmail log."""
+
+    def setUp(self):
+        self.hr = User.objects.create_user(
+            username='hr', password='pass12345', role=Role.HR
+        )
+        self.candidate = Candidate.objects.create(
+            first_name='Log', last_name='Probe', email='logprobe@example.com',
+        )
+
+    def test_successful_send_logged(self):
+        from notifications.models import OutboundEmail
+        send_candidate_email('confirmation.txt', {'job_title': 'Dev'}, self.candidate)
+        row = OutboundEmail.objects.get(candidate=self.candidate)
+        self.assertEqual(row.template_name, 'confirmation.txt')
+        self.assertEqual(row.recipient_email, 'logprobe@example.com')
+        self.assertTrue(row.success)
+
+    def test_no_email_skip_logged(self):
+        from notifications.models import OutboundEmail
+        self.candidate.email = ''
+        self.candidate.save()
+        result = send_candidate_email('confirmation.txt', {'job_title': 'Dev'}, self.candidate)
+        self.assertIsNone(result)
+        row = OutboundEmail.objects.get(candidate=self.candidate)
+        self.assertFalse(row.success)
+        self.assertEqual(row.recipient_email, '')
+
+    def test_candidate_detail_shows_log(self):
+        from notifications.models import OutboundEmail
+        send_candidate_email('rejection.txt', {'job_title': 'Dev'}, self.candidate)
+        assert self.client.login(username='hr', password='pass12345')
+        r = self.client.get(reverse('candidates:detail', args=[self.candidate.pk]))
+        self.assertContains(r, 'Emails sent to candidate')
+        self.assertContains(r, 'logprobe@example.com')

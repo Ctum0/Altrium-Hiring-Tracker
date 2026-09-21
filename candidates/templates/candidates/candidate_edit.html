@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+{% block title %}Edit: {{ candidate.full_name }} | Altrium Tracker{% endblock %}
+{% block breadcrumb %}<a class="breadcrumb-link" href="{% url 'candidates:list' %}">Candidates</a><span class="breadcrumb-sep">/</span><a class="breadcrumb-link" href="{% url 'candidates:detail' candidate.pk %}">{{ candidate.full_name }}</a><span class="breadcrumb-sep">/</span>Edit{% endblock %}
+{% block page_title %}Edit: {{ candidate.full_name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Edit candidate profile</h1>
+    <p class="page-sub">Correct contact details and skills. Applications, feedback, and pipeline history are unchanged.</p>
+  </div>
+</div>
+
+<div class="form-card" style="max-width:640px">
+  {% if form.non_field_errors %}
+  <div class="alert alert-error" role="alert">{{ form.non_field_errors.0 }}</div>
+  {% endif %}
+  <form method="post" novalidate>
+    {% csrf_token %}
+    <div class="form-field">
+      <label class="form-label" for="{{ form.first_name.id_for_label }}">First name</label>
+      {{ form.first_name }}
+      {% if form.first_name.errors %}<p class="form-error" id="{{ form.first_name.id_for_label }}_error" role="alert">{{ form.first_name.errors.0 }}</p>{% endif %}
+    </div>
+    <div class="form-field">
+      <label class="form-label" for="{{ form.last_name.id_for_label }}">Last name</label>
+      {{ form.last_name }}
+      {% if form.last_name.errors %}<p class="form-error" id="{{ form.last_name.id_for_label }}_error" role="alert">{{ form.last_name.errors.0 }}</p>{% endif %}
+    </div>
+    <div class="form-field">
+      <label class="form-label" for="{{ form.email.id_for_label }}">Email</label>
+      {{ form.email }}
+      {% if form.email.errors %}<p class="form-error" id="{{ form.email.id_for_label }}_error" role="alert">{{ form.email.errors.0 }}</p>{% endif %}
+    </div>
+    <div class="form-field">
+      <label class="form-label" for="{{ form.phone.id_for_label }}">Phone</label>
+      {{ form.phone }}
+      {% if form.phone.errors %}<p class="form-error" id="{{ form.phone.id_for_label }}_error" role="alert">{{ form.phone.errors.0 }}</p>{% endif %}
+    </div>
+    <div class="form-field">
+      <label class="form-label" for="{{ form.skills.id_for_label }}">Skills</label>
+      {{ form.skills }}
+      {% if form.skills.errors %}<p class="form-error" id="{{ form.skills.id_for_label }}_error" role="alert">{{ form.skills.errors.0 }}</p>{% endif %}
+      <p class="form-help">Comma-separated. Skills drive the per-job match score and job-fit breakdown.</p>
+    </div>
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">Save changes</button>
+      <a href="{% url 'candidates:detail' candidate.pk %}" class="btn btn-secondary">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

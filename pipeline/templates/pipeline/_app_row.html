@@ -88,18 +88,34 @@
                   hx-trigger="change delay:200ms"
                   hx-include="this">
             <option value="">{% if app.assigned_to %}Keep current{% else %}Assign to...{% endif %}</option>
+            {% if eligible_by_job %}
+            {# Precomputed per-job eligible list from the view (perf audit N+1 #2). #}
+            {% for iv in eligible_by_job|get_item:app.job.pk %}
+            <option value="{{ iv.pk }}" {% if app.assigned_to_id == iv.pk %}selected{% endif %}>{{ iv.get_full_name|default:iv.username }}{% if iv.specialty %} &middot; {{ iv.specialty }}{% endif %}{% if workload_counts %}{% with load=workload_counts|get_item:iv.pk|default:"0" %}{% if load and team_avg_workload and load > team_avg_workload|floatformat:0 %} ({{ load }} active, above avg){% else %} ({{ load }} active){% endif %}{% endwith %}{% endif %}</option>
+            {% endfor %}
+            {% else %}
             {% for iv in app.eligible_interviewers %}
             <option value="{{ iv.pk }}" {% if app.assigned_to_id == iv.pk %}selected{% endif %}>{{ iv.get_full_name|default:iv.username }}{% if iv.specialty %} &middot; {{ iv.specialty }}{% endif %}{% if workload_counts %}{% with load=workload_counts|get_item:iv.pk|default:"0" %}{% if load and team_avg_workload and load > team_avg_workload|floatformat:0 %} ({{ load }} active, above avg){% else %} ({{ load }} active){% endif %}{% endwith %}{% endif %}</option>
             {% endfor %}
+            {% endif %}
             {% if app.assigned_to %}
             <option value="__unassign__">Unassign…</option>
             {% endif %}
           </select>
+          {% if eligible_by_job %}
+          {% if not app.assigned_to and not eligible_by_job|get_item:app.job.pk %}
+          <p class="text-xs" style="color:var(--status-pending);margin:4px 0 0" role="note">
+            No interviewer matches this role's domain and seniority requirements yet.
+            Update interviewer profiles on the <a href="{% url 'accounts:interviewer_roster' %}" style="color:inherit;text-decoration:underline">Interviewers roster</a>.
+          </p>
+          {% endif %}
+          {% else %}
           {% if not app.assigned_to and not app.eligible_interviewers %}
           <p class="text-xs" style="color:var(--status-pending);margin:4px 0 0" role="note">
             No interviewer matches this role's domain and seniority requirements yet.
             Update interviewer profiles on the <a href="{% url 'accounts:interviewer_roster' %}" style="color:inherit;text-decoration:underline">Interviewers roster</a>.
           </p>
+          {% endif %}
           {% endif %}
           <button type="submit" class="btn btn-primary btn-sm"
                   data-confirm-action="assign" data-app-pk="{{ app.pk }}">Assign</button>
@@ -151,12 +167,25 @@
       {% include 'pipeline/_panel_consensus.html' %}
 
       <!-- Card Footer -->
+      {% if app.status == 'hired' %}
+      <div class="panel-pad" role="note" style="background:var(--status-hired-bg);border:1px solid var(--status-hired);border-radius:var(--radius);margin:var(--sp-2) 0">
+        <strong style="color:var(--status-hired)">🎉 Hired — next steps</strong>
+        <ul class="text-xs text-muted" style="margin:var(--sp-2) 0 0;padding-left:18px">
+          <li>Acceptance email was sent automatically — verify in the email log below</li>
+          <li>Schedule the candidate's start date and share interview outcome with the hiring manager</li>
+          {% if is_hr %}<li>When all openings are filled, <strong>close the job</strong> from the job page so it stops accepting CVs</li>{% endif %}
+        </ul>
+      </div>
+      {% endif %}
       <div class="app-card-footer">
         <div>
-          Applied {{ app.created_at|date:"M j, Y" }} &middot; {% if app.feedbacks.count %}{{ app.feedbacks.count }} feedback submission(s){% else %}No round feedback recorded yet{% endif %}
-          {% if app.moves.exists %}
-          <div class="last-move">Last moved to <strong>{{ app.get_status_display }}{% if app.current_round %} &middot; {{ app.current_round.name }}{% endif %}</strong> by {{ app.moves.first.moved_by.get_full_name|default:app.moves.first.moved_by.username }} {{ app.moves.first.moved_at|date:"M j, g:i A" }}</div>
+          {# Perf audit N+1 #2: .count/.exists/.first on related managers bypass the view's prefetch cache and re-query per row. Use the cached .all lists instead. #}
+          {% with fb_list=app.feedbacks.all move_list=app.moves.all %}
+          Applied {{ app.created_at|date:"M j, Y" }} &middot; {% if fb_list %}{{ fb_list|length }} feedback submission(s){% else %}No round feedback recorded yet{% endif %}
+          {% if move_list %}
+          <div class="last-move">Last moved to <strong>{{ app.get_status_display }}{% if app.current_round %} &middot; {{ app.current_round.name }}{% endif %}</strong> by {{ move_list.0.moved_by.get_full_name|default:move_list.0.moved_by.username }} {{ move_list.0.moved_at|date:"M j, g:i A" }}</div>
           {% endif %}
+          {% endwith %}
         </div>
         <div class="flex gap-2">
           <a href="{% url 'feedback:list' %}?application={{ app.pk }}" class="btn btn-ghost btn-sm">View Feedback History &rarr;</a>

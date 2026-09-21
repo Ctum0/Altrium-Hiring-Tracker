@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static accounts_extras %}
 {% block title %}{{ candidate.full_name }} | Altrium Tracker{% endblock %}
-{% block breadcrumb %}<a class="breadcrumb-link" href="{% url 'candidates:list' %}">Candidates</a><span class="breadcrumb-sep">/</span>{{ candidate.full_name }}{% endblock %}
+{% block breadcrumb %}<a class="breadcrumb-link" href="{% if list_return_url %}{{ list_return_url }}{% else %}{% url 'candidates:list' %}{% endif %}">Candidates</a><span class="breadcrumb-sep">/</span>{{ candidate.full_name }}{% endblock %}
 {% block page_title %}{{ candidate.full_name }}{% endblock %}
 {% block content_class %}candidate-detail{% endblock %}
 {% block content %}
@@ -33,7 +33,7 @@
       <button type="submit" class="btn btn-sm cd-btn-danger-ghost">Remove Candidate</button>
     </form>
     {% endif %}
-    <a href="{% url 'candidates:list' %}" class="btn btn-secondary btn-sm">All candidates</a>
+    <a href="{% if list_return_url %}{{ list_return_url }}{% else %}{% url 'candidates:list' %}{% endif %}" class="btn btn-secondary btn-sm">{% if list_return_url %}Back to results{% else %}All candidates{% endif %}</a>
   </div>
 </div>
 
@@ -159,6 +159,22 @@
     {% if candidate.resume_file %}
     <div class="resume-cta">
       <a class="btn btn-secondary btn-sm" href="{{ candidate.resume_file.url }}" target="_blank" rel="noopener">View original resume PDF &rarr;</a>
+    </div>
+    {% endif %}
+
+    {% if outbound_emails %}
+    <div class="panel-pad" style="margin-top:var(--sp-3);border-top:1px solid var(--glass-border)">
+      <h3 class="section-label" style="margin:0 0 var(--sp-2)">Emails sent to candidate</h3>
+      {% for e in outbound_emails %}
+      <div class="flex items-center justify-between text-xs" style="padding:3px 0;{% if not forloop.last %}border-bottom:1px solid var(--border);{% endif %}">
+        <span>
+          <span class="badge {% if e.success %}badge-success{% else %}badge-danger{% endif %}">{{ e.success|yesno:"Sent,Failed" }}</span>
+          {{ e.template_name|cut:'.txt'|title }}
+          {% if e.recipient_email %}&middot; {{ e.recipient_email }}{% endif %}
+        </span>
+        <span class="text-muted" style="white-space:nowrap">{{ e.created_at|date:'M j, H:i' }}</span>
+      </div>
+      {% endfor %}
     </div>
     {% endif %}
   </div>

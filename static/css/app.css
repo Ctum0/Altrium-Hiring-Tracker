@@ -2322,6 +2322,55 @@ a:hover {
   box-shadow: none !important;
 }
 
+/* Generic semantic badges used by ai/panel.py consensus output
+   (badge-success/info/warning/danger). Previously undefined — the panel
+   consensus pills rendered as bare unstyled text (audit C4/A2). Mapped to
+   the same semantic status tokens the rest of the product uses so
+   "Unanimous: Recommend Hire" reads green like every other hire signal. */
+.badge-success {
+  color: var(--status-hired) !important;
+  background: var(--status-hired-bg) !important;
+  border: 1px solid var(--status-hired) !important;
+  font-size: var(--text-xs) !important;
+  font-weight: 600 !important;
+  padding: 4px 10px !important;
+  border-radius: var(--radius-pill) !important;
+  box-shadow: none !important;
+}
+
+.badge-danger {
+  color: var(--status-rejected) !important;
+  background: var(--status-rejected-bg) !important;
+  border: 1px solid var(--status-rejected) !important;
+  font-size: var(--text-xs) !important;
+  font-weight: 600 !important;
+  padding: 4px 10px !important;
+  border-radius: var(--radius-pill) !important;
+  box-shadow: none !important;
+}
+
+.badge-info {
+  color: var(--status-new) !important;
+  background: var(--status-new-bg) !important;
+  border: 1px solid var(--status-new) !important;
+  font-size: var(--text-xs) !important;
+  font-weight: 600 !important;
+  padding: 4px 10px !important;
+  border-radius: var(--radius-pill) !important;
+  box-shadow: none !important;
+}
+
+.badge-warning {
+  color: var(--status-pending) !important;
+  background: var(--status-pending-bg) !important;
+  border: 1px solid var(--status-pending) !important;
+  font-size: var(--text-xs) !important;
+  font-weight: 600 !important;
+  padding: 4px 10px !important;
+  border-radius: var(--radius-pill) !important;
+  box-shadow: none !important;
+}
+
 /* Theme-aware badge text contrast (AA on tinted chip fills) */
 .badge-new { color: #5aa8ff !important; }
 .badge-shortlisted { color: #FFB547 !important; }

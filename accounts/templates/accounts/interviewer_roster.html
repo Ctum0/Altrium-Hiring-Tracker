@@ -21,13 +21,13 @@
   <table class="table">
     <thead>
       <tr>
-        <th>Interviewer</th>
-        <th>Specialty</th>
-        <th>Seniority</th>
-        <th>Availability</th>
-        <th>Active Load</th>
-        <th>Pending Feedback</th>
-        {% if user.is_hr %}<th>Action</th>{% endif %}
+        <th scope="col">Interviewer</th>
+        <th scope="col">Specialty</th>
+        <th scope="col">Seniority</th>
+        <th scope="col">Availability</th>
+        <th scope="col">Active Load</th>
+        <th scope="col">Pending Feedback</th>
+        {% if user.is_hr %}<th scope="col">Action</th>{% endif %}
       </tr>
     </thead>
     <tbody>

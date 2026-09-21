@@ -1,6 +1,5 @@
 """URL configuration for altrium_tracker project."""
 from django.conf import settings
-from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 from django.views.generic import RedirectView
@@ -24,5 +23,12 @@ urlpatterns = [
     path('feedback/', include('feedback.urls')),
 ]
 
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+if settings.DEBUG and not getattr(settings, 'STORAGES', {}).get('default', {}).get('BACKEND', '').endswith('s3boto3.S3Boto3Storage'):
+    # Local dev only: serve CVs through an authenticated, role-checked view.
+    # Production uses the private S3 bucket with presigned URLs (settings.py).
+    # The old static() route served every CV to anonymous clients
+    # (audit SEC-MEDIA-001, critical).
+    from candidates.media_views import ProtectedMediaView
+    urlpatterns += [
+        path('media/<path:path>', ProtectedMediaView.as_view()),
+    ]

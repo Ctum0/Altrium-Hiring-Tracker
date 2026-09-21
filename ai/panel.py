@@ -10,9 +10,15 @@ def synthesize_panel_consensus(application):
     Returns a dictionary with vote tallies, weighted score, divergence status,
     agreed strengths, conflicting areas, and AI recommended resolution.
     """
-    feedbacks = list(
-        application.feedbacks.select_related('interviewer', 'round').order_by('submitted_at')
-    )
+    # Perf audit: prefer the view's prefetch cache when populated —
+    # .all() on a prefetched relation is free; the old select_related()
+    # query re-fetched feedbacks on every call (24x per candidate page).
+    feedbacks = list(application.feedbacks.all())
+    if feedbacks and not feedbacks[0]._state.fields_cache.get('interviewer'):
+        feedbacks = list(
+            application.feedbacks.select_related('interviewer', 'round').order_by('submitted_at')
+        )
+    feedbacks.sort(key=lambda fb: fb.submitted_at)
     if not feedbacks:
         return None
 

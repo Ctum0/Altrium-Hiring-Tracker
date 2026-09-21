@@ -1355,22 +1355,22 @@ class CandidateDeleteMediaTests(CandidatesBaseTestCase):
 
 
 class StageSelectTerminalStateTests(CandidatesBaseTestCase):
-    """P2-14: candidate_list.html must not offer the stage-move select for
-    a terminal-status application, matching pipeline/_list_app_row.html's
-    "Final state" treatment."""
+    """Audit P0 remediation: the per-row stage dropdown was removed from
+    candidate_list.html (143-control page); the row action is now a
+    'Move →' link for non-terminal rows and 'Final state' text for
+    terminal ones. These tests pin the row-action contract."""
 
-    def test_non_terminal_status_shows_select(self):
+    def test_non_terminal_status_shows_move_link(self):
         self.login('hr')
         response = self.client.get(reverse('candidates:list') + '?all=1')
-        self.assertContains(response, 'class="stage-select"')
+        self.assertContains(response, 'Move →')
         self.assertNotContains(response, 'Final state')
 
-    def test_terminal_status_hides_select_and_shows_final_state(self):
+    def test_terminal_status_shows_final_state(self):
         self.application.status = JobApplication.Status.HIRED
         self.application.save(update_fields=['status'])
         self.login('hr')
         response = self.client.get(reverse('candidates:list') + '?all=1')
-        self.assertNotContains(response, 'class="stage-select"')
         self.assertContains(response, 'Final state')
 
 
@@ -2483,3 +2483,126 @@ class OcrFallbackTests(CandidatesBaseTestCase):
             outcome = ingest_cv(self._scanned_pdf_file(), self.job, source='upload')
         self.assertIsNotNone(outcome['failed'])
         self.assertIsNone(outcome['candidate'])
+
+
+class CandidateEditPageTests(CandidatesBaseTestCase):
+    """Audit regression: /candidates/<pk>/edit/ 500'd for every role —
+    the candidate_edit.html template did not exist (TemplateDoesNotExist).
+    HR's only contact-edit surface must render and save."""
+
+    def test_hr_gets_edit_form(self):
+        self.login('hr')
+        r = self.client.get(reverse('candidates:edit', args=[self.candidate.pk]))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'Edit candidate profile')
+        self.assertContains(r, 'value="Ada"')
+
+    def test_hr_post_saves_changes(self):
+        self.login('hr')
+        r = self.client.post(
+            reverse('candidates:edit', args=[self.candidate.pk]),
+            {'first_name': 'Ada', 'last_name': 'Lovelace',
+             'email': 'ada@example.com', 'phone': '555-1234',
+             'skills': 'Python, Django, Testing'},
+        )
+        self.assertRedirects(r, reverse('candidates:detail', args=[self.candidate.pk]))
+        self.candidate.refresh_from_db()
+        self.assertEqual(self.candidate.phone, '555-1234')
+
+    def test_interviewer_cannot_edit(self):
+        self.login('iv')
+        r = self.client.post(
+            reverse('candidates:edit', args=[self.candidate.pk]),
+            {'first_name': 'X'},
+        )
+        self.assertEqual(r.status_code, 302)
+        self.candidate.refresh_from_db()
+        self.assertEqual(self.candidate.first_name, 'Ada')
+
+
+class BulkAssignTests(CandidatesBaseTestCase):
+    """Audit regression: shortlist→assign was one page-load per candidate.
+    BulkAssignView applies the same eligibility rules per row and reports
+    per-row outcomes."""
+
+    def setUp(self):
+        super().setUp()
+        from jobs.models import InterviewRound
+        self.app2 = JobApplication.objects.create(
+            candidate=Candidate.objects.create(
+                first_name='Grace', last_name='Hopper',
+                email='grace@example.com', skills='Python',
+            ),
+            job=self.job, status=JobApplication.Status.NEW,
+        )
+        # Both apps unassigned, non-terminal.
+        JobApplication.objects.filter(pk__in=[self.application.pk, self.app2.pk]).update(
+            assigned_to=None, status=JobApplication.Status.NEW,
+        )
+
+    def test_bulk_assigns_all_eligible(self):
+        self.login('hr')
+        ids = f'{self.application.pk},{self.app2.pk}'
+        r = self.client.post(
+            reverse('candidates:bulk_assign'),
+            {'applications': ids, 'interviewer': self.interviewer.pk},
+        )
+        self.assertEqual(r.status_code, 302)
+        self.application.refresh_from_db()
+        self.app2.refresh_from_db()
+        self.assertEqual(self.application.assigned_to, self.interviewer)
+        self.assertEqual(self.app2.assigned_to, self.interviewer)
+
+    def test_bulk_skips_terminal_without_touching_others(self):
+        self.application.status = JobApplication.Status.HIRED
+        self.application.save()
+        self.login('hr')
+        ids = f'{self.application.pk},{self.app2.pk}'
+        self.client.post(
+            reverse('candidates:bulk_assign'),
+            {'applications': ids, 'interviewer': self.interviewer.pk},
+        )
+        self.application.refresh_from_db()
+        self.app2.refresh_from_db()
+        self.assertIsNone(self.application.assigned_to)  # hired: skipped
+        self.assertEqual(self.app2.assigned_to, self.interviewer)
+
+    def test_bulk_requires_selection(self):
+        self.login('hr')
+        r = self.client.post(
+            reverse('candidates:bulk_assign'),
+            {'applications': '', 'interviewer': self.interviewer.pk},
+        )
+        self.assertEqual(r.status_code, 302)
+        self.application.refresh_from_db()
+        self.assertIsNone(self.application.assigned_to)
+
+    def test_bulk_forbidden_for_interviewer(self):
+        self.login('iv')
+        r = self.client.post(
+            reverse('candidates:bulk_assign'),
+            {'applications': str(self.application.pk), 'interviewer': self.interviewer.pk},
+        )
+        self.assertEqual(r.status_code, 302)
+        self.application.refresh_from_db()
+        self.assertIsNone(self.application.assigned_to)
+
+
+class ListReturnContextTests(CandidatesBaseTestCase):
+    """Audit regression: detail pages hard-linked to the bare list,
+    stranding search/filter context. The list view remembers the filtered
+    querystring and detail pages offer 'Back to results'."""
+
+    def test_filtered_list_remembered(self):
+        self.login('hr')
+        self.client.get(reverse('candidates:list'), {'job': self.job.pk, 'stage': 'new'})
+        r = self.client.get(reverse('candidates:detail', args=[self.candidate.pk]))
+        self.assertContains(r, 'Back to results')
+        self.assertContains(r, 'job=%d' % self.job.pk)
+
+    def test_unfiltered_list_shows_plain_link(self):
+        self.login('hr')
+        self.client.get(reverse('candidates:list'))
+        r = self.client.get(reverse('candidates:detail', args=[self.candidate.pk]))
+        self.assertContains(r, 'All candidates')
+        self.assertNotContains(r, 'Back to results')

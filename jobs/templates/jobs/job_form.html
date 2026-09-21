@@ -20,27 +20,27 @@
     <div class="form-field">
       <label class="form-label" for="{{ form.title.id_for_label }}">Title</label>
       {{ form.title }}
-      {% if form.title.errors %}<p class="form-error">{{ form.title.errors.0 }}</p>{% endif %}
+      {% if form.title.errors %}<p class="form-error" id="{{ form.title.id_for_label }}_error" role="alert">{{ form.title.errors.0 }}</p>{% endif %}
     </div>
 
     <div class="form-row">
       <div class="form-field">
         <label class="form-label" for="{{ form.department.id_for_label }}">Department</label>
         {{ form.department }}
-        {% if form.department.errors %}<p class="form-error">{{ form.department.errors.0 }}</p>{% endif %}
+        {% if form.department.errors %}<p class="form-error" id="{{ form.department.id_for_label }}_error" role="alert">{{ form.department.errors.0 }}</p>{% endif %}
       </div>
 
       <div class="form-field">
         <label class="form-label" for="{{ form.domain.id_for_label }}">Domain</label>
         {{ form.domain }}
-        {% if form.domain.errors %}<p class="form-error">{{ form.domain.errors.0 }}</p>{% endif %}
+        {% if form.domain.errors %}<p class="form-error" id="{{ form.domain.id_for_label }}_error" role="alert">{{ form.domain.errors.0 }}</p>{% endif %}
         <p class="form-help">{{ form.domain.help_text }}</p>
       </div>
 
       <div class="form-field">
         <label class="form-label" for="{{ form.seniority.id_for_label }}">Seniority level</label>
         {{ form.seniority }}
-        {% if form.seniority.errors %}<p class="form-error">{{ form.seniority.errors.0 }}</p>{% endif %}
+        {% if form.seniority.errors %}<p class="form-error" id="{{ form.seniority.id_for_label }}_error" role="alert">{{ form.seniority.errors.0 }}</p>{% endif %}
         <p class="form-help">{{ form.seniority.help_text }}</p>
       </div>
     </div>
@@ -48,14 +48,14 @@
     <div class="form-field">
       <label class="form-label" for="{{ form.description.id_for_label }}">Description</label>
       {{ form.description }}
-      {% if form.description.errors %}<p class="form-error">{{ form.description.errors.0 }}</p>{% endif %}
+      {% if form.description.errors %}<p class="form-error" id="{{ form.description.id_for_label }}_error" role="alert">{{ form.description.errors.0 }}</p>{% endif %}
       <p class="form-help">Share the responsibilities, team, and what you are looking for.</p>
     </div>
 
     <div class="form-field">
       <label class="form-label" for="{{ form.requirements.id_for_label }}">Required skills</label>
       {{ form.requirements }}
-      {% if form.requirements.errors %}<p class="form-error">{{ form.requirements.errors.0 }}</p>{% endif %}
+      {% if form.requirements.errors %}<p class="form-error" id="{{ form.requirements.id_for_label }}_error" role="alert">{{ form.requirements.errors.0 }}</p>{% endif %}
       <p class="form-help">Comma-separated skills candidates must have. Used for automated scoring.</p>
     </div>
 
@@ -63,20 +63,20 @@
       <div class="form-field">
         <label class="form-label" for="{{ form.auto_reject_score.id_for_label }}">Auto-reject baseline score</label>
         {{ form.auto_reject_score }}
-        {% if form.auto_reject_score.errors %}<p class="form-error">{{ form.auto_reject_score.errors.0 }}</p>{% endif %}
+        {% if form.auto_reject_score.errors %}<p class="form-error" id="{{ form.auto_reject_score.id_for_label }}_error" role="alert">{{ form.auto_reject_score.errors.0 }}</p>{% endif %}
       </div>
 
       <div class="form-field">
         <label class="form-label" for="{{ form.num_openings.id_for_label }}">Number of openings</label>
         {{ form.num_openings }}
-        {% if form.num_openings.errors %}<p class="form-error">{{ form.num_openings.errors.0 }}</p>{% endif %}
+        {% if form.num_openings.errors %}<p class="form-error" id="{{ form.num_openings.id_for_label }}_error" role="alert">{{ form.num_openings.errors.0 }}</p>{% endif %}
         <p class="form-help">How many positions to fill for this posting (default: 1).</p>
       </div>
 
       <div class="form-field">
         <label class="form-label" for="{{ form.hiring_manager.id_for_label }}">Hiring manager</label>
         {{ form.hiring_manager }}
-        {% if form.hiring_manager.errors %}<p class="form-error">{{ form.hiring_manager.errors.0 }}</p>{% endif %}
+        {% if form.hiring_manager.errors %}<p class="form-error" id="{{ form.hiring_manager.id_for_label }}_error" role="alert">{{ form.hiring_manager.errors.0 }}</p>{% endif %}
       </div>
     </div>
 

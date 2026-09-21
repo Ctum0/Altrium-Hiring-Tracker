@@ -3,6 +3,11 @@
 {% block breadcrumb %}<a class="breadcrumb-link" href="{% url 'jobs:list' %}">Jobs</a><span class="breadcrumb-sep">/</span>{{ job.title }}{% endblock %}
 {% block page_title %}{{ job.title }}{% endblock %}
 {% block content %}
+{% if can_edit and job.is_active and job.is_fully_hired %}
+<div class="alert alert-success" role="status" style="margin-bottom:var(--sp-4)">
+  <span>All {{ job.num_openings }} opening{{ job.num_openings|pluralize }} filled — every hire has been made. Consider <strong>closing this job</strong> so it stops accepting new CVs.</span>
+</div>
+{% endif %}
 <div class="page-header">
   <div>
     <h1 class="page-title">{{ job.title }}</h1>
@@ -96,12 +101,12 @@
     <table class="table">
       <thead>
         <tr>
-          <th>Order</th>
-          <th>Round name</th>
-          <th>Candidates in round</th>
-          <th>Assigned interviewer</th>
-          <th>Next interview</th>
-          {% if can_edit %}<th></th>{% endif %}
+          <th scope="col">Order</th>
+          <th scope="col">Round name</th>
+          <th scope="col">Candidates in round</th>
+          <th scope="col">Assigned interviewer</th>
+          <th scope="col">Next interview</th>
+          {% if can_edit %}<th scope="col"></th>{% endif %}
         </tr>
       </thead>
       <tbody>
@@ -178,11 +183,11 @@
     <table class="table">
       <thead>
         <tr>
-          <th>Candidate</th>
-          <th>Email</th>
-          <th>Previous role</th>
-          <th>Score</th>
-          <th></th>
+          <th scope="col">Candidate</th>
+          <th scope="col">Email</th>
+          <th scope="col">Previous role</th>
+          <th scope="col">Score</th>
+          <th scope="col"></th>
         </tr>
       </thead>
       <tbody>

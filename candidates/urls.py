@@ -22,6 +22,7 @@ urlpatterns = [
     path('<int:pk>/score/', views.ScoreUpdateView.as_view(), name='score'),
     path('applications/<int:pk>/ai-fit/', views.AiFitSummaryView.as_view(), name='ai_fit'),
     path('applications/<int:pk>/assign/', views.AssignApplicationView.as_view(), name='assign'),
+    path('bulk-assign/', views.BulkAssignView.as_view(), name='bulk_assign'),
     path(
         'applications/<int:pk>/interview-details/',
         views.InterviewDetailsView.as_view(),

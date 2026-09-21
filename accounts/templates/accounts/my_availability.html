@@ -27,17 +27,17 @@
       <div class="form-field" style="margin:0">
         <label class="form-label" for="{{ form.weekday.id_for_label }}">Weekday</label>
         {{ form.weekday }}
-        {% if form.weekday.errors %}<p class="form-error">{{ form.weekday.errors.0 }}</p>{% endif %}
+        {% if form.weekday.errors %}<p class="form-error" id="{{ form.weekday.id_for_label }}_error" role="alert">{{ form.weekday.errors.0 }}</p>{% endif %}
       </div>
       <div class="form-field" style="margin:0">
         <label class="form-label" for="{{ form.start_time.id_for_label }}">Start</label>
         {{ form.start_time }}
-        {% if form.start_time.errors %}<p class="form-error">{{ form.start_time.errors.0 }}</p>{% endif %}
+        {% if form.start_time.errors %}<p class="form-error" id="{{ form.start_time.id_for_label }}_error" role="alert">{{ form.start_time.errors.0 }}</p>{% endif %}
       </div>
       <div class="form-field" style="margin:0">
         <label class="form-label" for="{{ form.end_time.id_for_label }}">End</label>
         {{ form.end_time }}
-        {% if form.end_time.errors %}<p class="form-error">{{ form.end_time.errors.0 }}</p>{% endif %}
+        {% if form.end_time.errors %}<p class="form-error" id="{{ form.end_time.id_for_label }}_error" role="alert">{{ form.end_time.errors.0 }}</p>{% endif %}
       </div>
       <div class="form-field" style="margin:0;padding-top:26px">
         <button type="submit" class="btn btn-primary btn-sm">Add window</button>

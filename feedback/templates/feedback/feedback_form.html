@@ -57,7 +57,7 @@
     <div class="form-field">
       <label class="form-label" for="{{ form.raw_notes.id_for_label }}">Raw notes</label>
       {{ form.raw_notes }}
-      {% if form.raw_notes.errors %}<p class="form-error">{{ form.raw_notes.errors.0 }}</p>{% endif %}
+      {% if form.raw_notes.errors %}<p class="form-error" id="{{ form.raw_notes.id_for_label }}_error" role="alert">{{ form.raw_notes.errors.0 }}</p>{% endif %}
       <p class="form-help">Paste messy notes; use Summarize to polish them below.</p>
       <div style="margin-top:var(--sp-2)">
         <button type="button" id="ai-polish-btn" class="btn btn-secondary btn-sm"
@@ -77,14 +77,14 @@
     <div class="form-field">
       <label class="form-label" for="{{ form.notes.id_for_label }}">Feedback</label>
       {{ form.notes }}
-      {% if form.notes.errors %}<p class="form-error">{{ form.notes.errors.0 }}</p>{% endif %}
+      {% if form.notes.errors %}<p class="form-error" id="{{ form.notes.id_for_label }}_error" role="alert">{{ form.notes.errors.0 }}</p>{% endif %}
       <p class="form-help">Your polished feedback for the recruitment record.</p>
     </div>
 
     <div class="form-field">
       <label class="form-label" for="{{ form.score.id_for_label }}">Overall score</label>
       {{ form.score }}
-      {% if form.score.errors %}<p class="form-error">{{ form.score.errors.0 }}</p>{% endif %}
+      {% if form.score.errors %}<p class="form-error" id="{{ form.score.id_for_label }}_error" role="alert">{{ form.score.errors.0 }}</p>{% endif %}
       <p class="form-help">
         Optional when the scorecard above is filled: it is computed as the criteria average.
         Required otherwise.

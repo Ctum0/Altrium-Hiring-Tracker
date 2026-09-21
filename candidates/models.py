@@ -239,9 +239,19 @@ class JobApplication(models.Model):
 
     @property
     def panel_consensus(self):
-        """Synthesizes multi-interviewer feedback and returns progressive weighted consensus."""
-        from ai.panel import synthesize_panel_consensus
-        return synthesize_panel_consensus(self)
+        """Synthesizes multi-interviewer feedback and returns progressive weighted consensus.
+
+        Memoized per instance: the detail template references this property
+        ~22 times per application row, and synthesize_panel_consensus
+        re-queries feedbacks on every call (perf audit: 24 duplicate
+        InterviewFeedback queries on a 2-app candidate page). Caching on
+        the instance keeps one computation per application per render
+        while still reflecting fresh DB state on new instances.
+        """
+        if '_panel_consensus_cache' not in self.__dict__:
+            from ai.panel import synthesize_panel_consensus
+            self.__dict__['_panel_consensus_cache'] = synthesize_panel_consensus(self)
+        return self.__dict__['_panel_consensus_cache']
 
     def is_panel_member_of(self, user):
         """Return True if *user* is on this application's hiring panel."""
