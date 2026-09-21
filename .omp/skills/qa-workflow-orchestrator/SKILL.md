@@ -37,6 +37,6 @@ VERIFY → UPDATE GAP LEDGER
 - **Do not immediately start modifying code.** FIX begins only after PRIORITIZE produces a prioritized list and the user (or an explicit standing instruction) has green-lit fixes.
 - **Read-only discovery:** GitHub read-only, database read-only, no production mutation, staging/local environment only. Source modification happens only in FIX.
 - **Least privilege throughout:** no production credentials, no secrets in logs/reports/screenshots/traces, storage states stay out of Git.
-- Resume support: the ledger's STATUS field is the workflow's state. Start any session by reading `PRODUCT_GAP_LEDGER.md` and `PRODUCT_FEATURE_GRAPH.md`; continue from the first non-VERIFIED entry or the phase the user names.
+- Resume support: the ledger's STATUS field is the workflow's state. Start any session by reading `PRODUCT_GAP_LEDGER.md` and `PRODUCT_FEATURE_GRAPH.md` (kept in the local `.archive/` directory — internal working docs, not part of the public repository; recreate them from the archived copies if missing); continue from the first non-VERIFIED entry or the phase the user names.
 - One cycle ends when every new ledger entry reaches VERIFIED or an explicit deferral (WONT-FIX with reason), and the feature graph reflects any new edges discovered.
 - Batch independent exploration slices as parallel subagents when the run is large; keep interpretation, prioritization, and fixes in the main session.

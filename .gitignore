@@ -77,3 +77,13 @@ qa/**
 tests/feature-transitions/artifacts/
 playwright-report/
 test-results/
+
+# Internal working documents archived locally (audit reports, QA process
+# docs, unused logos, one-off debug scripts) — not for the public repo.
+.archive/
+PRODUCT.md
+PRODUCT_GAP_LEDGER.md
+PRODUCT_FEATURE_GRAPH.md
+QA_TOOLING_INVENTORY.md
+qa/scripts/axe_detail.js
+qa/scripts/axe_headings.js
