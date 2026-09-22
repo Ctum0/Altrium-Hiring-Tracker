@@ -21,11 +21,22 @@ class Command(BaseCommand):
     help = 'Create the first admin account from ADMIN_* env vars (one-shot).'
 
     def handle(self, *args, **options):
+        gate = os.environ.get('BOOTSTRAP_ADMIN', '')
+        self.stdout.write(f'bootstrap_admin: BOOTSTRAP_ADMIN={gate!r}')
+
         existing = User.objects.filter(
             role=Role.ADMIN, is_active=True,
         ).exists() or User.objects.filter(is_superuser=True).exists()
         if existing:
             self.stdout.write('An admin already exists — nothing to do.')
+            return
+
+        if gate != 'true':
+            self.stdout.write(
+                'No admin exists and BOOTSTRAP_ADMIN is not true — skipping. '
+                'Set ADMIN_USERNAME/ADMIN_EMAIL/ADMIN_PASSWORD and '
+                'BOOTSTRAP_ADMIN=true, then redeploy.'
+            )
             return
 
         username = os.environ.get('ADMIN_USERNAME', '').strip()
