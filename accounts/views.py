@@ -160,6 +160,12 @@ class LoginView(auth_views.LoginView):
     redirect_authenticated_user = True
 
     def get_success_url(self):
+        # A ?next= target (e.g. the page a session drop interrupted) wins
+        # over the role default — the user returns to where they were.
+        # Relative paths only (open-redirect guard).
+        next_url = self.request.POST.get('next') or self.request.GET.get('next') or ''
+        if next_url.startswith('/') and not next_url.startswith('//'):
+            return next_url
         user = self.request.user
         if user.is_hr() or user.is_management():
             return reverse_lazy('accounts:hr_dashboard')
@@ -927,6 +933,16 @@ class MyCalendarView(LoginRequiredMixin, TemplateView):
         for date, apps in groupby(booked, key=lambda app: timezone.localdate(app.interview_at)):
             days.append({'date': date, 'apps': list(apps)})
         context['calendar_days'] = days
+        # Assigned but not yet scheduled: these still need HR to book a
+        # time, so the calendar answers 'what's on my plate' completely.
+        awaiting = (
+            JobApplication.objects
+            .filter(assigned_to=self.request.user, interview_at__isnull=True)
+            .exclude(status__in=['hired', 'rejected'])
+            .select_related('candidate', 'job', 'current_round')
+            .order_by('-updated_at')
+        )
+        context['awaiting_scheduling'] = list(awaiting)
         context['active_nav'] = 'calendar'
         return context
 

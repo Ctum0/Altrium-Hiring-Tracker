@@ -236,13 +236,22 @@ class CandidateDetailView(LoginRequiredMixin, DetailView):
                 .order_by('first_name', 'last_name')
             )
             eligible_by_job = {}
+            ineligible_by_job = {}
             for app in applications:
                 job = app.job
                 if job.pk not in eligible_by_job:
                     eligible_by_job[job.pk] = [
                         u for u in interviewers if u.is_fully_eligible_for(job)
                     ]
+                    # Greyed-out context: interviewers who fail eligibility,
+                    # with the human-readable reason, so the dropdown never
+                    # looks broken when it is actually a filter.
+                    ineligible_by_job[job.pk] = [
+                        (u, u.ineligibility_reason_for(job))
+                        for u in interviewers if not u.is_fully_eligible_for(job)
+                    ]
             context['eligible_by_job'] = eligible_by_job
+            context['ineligible_by_job'] = ineligible_by_job
 
         # Panel consensus is rendered via the app.panel_consensus property
         # inside the row partial; no precompute here.

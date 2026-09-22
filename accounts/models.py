@@ -170,6 +170,21 @@ class User(AbstractUser):
         """
         return self.is_eligible_interviewer_for(job) and self.meets_seniority_for(job)
 
+    def ineligibility_reason_for(self, job) -> str:
+        """Human-readable reason this interviewer is not fully eligible.
+
+        Empty string when eligible. Domain mismatch wins over seniority
+        (it is the harder blocker to fix); seniority floor is reported
+        with the actual levels so HR can see the gap at a glance.
+        """
+        if self.is_fully_eligible_for(job):
+            return ''
+        if not self.is_eligible_interviewer_for(job):
+            return f"domain mismatch ({(self.domain or self.specialty or 'unclassified').strip().lower()} ≠ {(job.domain or job.department or 'unclassified').strip().lower()})"
+        required = (job.seniority or '').strip().lower()
+        mine = (self.seniority or '').strip().lower() or 'unclassified'
+        return f"seniority too low ({mine} < {required})"
+
 
 class InterviewerAvailability(models.Model):
     """Recurring weekly availability window for an interviewer.

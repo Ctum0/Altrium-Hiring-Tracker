@@ -5414,3 +5414,27 @@ body.no-scroll {
 .job-card-board-link:hover {
   background: var(--brand-soft);
 }
+
+/* ===== UX FIXES: ineligible dropdown options =====
+   Greyed ineligible interviewers in the assign dropdown — the filter
+   becomes visible instead of looking broken. */
+select option:disabled {
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* ===== UX FIXES: login waking indicator ===== */
+.login-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--border);
+  border-top-color: var(--brand);
+  border-radius: 50%;
+  animation: login-spin 0.8s linear infinite;
+  vertical-align: -2px;
+  margin-right: 6px;
+}
+@keyframes login-spin {
+  to { transform: rotate(360deg); }
+}

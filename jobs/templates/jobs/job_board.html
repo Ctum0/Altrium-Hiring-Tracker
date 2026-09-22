@@ -210,12 +210,32 @@
         card.focus();
         return;
       }
+      var feedbackUrl = resp.headers.get('X-Feedback-URL');
       return resp.text().then(function(text) {
-        showBoardToast(text && text.indexOf('<') !== 0 ? text : ('Request failed (' + resp.status + ').'));
+        var msg = text && text.indexOf('<') !== 0 ? text : ('Request failed (' + resp.status + ').');
+        if (feedbackUrl) {
+          showBoardToast(messageHtml(msg, feedbackUrl));
+        } else {
+          showBoardToast(msg);
+        }
       });
     }).catch(function() {
       showBoardToast('Network error - check your connection and retry.');
     });
+  }
+
+  // Turn a blocked-move message into a message + one-click action link.
+  function messageHtml(message, url) {
+    var container = document.createElement('span');
+    var text = document.createElement('span');
+    text.textContent = message + ' ';
+    container.appendChild(text);
+    var link = document.createElement('a');
+    link.href = url;
+    link.textContent = 'Give feedback';
+    link.style.textDecoration = 'underline';
+    container.appendChild(link);
+    return container;
   }
 
   board.addEventListener('keydown', function(e) {
@@ -312,7 +332,12 @@
     var toast = document.createElement('div');
     toast.className = 'toast toast-error';
     toast.setAttribute('role', 'alert');
-    toast.textContent = message;
+    if (typeof message === 'string') {
+      toast.textContent = message;
+    } else {
+      // DOM node (message + action link) — append as markup.
+      toast.appendChild(message);
+    }
     var closeBtn = document.createElement('button');
     closeBtn.className = 'toast-dismiss';
     closeBtn.setAttribute('aria-label', 'Dismiss');

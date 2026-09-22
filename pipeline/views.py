@@ -80,10 +80,16 @@ class PipelineMoveView(LoginRequiredMixin, View):
             if from_round and from_round != to_round:
                 has_feedback = app.feedbacks.filter(round=from_round).exists()
                 if not has_feedback:
-                    return HttpResponse(
+                    from django.urls import reverse
+                    feedback_url = reverse('feedback:form', args=[app.pk, from_round.pk])
+                    response = HttpResponse(
                         'Feedback required to move candidate to a different round.',
                         status=409,
                     )
+                    # Machine-readable action target: the board toast turns
+                    # this into a one-click 'Give feedback' link.
+                    response['X-Feedback-URL'] = feedback_url
+                    return response
 
             app.current_round = to_round
             app.status = JobApplication.Status.IN_PROGRESS
