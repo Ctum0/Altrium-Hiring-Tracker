@@ -13,7 +13,6 @@ from django.utils.text import get_valid_filename
 from ai.cv_parser import extract_text
 from ai.matching import auto_apply
 from ai.services import parse_cv
-
 from notifications.mail import send_candidate_email
 
 from .dedup import find_fuzzy_match
@@ -119,8 +118,14 @@ def ingest_cv(f, job, *, source='upload'):
                 candidate = match
                 if needs_review:
                     candidate.needs_review = True
-                    candidate.needs_review_reasons = ', '.join(review_reasons) if review_reasons else ''
-                    candidate.save(update_fields=['needs_review', 'needs_review_reasons', 'updated_at'])
+                    candidate.needs_review_reasons = (
+                        ', '.join(review_reasons) if review_reasons else ''
+                    )
+                    candidate.save(
+                        update_fields=[
+                            'needs_review', 'needs_review_reasons', 'updated_at'
+                        ]
+                    )
             else:
                 result['created'] = True
         else:
@@ -136,6 +141,16 @@ def ingest_cv(f, job, *, source='upload'):
         # re-upload links to the existing person instead of creating an
         # orphan duplicate. Still store the CV so it is not lost.
         candidate = find_fuzzy_match(parsed)
+        if candidate is None and not parsed.get('first_name') and not parsed.get('last_name'):
+            # A nameless parse cannot be deduplicated (find_fuzzy_match
+            # returns None for nameless input) — surface that to HR so the
+            # silent-duplicate trap from the audit cannot happen.
+            review_reasons = list(review_reasons or [])
+            review_reasons.append(
+                'CV had no readable name or contact details — deduplication '
+                'was not possible; check for an existing record manually.'
+            )
+            needs_review = True
         if candidate is not None:
             result['fuzzy_duplicate'] = True
             candidate.resume_file = f

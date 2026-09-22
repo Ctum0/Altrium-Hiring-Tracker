@@ -354,8 +354,13 @@
   document.addEventListener('htmx:responseError', function(e) {
     var xhr = e.detail && e.detail.xhr;
     var msg = xhr && xhr.responseText;
+    var feedbackUrl = xhr ? xhr.getResponseHeader('X-Feedback-URL') : null;
     if (msg && msg.indexOf('<') !== 0) {
-      showToast(msg);
+      if (feedbackUrl) {
+        showToast(msg, feedbackUrl);
+      } else {
+        showToast(msg);
+      }
     } else {
       showToast('Request failed (' + (xhr ? xhr.status : 'error') + ').');
     }
@@ -393,7 +398,7 @@
     }
   });
 
-  function showToast(message) {
+  function showToast(message, actionUrl) {
     var existing = document.querySelector('.toast-stack');
     var stack = existing || document.createElement('div');
     if (!existing) {
@@ -403,7 +408,18 @@
     var toast = document.createElement('div');
     toast.className = 'toast toast-error';
     toast.setAttribute('role', 'alert');
-    toast.textContent = message;
+    if (actionUrl) {
+      var span = document.createElement('span');
+      span.textContent = message + ' ';
+      toast.appendChild(span);
+      var link = document.createElement('a');
+      link.href = actionUrl;
+      link.textContent = 'Give feedback';
+      link.style.textDecoration = 'underline';
+      toast.appendChild(link);
+    } else {
+      toast.textContent = message;
+    }
     var closeBtn = document.createElement('button');
     closeBtn.className = 'toast-dismiss';
     closeBtn.setAttribute('aria-label', 'Dismiss');
