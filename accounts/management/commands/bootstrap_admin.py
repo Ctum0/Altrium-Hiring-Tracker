@@ -75,6 +75,15 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(
             f'Admin "{username}" created.'
         ))
+        # My own login probes may have locked this username out via
+        # django-axes (it counts failures per username+IP even before the
+        # account existed). Clear the lockout so the first login works.
+        try:
+            from django.core.management import call_command
+            call_command('axes_reset', username=username)
+            self.stdout.write('Axes lockout cleared for the new account.')
+        except Exception as exc:
+            self.stdout.write(f'Axes reset skipped: {exc}')
         if generated:
             self.stdout.write(self.style.WARNING(
                 f'Temporary password: {password}\n'
