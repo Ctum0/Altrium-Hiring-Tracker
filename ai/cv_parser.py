@@ -10,14 +10,26 @@ def extract_text(uploaded_file) -> str:
     name = (uploaded_file.name or '').lower()
     data = uploaded_file.read()
     if name.endswith('.pdf'):
-        return _from_pdf(data)
+        return _clean(_from_pdf(data))
     if name.endswith('.docx'):
-        return _from_docx(data)
+        return _clean(_from_docx(data))
     # Fallback: try to read as text
     try:
-        return data.decode('utf-8', errors='replace')
+        return _clean(data.decode('utf-8', errors='replace'))
     except Exception:
         return ''
+
+
+def _clean(text):
+    """Normalize extraction artifacts.
+
+    pdfminer emits a raw form-feed (\\x0c) page separator that renders as
+    a junk glyph in the CV-text overlay (CV audit BUG D). Replace with a
+    newline and collapse the surrounding blank lines.
+    """
+    if not text:
+        return text
+    return text.replace('\x0c', '\n').replace('\n\n\n', '\n\n').strip()
 
 
 def _from_pdf(data: bytes) -> str:

@@ -7,7 +7,7 @@ from .models import AuditLog, User
 @admin.register(User)
 class CustomUserAdmin(UserAdmin):
     fieldsets = UserAdmin.fieldsets + (
-        ('Role', {'fields': ('role', 'specialty', 'seniority', 'domain')}),
+        ('Role', {'fields': ('role', 'specialty', 'seniority', 'domain', 'photo')}),
         ('Security', {'fields': ('force_password_change',)}),
     )
     list_display = ('username', 'email', 'role', 'seniority', 'domain', 'is_active', 'force_password_change')

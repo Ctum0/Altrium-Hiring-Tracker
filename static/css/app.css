@@ -173,6 +173,12 @@
   --text-base: 1rem;
   --text-lg: 1.125rem;
   --text-xl: 1.25rem;
+
+  /* Layout-audit H-1: --radius-md and --transition-fast were used by the
+     user-menu family without ever being defined — border-radius and
+     transition declarations silently dropped. Define both. */
+  --radius-md: 12px;
+  --transition-fast: 120ms ease;
   --text-2xl: 1.5rem;
   --text-3xl: 1.75rem;
 
@@ -3120,6 +3126,10 @@ a:hover {
 .text-muted { color: var(--muted); }
 .text-sm { font-size: var(--text-sm); }
 .text-xs { font-size: var(--text-xs); }
+/* Layout-audit P2-2: .text-micro is used across consensus/dashboard
+   templates but was never defined — those labels rendered at inherited
+   size instead of the micro scale. */
+.text-micro { font-size: var(--text-micro); }
 .text-brand { color: var(--brand); }
 .font-mono { font-family: var(--font-mono); }
 .strong { font-weight: 600; color: var(--ink); }
@@ -4370,16 +4380,27 @@ body.no-scroll {
   gap: 12px;
 }
 .job-card-premium {
+  position: relative; /* anchor for .job-card-stretched-link */
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
   padding: 16px 18px;
   box-shadow: var(--shadow-sm);
   transition: border-color 200ms ease, transform 200ms ease, box-shadow 200ms ease;
-  position: relative;
   overflow: hidden;
   display: block;
   text-decoration: none;
+}
+.job-card-stretched-link {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+}
+/* Board link sits above the stretched link so it stays clickable. */
+.job-card-board-link {
+  position: relative;
+  z-index: 2;
 }
 .job-card-premium::before {
   content: '';
@@ -4590,6 +4611,15 @@ body.no-scroll {
   align-items: center;
   gap: var(--sp-2);
   margin-bottom: var(--sp-2);
+}
+/* Layout-audit P3-2: class used in _board_card.html but never defined —
+   the assignee line rendered as bare inherited text. */
+.kanban-card-assignee {
+  font-size: var(--text-xs);
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .kanban-card-name {
   display: flex;
@@ -5084,6 +5114,11 @@ body.no-scroll {
 
 /* ---- AI Panel Consensus card (2+ evaluations only) ---- */
 .panel-consensus-card {
+  /* Layout-audit P2-1: this card lives in a ~380px grid column, but its
+     internal breakpoints were viewport queries (640px) that never fire on
+     desktop. Container queries let the card adapt to its ACTUAL width. */
+  container-type: inline-size;
+  container-name: consensus;
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -5121,7 +5156,9 @@ body.no-scroll {
 }
 .consensus-metrics {
   display: grid;
-  grid-template-columns: 140px 1fr;
+  /* Three tiles (average / votes / verdict) flow side by side and wrap
+     when the card is narrow — container query stacks them below 640px. */
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: var(--sp-3);
 }
 @media (max-width: 480px) {
@@ -5336,7 +5373,8 @@ body.no-scroll {
   min-width: 0;
 }
 .consensus-criterion-label {
-  flex: 0 0 110px;
+  flex: 0 1 110px;
+  min-width: 0;
   color: var(--muted);
   white-space: nowrap;
   overflow: hidden;
@@ -5399,9 +5437,12 @@ body.no-scroll {
   display: grid;
   gap: 6px;
 }
-@media (max-width: 640px) {
+/* Layout-audit P2-1: container queries replace the viewport query — the
+   card adapts to its ~380px grid column, not the 1280px viewport. */
+@container consensus (max-width: 640px) {
   .consensus-eval-body { flex-direction: column; align-items: stretch; }
   .consensus-criterion-label { flex-basis: 90px; }
+  .consensus-metrics { grid-template-columns: 1fr; }
 }
 
 /* ---- Responsive: stacked layout keeps everything reachable ---- */
@@ -5511,8 +5552,12 @@ body.no-scroll {
 /* ===== MODERNIZATION: panel inset floor =====
    Detector: children flush against card borders on panels that lack
    .panel-pad. Give every glass-panel a minimum inset so content never
-   touches the card edge; .panel-pad pages keep their larger padding. */
-.glass-panel {
+   touches the card edge; .panel-pad pages keep their larger padding.
+   Layout-audit P1: the blanket rule overrode component-specific padding
+   (KPI cards, upcoming cards, popovers, consensus tiles) because it was
+   appended last at equal specificity. Excluded: every component that
+   declares its own padding. */
+.glass-panel:not(.ref-kpi-card):not(.upcoming-card):not(.notif-popover):not(.consensus-metric-box):not(.consensus-evals):not(.consensus-criteria-compare):not(.user-menu-panel):not(.slot-preview-card):not(.kpi-card-link) {
   padding: var(--sp-4);
 }
 .panel-pad {

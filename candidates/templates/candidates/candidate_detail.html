@@ -128,8 +128,16 @@
       {% if candidate.resume_text %}
       <div class="cd-skills-block">
         <h2 class="section-label">CV Summary</h2>
+        {% if 'low_text_volume' in candidate.needs_review_reasons %}
+        <p class="badge badge-pending" style="display:inline-block;margin:0 0 var(--sp-1)">Parse low confidence — verify against the original PDF</p>
+        {% endif %}
         <p class="cd-cv-summary">{{ candidate.resume_preview_snippet }}</p>
         <button type="button" class="btn btn-secondary btn-sm" onclick="openCvOverlay()">View full extracted CV text &rarr;</button>
+      </div>
+      {% elif candidate.resume_file %}
+      <div class="cd-skills-block">
+        <h2 class="section-label">CV Summary</h2>
+        <p class="cd-cv-summary text-muted">No text could be extracted from the uploaded CV — it may be a scanned/image-based file. Use "View original resume PDF" to read it directly.</p>
       </div>
       {% endif %}
 
@@ -256,16 +264,39 @@
   })();
 
   var cvOverlay = document.getElementById('cv-overlay');
+  var cvTrigger = null;
   window.openCvOverlay = function () {
+    cvTrigger = document.activeElement;
     cvOverlay.classList.add('open');
     cvOverlay.setAttribute('aria-hidden', 'false');
     document.body.classList.add('no-scroll');
+    // A11y audit BUG C: move focus into the dialog and trap Tab while it
+    // is open — aria-modal without focus management leaves keyboard and
+    // screen-reader users on the obscured page.
+    var panel = cvOverlay.querySelector('.cv-overlay-panel');
+    if (panel) panel.focus({preventScroll: true});
   };
   window.closeCvOverlay = function () {
     cvOverlay.classList.remove('open');
     cvOverlay.setAttribute('aria-hidden', 'true');
     document.body.classList.remove('no-scroll');
+    if (cvTrigger && document.contains(cvTrigger)) cvTrigger.focus();
   };
+  // Minimal Tab trap: cycle focus inside the overlay while open.
+  cvOverlay.addEventListener('keydown', function (e) {
+    if (e.key !== 'Tab') return;
+    var focusables = cvOverlay.querySelectorAll('button, a[href], input, [tabindex]:not([tabindex="-1"])');
+    if (!focusables.length) return;
+    var first = focusables[0];
+    var last = focusables[focusables.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  });
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && cvOverlay.classList.contains('open')) {
       closeCvOverlay();

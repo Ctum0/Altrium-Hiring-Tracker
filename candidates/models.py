@@ -74,6 +74,11 @@ class Candidate(models.Model):
             if not self.resume_file._committed:
                 directory, basename = os.path.split(self.resume_file.name)
                 ext = basename.rsplit('.', 1)[-1].lower()
+                # Data-repair guard: some legacy rows carry a doubled
+                # 'cvs/cvs/...' prefix (a caller assigned a name that
+                # already included the upload_to dir). Collapse repeats.
+                while directory.startswith('cvs/') or directory == 'cvs':
+                    directory = directory[4:] if directory != 'cvs' else ''
                 subdir = directory or 'cvs'
                 self.resume_file.name = f'{subdir}/{uuid4().hex}.{ext}'
         super().save(*args, **kwargs)

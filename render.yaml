@@ -32,6 +32,16 @@ services:
         value: ".onrender.com"
       - key: GROQ_API_KEY
         sync: false
+      # First-admin bootstrap (accounts/management/commands/bootstrap_admin.py):
+      # set ADMIN_USERNAME + ADMIN_PASSWORD in the Render dashboard and
+      # redeploy — the start command creates the account and resets any
+      # axes lockouts from pre-creation login attempts.
+      - key: ADMIN_USERNAME
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
       # Shared cache/rate-limit store so django-axes lockout counters are
       # consistent across all gunicorn workers (without it, each worker
       # keeps its own LocMem counter and the effective failed-login

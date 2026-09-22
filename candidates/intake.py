@@ -112,8 +112,16 @@ def ingest_cv(f, job, *, source='upload'):
             match = find_fuzzy_match(parsed, exclude_pk=candidate.pk)
             if match is not None:
                 result['fuzzy_duplicate'] = True
-                if candidate.resume_file:
-                    candidate.resume_file.delete(save=False)
+                # CV-text audit BUG A: the fresh row holds successfully
+                # extracted resume_file/text/skills — transfer them to the
+                # surviving match before deleting, or a re-upload of a
+                # readable CV leaves the existing candidate's text stale.
+                match.resume_file = candidate.resume_file or match.resume_file
+                if (candidate.resume_text or '').strip():
+                    match.resume_text = candidate.resume_text
+                if (candidate.skills or '').strip():
+                    match.skills = candidate.skills
+                match.save(update_fields=['resume_file', 'resume_text', 'skills', 'updated_at'])
                 candidate.delete()  # cascades the just-created application
                 candidate = match
                 if needs_review:

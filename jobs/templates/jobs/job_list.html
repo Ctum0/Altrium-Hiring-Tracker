@@ -38,7 +38,9 @@
 {% if jobs %}
 <div class="jobs-card-grid">
   {% for job in jobs %}
-  <a href="{% url 'jobs:detail' job.pk %}" class="job-card-premium">
+  {# Layout-audit P3-1: the card was an <a> containing a nested <a> (Board) — invalid HTML that browsers reparent, breaking focus order and SR semantics. Card is now a div with a stretched link; Board remains a real link. #}
+  <div class="job-card-premium">
+    <a href="{% url 'jobs:detail' job.pk %}" class="job-card-stretched-link" aria-label="Open job {{ job.title }}"></a>
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:var(--sp-2)">
       <div style="flex:1;min-width:0">
         <h2 class="job-card-title">{{ job.title }}</h2>
@@ -73,11 +75,11 @@
       <span style="display:inline-flex;align-items:center;gap:var(--sp-2)">
         <span style="font-size:11px;color:var(--brand)">View &rarr;</span>
         {% if job.is_active %}
-        <a href="{% url 'jobs:board' job.pk %}" class="job-card-board-link" onclick="event.stopPropagation()" aria-label="Open Kanban board for {{ job.title }}">Board</a>
+        <a href="{% url 'jobs:board' job.pk %}" class="job-card-board-link" aria-label="Open Kanban board for {{ job.title }}">Board</a>
         {% endif %}
       </span>
     </div>
-  </a>
+  </div>
   {% endfor %}
 </div>
 

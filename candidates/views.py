@@ -590,6 +590,14 @@ class CandidateImportView(LoginRequiredMixin, View):
                 match = find_fuzzy_match(parsed, exclude_pk=candidate.pk)
                 if match is not None:
                     fuzzy_duplicates += 1
+                    # CV-text audit BUG B: transfer the freshly parsed
+                    # text/skills to the surviving match before deleting,
+                    # mirroring the no-email branch below.
+                    if (candidate.resume_text or '').strip():
+                        match.resume_text = candidate.resume_text
+                    if (candidate.skills or '').strip():
+                        match.skills = candidate.skills
+                    match.save(update_fields=['resume_text', 'skills', 'updated_at'])
                     candidate.delete()  # cascades the just-created application
                     candidate = match
                     was_created = False
