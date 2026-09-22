@@ -127,11 +127,18 @@ class User(AbstractUser):
         """
         if self.role != Role.INTERVIEWER:
             return False
+        # A blank or 'other' job domain imposes no constraint AT ALL —
+        # including for legacy interviewers without a structured domain.
+        # The old code only honored the bypass inside the structured-domain
+        # branch, so a domain-blank interviewer fell through to the legacy
+        # specialty-vs-department check and got wrongly filtered off jobs
+        # whose domain was 'other' (their specialty rarely matches the
+        # department slug — 'quality assurance' vs 'engineering').
+        job_domain = (job.domain or '').strip().lower()
+        if not job_domain or job_domain == Job.Domain.OTHER:
+            return True
         domain = (self.domain or '').strip().lower()
         if domain:
-            job_domain = (job.domain or '').strip().lower()
-            if not job_domain or job_domain == Job.Domain.OTHER:
-                return True
             return domain == job_domain
         specialty = (self.specialty or '').strip().lower()
         department = (job.department or '').strip().lower()

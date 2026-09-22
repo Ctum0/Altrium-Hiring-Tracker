@@ -779,6 +779,16 @@ class SeniorityEligibilityTests(AuthAndRoleTestBase):
         self.assertFalse(self.interviewer.meets_seniority_for(lead_job))
 
     def test_fully_eligible_combines_domain_and_seniority(self):
+        """Seniority floor combines with the domain rule.
+
+        NOTE: the jobs here have a BLANK domain (unclassified job). Per the
+        documented rule, a blank or 'other' job domain imposes NO domain
+        constraint — so the design job differs only by seniority, and the
+        senior interviewer passes both. The old expectation (design job
+        ineligible via specialty-vs-department) contradicted the documented
+        rule and blocked legacy interviewers off unclassified jobs; see the
+        is_eligible_interviewer_for docstring.
+        """
         eng_job = self._job('mid')
         design_job = _make_job(self.hr, title='Product Designer', department='Design')
         design_job.seniority = 'mid'
@@ -787,7 +797,23 @@ class SeniorityEligibilityTests(AuthAndRoleTestBase):
         self.interviewer.specialty = 'Engineering'
         self.interviewer.save()
         self.assertTrue(self.interviewer.is_fully_eligible_for(eng_job))
-        self.assertFalse(self.interviewer.is_fully_eligible_for(design_job))
+        self.assertTrue(self.interviewer.is_fully_eligible_for(design_job))
+
+    def test_structured_domain_still_blocks_mismatch(self):
+        """When the JOB has a structured domain, a mismatching interviewer
+        domain blocks — the bypass applies only to unclassified jobs."""
+        eng_job = _make_job(self.hr, seniority='mid')
+        eng_job.domain = 'engineering'
+        eng_job.save()
+        self.interviewer.seniority = 'senior'
+        self.interviewer.specialty = 'Engineering'
+        self.interviewer.domain = 'quality_assurance'
+        self.interviewer.save()
+        self.assertFalse(self.interviewer.is_fully_eligible_for(eng_job))
+        self.assertEqual(
+            self.interviewer.ineligibility_reason_for(eng_job),
+            'domain mismatch (quality_assurance ≠ engineering)',
+        )
 
 
 class ReportExportCSVTest(AuthAndRoleTestBase):

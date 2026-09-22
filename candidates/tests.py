@@ -583,6 +583,7 @@ class InterviewerSelectionTests(CandidatesBaseTestCase):
         backend = self._create_specialist('Engineering', username='iv_eng')
         designer = self._create_specialist('Design', username='iv_des')
         self.job.department = 'Engineering'
+        self.job.domain = 'engineering'  # structured job domain: rule applies
         self.job.save()
 
         eligible = [u.username for u in self.application.eligible_interviewers]
@@ -591,10 +592,23 @@ class InterviewerSelectionTests(CandidatesBaseTestCase):
         self.assertIn('iv_eng', eligible)
         self.assertNotIn('iv_des', eligible)
 
+    def test_unclassified_job_domain_imposes_no_specialty_filter(self):
+        """A blank job domain means 'nobody classified this job' — the
+        documented rule imposes NO specialty constraint, even for legacy
+        (domain-blank) interviewers. Pins the fix for the bug where the
+        bypass only applied to structured-domain interviewers."""
+        backend = self._create_specialist('Engineering', username='iv_eng')
+        designer = self._create_specialist('Design', username='iv_des')
+        self.job.department = 'Engineering'
+        # self.job.domain stays blank (unclassified)
+        eligible = [u.username for u in self.application.eligible_interviewers]
+        self.assertIn('iv_des', eligible)
+
     def test_assign_rejects_specialty_mismatch(self):
         designer = self._create_specialist('Design', username='iv_des')
         self._give_window(designer)
         self.job.department = 'Engineering'
+        self.job.domain = 'engineering'  # structured job domain: rule applies
         self.job.save()
 
         response = self._assign(designer.pk)
@@ -743,6 +757,7 @@ class SlotPreviewTests(CandidatesBaseTestCase):
         self.interviewer.specialty = 'Design'
         self.interviewer.save()
         self.job.department = 'Engineering'
+        self.job.domain = 'engineering'  # structured job domain: rule applies
         self.job.save()
         self.login('hr')
         response = self.client.get(
