@@ -698,6 +698,14 @@ a:hover {
   overflow-y: auto;
 }
 
+/* Flex children must keep their natural height: as a flex column with a
+   viewport-pinned height, default flex-shrink:1 squashes panels (charts,
+   tables, cards) instead of letting the container scroll — the root cause
+   of clipped dashboards at every viewport. */
+.main-content > * {
+  flex-shrink: 0;
+}
+
 .main-content.scrollable {
   overflow-y: auto;
 }
@@ -3714,6 +3722,18 @@ a.ref-kpi-card.kpi-card-link:focus-visible {
 @media (max-width: 900px) {
   .app-shell {
     grid-template-columns: 1fr;
+    /* Unpin the shell height at narrow widths: a 100vh grid with
+       overflow:hidden over-constrains the rows and squeezes the sidebar
+       to its min-content (padding only), clipping the nav. Natural page
+       flow (height:auto + visible overflow) keeps everything reachable. */
+    height: auto;
+    max-height: none;
+    overflow: visible;
+    /* Rows: sidebar sized by its content, main takes the rest. */
+    grid-template-rows: auto 1fr;
+  }
+  .main {
+    overflow: visible;
   }
 
   .main {
@@ -3722,14 +3742,31 @@ a.ref-kpi-card.kpi-card-link:focus-visible {
 
   .sidebar {
     position: static;
-    height: auto;
-    min-height: 63px;
-    flex-direction: row;
-    align-items: center;
-    padding: var(--sp-3);
-    overflow-x: auto;
+    display: block;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    padding: var(--sp-2) var(--sp-3);
+    overflow: visible;
     border-right: none;
     border-bottom: 1px solid var(--glass-border);
+  }
+  .sidebar .brand {
+    padding: var(--sp-1) 0;
+    margin-bottom: var(--sp-2);
+    border-bottom: none;
+  }
+  .sidebar .nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--sp-1);
+    margin: 0;
+  }
+  /* The nav must participate in the sidebar's height: as a flex item it
+     wraps to its own row and the sidebar grows to contain it. */
+  .sidebar .nav {
+    flex: 1 1 100%;
+    margin-left: 0;
   }
 
   .brand {
@@ -3748,6 +3785,7 @@ a.ref-kpi-card.kpi-card-link:focus-visible {
     margin-left: var(--sp-3);
     flex-wrap: wrap;
     row-gap: var(--sp-1);
+    margin-top: 0;
   }
 
   /* Wrap the nav instead of silently clipping trailing items: every
@@ -5971,4 +6009,199 @@ select option:disabled {
   padding: var(--sp-3) var(--sp-4);
   text-align: center;
   user-select: all;
+}
+
+/* ===== LAYOUT AUDIT FIXES (3-agent full-app audit) ===== */
+
+/* X1/K1: 900px topbar — nav wrap already fixed above (min-height:0 +
+   flex-wrap on .sidebar). Duplicate-chrome fix: hide the sidebar footer
+   user chip at 900 since the topbar already shows identity. */
+@media (max-width: 900px) {
+  .sidebar-footer {
+    display: none;
+  }
+}
+
+/* X2/J-2/M-jobs-titles: job card titles ellipsize even at 1440 — allow
+   two-line clamp instead of hard single-line cut. */
+.job-card-title {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* X3: notification bell badge — center it on the bell corner instead of
+   overlapping the glyph. */
+.topbar .notif-bell {
+  position: relative;
+}
+.topbar .notif-count {
+  position: absolute;
+  top: -4px;
+  right: -6px;
+  z-index: 1;
+}
+
+/* HR-1/M-kpi-orphan: 5 KPI cards in fixed 4-col grid orphan the 5th —
+   auto-fit so cards share the row evenly at any count. */
+@media (min-width: 901px) {
+  .ref-kpi-row {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)) !important;
+  }
+}
+
+/* HR-2: AI insight distribution labels truncated to ~8 chars — let them
+   size to content. */
+.ai-dist-row {
+  grid-template-columns: minmax(120px, auto) 1fr auto;
+}
+
+/* HR-3: stalled-candidates flag overlapping the stage table — give the
+   flag its own block space. */
+.ref-velocity-flag {
+  position: static;
+  margin-top: var(--sp-3);
+}
+
+/* C-2: candidate email column truncates at fixed 180px even on desktop —
+   allow wrap to a second line instead. */
+.cand-name-email {
+  white-space: normal;
+  word-break: break-all;
+  line-height: 1.3;
+}
+
+/* C-1/L1: candidates filter panel overflow at 900 — the filter grid's
+   third row (Min score + Filter) spills out of the panel. Let the panel
+   grow with its content. */
+@media (max-width: 900px) {
+  .filter-panel,
+  .candidates-filter-panel {
+    height: auto !important;
+    overflow: visible !important;
+    flex-shrink: 0 !important;
+  }
+}
+
+/* JD-1: zero-height inline forms on job detail orphan their controls —
+   forms must never collapse. */
+.job-detail form,
+.panel form {
+  min-height: 0;
+}
+table form,
+.inline-form {
+  display: inline;
+}
+
+/* CD-2: Regenerate button wrapping onto the control label at 900 — give
+   the footer its own row. */
+.fit-summary .flex {
+  flex-wrap: wrap;
+}
+
+/* PC-1/G2: password-change inputs are unstyled Django defaults (invisible
+   in light theme) — style them like every other form input. */
+.password-change-form input,
+#password-change-form input,
+.main-content input[name="old_password"],
+.main-content input[name="new_password1"],
+.main-content input[name="new_password2"] {
+  display: block;
+  width: 100%;
+  max-width: 430px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--text-sm);
+  min-height: 36px;
+}
+.main-content p.form-help,
+.main-content .helptext {
+  min-height: 0;
+  margin: 4px 0 0;
+}
+
+/* U-1/P-1/CD-1: empty paragraphs and <br> spacer hacks — collapse empties,
+   neutralize spacers in the CV/profile bodies. */
+.cd-profile-body br,
+.fit-summary-body br,
+.profile-body br {
+  display: none;
+}
+#file-count:empty {
+  display: none;
+  margin: 0;
+}
+
+/* M-1: jobs stretched-link containing block — the card is position:absolute
+   (stale rule); make it relative so the inset-0 link is bounded by the card. */
+.job-card-premium {
+  position: relative !important;
+}
+
+/* M-feedback-date: submitted-date column squeeze at 900 — stop the wrap. */
+.feedback-table td:nth-last-child(2),
+.feedback-list-table td.date-col {
+  white-space: nowrap;
+}
+
+/* M-ring: scorecard overall ring inflating the line box — align it. */
+.feedback-overall-row,
+.scorecard-overall {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+/* Apply-page consent checkbox alignment at narrow widths. */
+.apply-consent-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+}
+.apply-consent-row input[type="checkbox"] {
+  margin-top: 3px;
+}
+
+/* K2/K3: calendar rhythm — even gaps, badge breathing room. */
+.my-calendar-section {
+  margin-top: var(--sp-5);
+}
+.my-calendar-section:first-of-type {
+  margin-top: 0;
+}
+.calendar-not-scheduled-badge {
+  margin-right: var(--sp-2);
+}
+
+/* A1: availability exceptions row spacing. */
+.exception-form-row {
+  gap: var(--sp-3);
+}
+
+/* D2: feedback queue chip — clean ellipsis instead of hard clip. */
+.callout-pending .btn {
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+}
+
+/* D3: KPI label wrap consistency — single line with ellipsis. */
+.ref-kpi-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* L2: score bar width sanity — bars must reflect score proportionally
+   (min visual width for nonzero scores so 68 vs 72 read differently). */
+.score-bar-fill {
+  min-width: 2px;
 }

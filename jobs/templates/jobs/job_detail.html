@@ -210,7 +210,7 @@
           <td>{{ s.old_job_title }}</td>
           <td class="mono">{{ s.score }}</td>
           <td style="text-align:right">
-            <form method="post" action="{% url 'jobs:talent_pool_add' job.pk s.old_application_pk %}">
+            <form method="post" action="{% url 'jobs:talent_pool_add' job.pk s.old_application_pk %}" style="display:inline">
               {% csrf_token %}
               <button type="submit" class="btn btn-secondary btn-sm">Add to this job</button>
             </form>
