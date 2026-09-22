@@ -22,7 +22,13 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         gate = os.environ.get('BOOTSTRAP_ADMIN', '')
-        self.stdout.write(f'bootstrap_admin: BOOTSTRAP_ADMIN={gate!r}')
+        note = f'bootstrap_admin: BOOTSTRAP_ADMIN={gate!r}'
+        self.stdout.write(note)
+        try:
+            with open('/tmp/bootstrap.log', 'a') as f:
+                f.write(note + '\n')
+        except Exception:
+            pass
 
         existing = User.objects.filter(
             role=Role.ADMIN, is_active=True,
@@ -38,6 +44,15 @@ class Command(BaseCommand):
                 'BOOTSTRAP_ADMIN=true, then redeploy.'
             )
             return
+
+        # Clear any axes lockout accumulated against this username before
+        # the account existed (login probes count per username+IP).
+        try:
+            from django.core.management import call_command
+            call_command('axes_reset')
+            self.stdout.write('Axes attempts/lockouts reset.')
+        except Exception as exc:
+            self.stdout.write(f'Axes reset failed: {exc}')
 
         username = os.environ.get('ADMIN_USERNAME', '').strip()
         email = os.environ.get('ADMIN_EMAIL', '').strip()
