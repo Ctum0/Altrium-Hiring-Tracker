@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load accounts_extras %}
 {% block title %}Review: {{ candidate.full_name }} | Altrium Tracker{% endblock %}
-{% block breadcrumb %}<a class="breadcrumb-link" href="{% url 'candidates:list' %}">Candidates</a><span class="breadcrumb-sep">/</span>{{ candidate.full_name }}{% endblock %}
+{% block breadcrumb %}<a class="breadcrumb-link" href="{% if list_return_url %}{{ list_return_url }}{% else %}{% url 'candidates:list' %}{% endif %}">Candidates</a><span class="breadcrumb-sep">/</span>{{ candidate.full_name }}{% endblock %}
 {% block page_title %}Review Candidate{% endblock %}
 
 {% block content %}
@@ -58,7 +58,7 @@
 
     <div class="form-actions" style="margin-top:var(--sp-4)">
       <button type="submit" class="btn btn-primary">Save &amp; Mark Reviewed</button>
-      <a href="{% url 'candidates:detail' pk=candidate.pk %}" class="btn btn-secondary">Cancel</a>
+      <a href="{% if list_return_url %}{{ list_return_url }}{% else %}{% url 'candidates:detail' pk=candidate.pk %}{% endif %}" class="btn btn-secondary">Cancel</a>
     </div>
   </form>
 </div>

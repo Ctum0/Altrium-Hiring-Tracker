@@ -145,6 +145,7 @@ class CandidateListView(LoginRequiredMixin, ListView):
         context['filter_stage'] = self.request.GET.get('stage', '')
         context['filter_min_score'] = self.request.GET.get('min_score', '')
         context['filter_q'] = self.request.GET.get('q', '')
+        context['filter_needs_review'] = self.request.GET.get('needs_review') == '1'
         # Pagination links re-attach every current filter param.
         get_params = self.request.GET.copy()
         get_params.pop('page', None)
@@ -153,7 +154,7 @@ class CandidateListView(LoginRequiredMixin, ListView):
         context['has_filters'] = bool(
             context['filter_q'] or context['filter_job']
             or context['filter_stage'] or context['filter_min_score']
-            or context['show_all']
+            or context['show_all'] or context['filter_needs_review']
         )
         # Audit gap: detail pages hard-link back to the bare list, stranding
         # any search/filter context. Remember the current querystring so
@@ -188,7 +189,6 @@ class CandidateListView(LoginRequiredMixin, ListView):
             .exclude(status__in=['hired', 'rejected'])
             .count()
         )
-        context['filter_needs_review'] = self.request.GET.get('needs_review') == '1'
         return context
 
 
@@ -1211,11 +1211,15 @@ class CandidateReviewView(LoginRequiredMixin, View):
         reasons_list = [r.strip() for r in (candidate.needs_review_reasons or '').split(',') if r.strip()]
         # Get the most recent application to show which job this was uploaded for
         latest_app = candidate.applications.select_related('job').order_by('-created_at').first()
+        # Audit fix: Cancel/finish must return to the review queue the user
+        # came from, not strand them on a detail page.
+        list_qs = request.session.get('candidates_list_qs')
         return render(request, 'candidates/candidate_review.html', {
             'candidate': candidate,
             'reasons_list': reasons_list,
             'latest_job': latest_app.job if latest_app else None,
             'active_nav': 'candidates',
+            'list_return_url': f'{reverse("candidates:list")}?{list_qs}' if list_qs else None,
         })
 
     def post(self, request, pk):
@@ -1262,6 +1266,15 @@ class CandidateReviewView(LoginRequiredMixin, View):
                 f'{outcome["rejected"]} fell below an auto-reject baseline.'
             )
         messages.success(request, summary)
+        # Audit fix: return to the review queue (preserving filters) when
+        # the user came from it; ?next= (relative) overrides for explicit
+        # entry points. Detail page remains the fallback.
+        next_url = request.POST.get('next') or ''
+        if next_url.startswith('/') and not next_url.startswith('//'):
+            return redirect(next_url)
+        list_qs = request.session.get('candidates_list_qs')
+        if list_qs and 'needs_review=1' in list_qs:
+            return redirect(f'{reverse("candidates:list")}?{list_qs}')
         return redirect('candidates:detail', pk=pk)
 
 
@@ -1276,9 +1289,12 @@ class OffboardingCandidatesView(LoginRequiredMixin, View):
         ).exclude(
             status__in=['hired', 'rejected', 'on_hold'],
         ).select_related('candidate', 'job', 'assigned_to', 'current_round')
+        # Audit fix: restore the filtered list context the user came from.
+        list_qs = request.session.get('candidates_list_qs')
         return render(request, 'candidates/offboarding_list.html', {
             'applications': apps,
             'active_nav': 'candidates',
+            'list_return_url': f'{reverse("candidates:list")}?{list_qs}' if list_qs else None,
         })
 
 

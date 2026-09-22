@@ -2665,3 +2665,66 @@ class ResumeDownloadTests(CandidatesBaseTestCase):
         self.login('hr')
         r = self.client.get(reverse('candidates:detail', args=[self.candidate.pk]))
         self.assertContains(r, reverse('candidates:resume', args=[self.candidate.pk]))
+
+
+class OffboardingNavigationTests(CandidatesBaseTestCase):
+    """Audit regression: the Offboarding page was a dead end — no tabs, no
+    way back to the Candidates context. It must mirror the list's tab strip
+    and honor the remembered list querystring."""
+
+    def test_offboarding_has_tab_strip_and_back_link(self):
+        self.login('hr')
+        r = self.client.get(reverse('candidates:offboarding'))
+        self.assertContains(r, 'Back to results')
+        self.assertContains(r, '>Active<')
+        self.assertContains(r, 'Offboarding')
+
+    def test_offboarding_back_link_restores_filters(self):
+        self.login('hr')
+        self.client.get(reverse('candidates:list'), {'job': self.job.pk, 'stage': 'new'})
+        r = self.client.get(reverse('candidates:offboarding'))
+        self.assertContains(r, 'job=%d' % self.job.pk)
+
+
+class ReviewReturnContextTests(CandidatesBaseTestCase):
+    """Audit regression: resolving a needs-review candidate always
+    redirected to the detail page, losing the review-queue context. When
+    the user came from the queue, return there."""
+
+    def setUp(self):
+        super().setUp()
+        self.candidate.needs_review = True
+        self.candidate.needs_review_reasons = 'low_text_volume'
+        self.candidate.save()
+
+    def _post_review(self):
+        return self.client.post(
+            reverse('candidates:review', args=[self.candidate.pk]),
+            {'first_name': 'Ada', 'last_name': 'Lovelace',
+             'email': 'ada@example.com', 'phone': '', 'skills': 'Python'},
+        )
+
+    def test_review_returns_to_queue(self):
+        self.login('hr')
+        self.client.get(reverse('candidates:list'), {'needs_review': '1'})
+        r = self._post_review()
+        self.assertRedirects(
+            r,
+            reverse('candidates:list') + '?needs_review=1',
+            fetch_redirect_response=False,
+        )
+
+    def test_review_without_queue_goes_to_detail(self):
+        self.login('hr')
+        r = self._post_review()
+        self.assertRedirects(
+            r,
+            reverse('candidates:detail', args=[self.candidate.pk]),
+            fetch_redirect_response=False,
+        )
+
+    def test_review_cancel_uses_return_context(self):
+        self.login('hr')
+        self.client.get(reverse('candidates:list'), {'needs_review': '1'})
+        r = self.client.get(reverse('candidates:review', args=[self.candidate.pk]))
+        self.assertContains(r, 'needs_review=1')

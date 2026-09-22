@@ -30,7 +30,7 @@
     };
   })();
   </script>
-  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <link rel="stylesheet" href="{% static 'css/app.css' %}?v={{ app_css_version }}">
   <script src="{% static 'vendor/htmx.min.js' %}"></script>
   {% block head %}{% endblock %}
 </head>

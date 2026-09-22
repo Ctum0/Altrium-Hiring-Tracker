@@ -4,8 +4,16 @@
 
 {% block content %}
 <div class="page-header">
-  <h1 class="page-title">Needs Reassignment</h1>
-  <p class="page-sub">Candidates assigned to deactivated interviewers who need a new interviewer.</p>
+  <div>
+    <h1 class="page-title">Needs Reassignment</h1>
+    <p class="page-sub">Candidates assigned to deactivated interviewers who need a new interviewer.</p>
+  </div>
+  <div class="page-actions">
+    {# Audit fix: this page was a dead end — no tabs, no way back to the Candidates context the user came from. Mirror the list's tab strip. #}
+    <a href="{% if list_return_url %}{{ list_return_url }}{% else %}{% url 'candidates:list' %}?all=1{% endif %}" class="btn btn-sm btn-secondary">← Back to results</a>
+    <a href="{% url 'candidates:list' %}" class="btn btn-sm btn-secondary">Active</a>
+    <a href="{% url 'candidates:offboarding' %}" class="btn btn-sm btn-primary">🔄 Offboarding</a>
+  </div>
 </div>
 
 {% if applications %}
