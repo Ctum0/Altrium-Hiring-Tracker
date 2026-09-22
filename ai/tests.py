@@ -1,10 +1,11 @@
 import re
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 from django.test import SimpleTestCase, override_settings
 
 from ai import services
 from ai.confidence import assess_confidence
+from ai.panel import synthesize_panel_consensus
 
 
 class _FakeResp:
@@ -195,3 +196,56 @@ class ConfidenceNoNameTests(SimpleTestCase):
         parsed = {'first_name': 'Jane', 'last_name': 'Doe', 'email': 'jane@example.com', 'phone': '', 'skills': ['Python']}
         needs_review, reasons = assess_confidence(parsed, 'x' * 200)
         self.assertNotIn('no_name', reasons)
+
+
+class PanelConsensusUpgradeTests(SimpleTestCase):
+    """Mockup upgrade: consensus exposes per-evaluator criteria, criteria
+    averages, confidence %, and last-updated for the richer candidate
+    detail card."""
+
+    def _make_feedback(self, score, criteria):
+        from datetime import datetime, timezone as tz
+        from unittest.mock import MagicMock
+        fb = MagicMock()
+        fb.score = score
+        fb.criteria_scores = criteria
+        fb.notes = 'solid technical round'
+        fb.submitted_at = datetime(2026, 9, 20, 10, 0, tzinfo=tz.utc)
+        fb.round.name = 'Screening'
+        fb.round.order = 1
+        fb.interviewer.get_full_name.return_value = 'Ivan Vance'
+        fb.interviewer.username = 'iv'
+        return fb
+
+    def _app_with(self, feedbacks):
+        from types import SimpleNamespace
+
+        class _Mgr:
+            def __init__(self, items):
+                self._items = items
+
+            def all(self):
+                return self._items
+
+            def select_related(self, *a, **k):
+                return self
+
+            def order_by(self, *a, **k):
+                return self
+
+        return SimpleNamespace(feedbacks=_Mgr(feedbacks))
+
+    def test_evaluator_criteria_normalized(self):
+        fb = self._make_feedback(80, [{'criterion': 'Technical Skill', 'score': 70}])
+        result = synthesize_panel_consensus(self._app_with([fb]))
+        self.assertEqual(result['evaluators'][0]['criteria'][0]['score_10'], 7.0)
+
+    def test_criteria_averages_sorted_and_confidence(self):
+        fb1 = self._make_feedback(80, [{'criterion': 'Technical Skill', 'score': 90}])
+        fb2 = self._make_feedback(40, [{'criterion': 'Technical Skill', 'score': 50}])
+        result = synthesize_panel_consensus(self._app_with([fb1, fb2]))
+        avgs = {c['criterion']: c['avg_10'] for c in result['criteria_averages']}
+        self.assertEqual(avgs['Technical Skill'], 7.0)
+        # 1 hire + 1 reject = split: confidence 100 - 12 = 88
+        self.assertEqual(result['confidence_pct'], 88)
+        self.assertIsNotNone(result['last_updated'])

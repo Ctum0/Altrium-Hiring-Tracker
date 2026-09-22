@@ -72,6 +72,17 @@ def synthesize_panel_consensus(application):
             'vote': vote,
             'notes': fb.notes,
             'submitted_at': fb.submitted_at,
+            # Per-criterion scores for the evaluation rows (mockup upgrade):
+            # normalized to /10 for display; None when not scored.
+            'criteria': [
+                {
+                    'criterion': entry.get('criterion', ''),
+                    'score_10': round(float(entry['score']) / 10.0, 1)
+                    if entry.get('score') is not None else None,
+                }
+                for entry in (fb.criteria_scores or [])
+                if isinstance(entry, dict)
+            ],
         })
 
     weighted_avg_10 = round(total_weighted_score / total_weight, 1) if total_weight > 0 else 0.0
@@ -190,6 +201,36 @@ def synthesize_panel_consensus(application):
             f"HR Recommendation: Re-evaluate candidate against current role priorities or keep on hold."
         )
 
+    # Per-criterion panel averages + consensus confidence + last update
+    # (mockup upgrade: criteria comparison bars, confidence %, timestamp).
+    criteria_totals = {}
+    criteria_counts = {}
+    for ev in evaluators:
+        for c in ev['criteria']:
+            if c['score_10'] is None:
+                continue
+            criteria_totals[c['criterion']] = criteria_totals.get(c['criterion'], 0.0) + c['score_10']
+            criteria_counts[c['criterion']] = criteria_counts.get(c['criterion'], 0) + 1
+    criteria_averages = [
+        {
+            'criterion': name,
+            'avg_10': round(criteria_totals[name] / criteria_counts[name], 1),
+        }
+        for name in criteria_totals
+    ]
+    criteria_averages.sort(key=lambda c: c['avg_10'])
+
+    # Confidence: unanimous panels are high-confidence; divergence lowers
+    # it. Scale: 100 - 12 per split vote beyond the majority, floored at 55.
+    total_votes = hire_votes + hold_votes + reject_votes
+    if total_votes:
+        majority = max(hire_votes, hold_votes, reject_votes)
+        confidence_pct = max(55, 100 - 12 * (total_votes - majority))
+    else:
+        confidence_pct = 50
+
+    last_updated = max(e['submitted_at'] for e in evaluators) if evaluators else None
+
     return {
         'total_evaluators': len(evaluators),
         'evaluators': evaluators,
@@ -208,4 +249,7 @@ def synthesize_panel_consensus(application):
         'agreed_strengths': agreed_strengths,
         'conflict_points': conflict_points,
         'recommendation': recommendation,
+        'criteria_averages': criteria_averages,
+        'confidence_pct': confidence_pct,
+        'last_updated': last_updated,
     }

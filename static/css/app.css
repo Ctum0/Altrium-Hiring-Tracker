@@ -5282,6 +5282,128 @@ body.no-scroll {
   color: var(--brand);
 }
 
+/* ---- Consensus upgrade: per-evaluator rows, criteria bars, verdict ---- */
+.consensus-verdict-box { text-align: left; }
+.consensus-verdict-value {
+  font-size: 1.4rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+.consensus-verdict-green { color: var(--status-hired); }
+.consensus-verdict-red { color: var(--status-rejected); }
+.consensus-verdict-amber { color: var(--status-pending); }
+.consensus-verdict-blue { color: var(--status-new); }
+
+.consensus-evals {
+  margin-top: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  min-width: 0;
+}
+.consensus-eval-row {
+  padding: var(--sp-2) 0;
+}
+.consensus-eval-row-border {
+  border-bottom: 1px solid var(--border);
+}
+.consensus-eval-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-1);
+}
+.consensus-eval-body {
+  display: flex;
+  gap: var(--sp-4);
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+.consensus-eval-criteria {
+  flex: 1 1 260px;
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+.consensus-criterion {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.consensus-criterion-label {
+  flex: 0 0 110px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.consensus-criterion-bar {
+  position: relative;
+  flex: 1 1 120px;
+  height: 8px;
+  min-width: 60px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+.consensus-bar-wide { height: 10px; }
+.consensus-criterion-fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-pill);
+}
+.consensus-fill-hire { background: var(--status-hired); }
+.consensus-fill-hold { background: var(--status-pending); }
+.consensus-fill-reject { background: var(--status-rejected); }
+.consensus-benchmark-mark {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  left: 60%;
+  width: 2px;
+  background: var(--muted);
+  opacity: 0.7;
+}
+.consensus-criterion-score {
+  flex: 0 0 52px;
+  text-align: right;
+  color: var(--ink-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.consensus-eval-overall {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+.consensus-eval-score {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.consensus-criteria-compare {
+  margin-top: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+@media (max-width: 640px) {
+  .consensus-eval-body { flex-direction: column; align-items: stretch; }
+  .consensus-criterion-label { flex-basis: 90px; }
+}
+
 /* ---- Responsive: stacked layout keeps everything reachable ---- */
 @media (max-width: 900px) {
   .candidate-detail-grid {

@@ -1,5 +1,9 @@
 {% comment %}
-AI Panel Consensus & Conflict Resolver card for one application.
+AI Panel Consensus & Conflict Resolver card for one application —
+upgraded to the mockup layout: header with status pill + confidence +
+last-updated, three KPI tiles (weighted average, vote breakdown bar,
+consensus verdict), per-interviewer evaluation rows with per-criterion
+bars, criteria comparison vs benchmark, and the AI recommendation.
 Include with an `app` in context from the application row body.
 Rendered ONLY when two or more interviewer evaluations exist; a single
 evaluation is summarized on the collapsed row instead of showing a
@@ -7,7 +11,8 @@ consensus card for one data point.
 {% endcomment %}
 {% if app.panel_consensus and app.panel_consensus.total_evaluators >= 2 %}
 <div class="panel-consensus-card">
-  <!-- Header & Status Badge -->
+
+  <!-- Header: icon + title + status pill + confidence + last updated -->
   <div class="consensus-header">
     <div class="flex items-center gap-2">
       <span class="consensus-icon-tile" aria-hidden="true">
@@ -18,24 +23,28 @@ consensus card for one data point.
         <span class="text-micro text-muted">Synthesized across {{ app.panel_consensus.total_evaluators }} interviewer evaluation(s)</span>
       </div>
     </div>
-    <span class="badge {{ app.panel_consensus.status_badge_class }}">
-      {{ app.panel_consensus.status_label }}
-    </span>
+    <div class="flex items-center gap-3" style="flex-wrap:wrap;justify-content:flex-end">
+      <span class="badge {{ app.panel_consensus.status_badge_class }}">
+        {{ app.panel_consensus.status_label }}
+      </span>
+      <span class="text-micro text-muted" style="text-align:right">
+        Confidence {{ app.panel_consensus.confidence_pct }}%
+        {% if app.panel_consensus.last_updated %}&middot; Updated {{ app.panel_consensus.last_updated|date:'M j, H:i' }}{% endif %}
+      </span>
+    </div>
   </div>
 
-  <!-- Metric Summary Row -->
+  <!-- KPI row: weighted average / vote breakdown / consensus verdict -->
   <div class="consensus-metrics">
-    <!-- Progressive Weighted Score -->
     <div class="consensus-metric-box">
-      <div class="consensus-metric-label">Weighted Panel Avg</div>
+      <div class="consensus-metric-label">Weighted Panel Average</div>
       <div class="consensus-metric-value">{{ app.panel_consensus.weighted_avg_10 }} <small>/ 10</small></div>
       <div class="consensus-metric-sub">({{ app.panel_consensus.weighted_avg_100 }}% match)</div>
     </div>
 
-    <!-- Vote Tally & Divergence Bar -->
     <div class="consensus-metric-box consensus-vote-box">
       <div class="consensus-vote-head">
-        <span>Panel Vote Breakdown:</span>
+        <span>Panel Vote Breakdown</span>
         <span class="consensus-vote-tally">
           <span class="consensus-vote-hire">Hire: {{ app.panel_consensus.hire_votes }}</span> &middot;
           <span class="consensus-vote-hold">Hold: {{ app.panel_consensus.hold_votes }}</span> &middot;
@@ -57,11 +66,73 @@ consensus card for one data point.
       <div class="consensus-divergence-note">High Divergence: Score spread is {{ app.panel_consensus.score_spread }} pts across rounds.</div>
       {% endif %}
     </div>
+
+    <div class="consensus-metric-box consensus-verdict-box">
+      <div class="consensus-metric-label">Consensus</div>
+      <div class="consensus-verdict-value consensus-verdict-{{ app.panel_consensus.status_tone }}">
+        {% if app.panel_consensus.status_code == 'consensus_hire' %}Hire
+        {% elif app.panel_consensus.status_code == 'consensus_reject' %}Reject
+        {% elif app.panel_consensus.status_code == 'divergent' %}Split
+        {% else %}Hold{% endif %}
+      </div>
+      <div class="consensus-metric-sub">{{ app.panel_consensus.confidence_pct }}% confidence</div>
+    </div>
   </div>
+
+  <!-- Per-interviewer evaluation rows: per-criterion bars + overall + verdict -->
+  <div class="consensus-evals">
+    <h5 class="consensus-box-label">Interviewer Evaluations</h5>
+    {% for ev in app.panel_consensus.evaluators %}
+    <div class="consensus-eval-row {% if not forloop.last %}consensus-eval-row-border{% endif %}">
+      <div class="consensus-eval-head">
+        <span class="strong">{{ ev.name }}</span>
+        <span class="text-micro text-muted">{{ ev.round_name }} &middot; {{ ev.submitted_at|date:'D, M j, H:i' }}</span>
+      </div>
+      <div class="consensus-eval-body">
+        {% if ev.criteria %}
+        <div class="consensus-eval-criteria">
+          {% for c in ev.criteria %}
+          <div class="consensus-criterion">
+            <span class="consensus-criterion-label text-micro">{{ c.criterion }}</span>
+            <span class="consensus-criterion-bar" role="presentation">
+              <span class="consensus-criterion-fill {% if c.score_10 >= 7 %}consensus-fill-hire{% elif c.score_10 >= 5 %}consensus-fill-hold{% else %}consensus-fill-reject{% endif %}"
+                    style="width:{% widthratio c.score_10 10 100 %}%"></span>
+            </span>
+            <span class="consensus-criterion-score text-micro">{{ c.score_10|default:'—' }} / 10</span>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+        <div class="consensus-eval-overall">
+          <span class="consensus-metric-label text-micro">Overall</span>
+          <span class="consensus-eval-score">{{ ev.score_10 }} / 10</span>
+          <span class="badge {% if ev.vote == 'Hire' %}badge-success{% elif ev.vote == 'Reject' %}badge-danger{% else %}badge-warning{% endif %}">{{ ev.vote }}</span>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Criteria comparison vs 6.0 benchmark -->
+  {% if app.panel_consensus.criteria_averages %}
+  <div class="consensus-criteria-compare">
+    <h5 class="consensus-box-label">Criteria Comparison <span class="text-micro text-muted">(panel average per criterion; dashed line = 6.0 benchmark)</span></h5>
+    {% for c in app.panel_consensus.criteria_averages %}
+    <div class="consensus-criterion">
+      <span class="consensus-criterion-label text-sm">{{ c.criterion }}</span>
+      <span class="consensus-criterion-bar consensus-bar-wide" role="presentation">
+        <span class="consensus-criterion-fill {% if c.avg_10 >= 7 %}consensus-fill-hire{% elif c.avg_10 >= 5 %}consensus-fill-hold{% else %}consensus-fill-reject{% endif %}"
+              style="width:{% widthratio c.avg_10 10 100 %}%"></span>
+        <span class="consensus-benchmark-mark" aria-hidden="true"></span>
+      </span>
+      <span class="consensus-criterion-score text-sm">{{ c.avg_10 }} / 10</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
 
   <!-- Agreed Strengths & Conflicts Grid -->
   <div class="consensus-grid">
-    <!-- Agreed Strengths -->
     <div class="consensus-strengths-box">
       <h5 class="consensus-box-label consensus-label-strengths">Agreed Strengths</h5>
       <ul class="consensus-list">
@@ -71,7 +142,6 @@ consensus card for one data point.
       </ul>
     </div>
 
-    <!-- Divergence / Conflict Points -->
     {% if app.panel_consensus.is_divergent %}
     <div class="consensus-conflict-box">
       <h5 class="consensus-box-label consensus-label-conflict">Panel Divergence Notes</h5>
