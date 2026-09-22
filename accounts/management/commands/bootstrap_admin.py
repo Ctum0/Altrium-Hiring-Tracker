@@ -37,7 +37,15 @@ class Command(BaseCommand):
             self.stderr.write('An admin already exists — nothing to do.')
             return
 
-        if gate != 'true':
+        # Two activation paths: the explicit BOOTSTRAP_ADMIN=true gate, or
+        # simply having ADMIN_USERNAME + ADMIN_PASSWORD set (explicit
+        # credentials are explicit intent). This removes the failure mode
+        # where the operator sets the credentials but forgets the gate.
+        has_creds = bool(
+            os.environ.get('ADMIN_USERNAME', '').strip()
+            and os.environ.get('ADMIN_PASSWORD', '')
+        )
+        if gate != 'true' and not has_creds:
             self.stderr.write(
                 'No admin exists and BOOTSTRAP_ADMIN is not true — skipping. '
                 'Set ADMIN_USERNAME/ADMIN_EMAIL/ADMIN_PASSWORD and '
