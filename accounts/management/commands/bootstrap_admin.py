@@ -23,7 +23,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         gate = os.environ.get('BOOTSTRAP_ADMIN', '')
         note = f'bootstrap_admin: BOOTSTRAP_ADMIN={gate!r}'
-        self.stdout.write(note)
+        self.stderr.write(note)
         try:
             with open('/tmp/bootstrap.log', 'a') as f:
                 f.write(note + '\n')
@@ -34,11 +34,11 @@ class Command(BaseCommand):
             role=Role.ADMIN, is_active=True,
         ).exists() or User.objects.filter(is_superuser=True).exists()
         if existing:
-            self.stdout.write('An admin already exists — nothing to do.')
+            self.stderr.write('An admin already exists — nothing to do.')
             return
 
         if gate != 'true':
-            self.stdout.write(
+            self.stderr.write(
                 'No admin exists and BOOTSTRAP_ADMIN is not true — skipping. '
                 'Set ADMIN_USERNAME/ADMIN_EMAIL/ADMIN_PASSWORD and '
                 'BOOTSTRAP_ADMIN=true, then redeploy.'
@@ -50,9 +50,9 @@ class Command(BaseCommand):
         try:
             from django.core.management import call_command
             call_command('axes_reset')
-            self.stdout.write('Axes attempts/lockouts reset.')
+            self.stderr.write('Axes attempts/lockouts reset.')
         except Exception as exc:
-            self.stdout.write(f'Axes reset failed: {exc}')
+            self.stderr.write(f'Axes reset failed: {exc}')
 
         username = os.environ.get('ADMIN_USERNAME', '').strip()
         email = os.environ.get('ADMIN_EMAIL', '').strip()
@@ -87,7 +87,7 @@ class Command(BaseCommand):
                 detail=f'Bootstrapped admin account "{username}" via env gate.',
             )
 
-        self.stdout.write(self.style.SUCCESS(
+        self.stderr.write(self.style.SUCCESS(
             f'Admin "{username}" created.'
         ))
         # My own login probes may have locked this username out via
@@ -96,11 +96,11 @@ class Command(BaseCommand):
         try:
             from django.core.management import call_command
             call_command('axes_reset', username=username)
-            self.stdout.write('Axes lockout cleared for the new account.')
+            self.stderr.write('Axes lockout cleared for the new account.')
         except Exception as exc:
-            self.stdout.write(f'Axes reset skipped: {exc}')
+            self.stderr.write(f'Axes reset skipped: {exc}')
         if generated:
-            self.stdout.write(self.style.WARNING(
+            self.stderr.write(self.style.WARNING(
                 f'Temporary password: {password}\n'
                 'Copy it now — it is not stored in plaintext and the account '
                 'must change it at first login.'
