@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% block title %}Needs Reassignment | Altrium Tracker{% endblock %}
+{% block breadcrumb %}<a class="breadcrumb-link" href="{% url 'candidates:list' %}">Candidates</a><span class="breadcrumb-sep">/</span>Offboarding{% endblock %}
 {% block page_title %}Needs Reassignment{% endblock %}
 
 {% block content %}
@@ -12,7 +13,7 @@
     {# Audit fix: this page was a dead end — no tabs, no way back to the Candidates context the user came from. Mirror the list's tab strip. #}
     <a href="{% if list_return_url %}{{ list_return_url }}{% else %}{% url 'candidates:list' %}?all=1{% endif %}" class="btn btn-sm btn-secondary">← Back to results</a>
     <a href="{% url 'candidates:list' %}" class="btn btn-sm btn-secondary">Active</a>
-    <a href="{% url 'candidates:offboarding' %}" class="btn btn-sm btn-primary">🔄 Offboarding</a>
+    <a href="{% url 'candidates:offboarding' %}" class="btn btn-sm btn-primary"><svg class="btn-inline-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 9 15 9"/></svg> Offboarding</a>
   </div>
 </div>
 

@@ -1,5 +1,6 @@
 import re
-from datetime import datetime, timedelta
+from collections import defaultdict
+from datetime import datetime, time, timedelta
 
 from django.conf import settings
 from django.contrib import messages
@@ -214,10 +215,19 @@ class CandidateDetailView(LoginRequiredMixin, DetailView):
         context['active_nav'] = 'candidates'
         applications = self.object.applications.select_related(
             'candidate', 'job', 'current_round', 'assigned_to'
-        ).prefetch_related('job__rounds', 'feedbacks', 'panel_interviewers', 'moves', 'moves__moved_by')
+        ).prefetch_related('job__rounds', 'feedbacks', 'panel_interviewers', 'moves', 'moves__moved_by', 'reschedule_requests')
         context['applications'] = applications
         context['is_hr'] = self.request.user.is_hr()
         context['is_management'] = self.request.user.is_management()
+        # Badge for pending reschedule requests on this candidate's
+        # applications (interviewer-initiated, HR acts on
+        # /accounts/reschedule-requests/). One aggregate query.
+        pending_reschedules = sum(
+            1 for app in applications
+            for req in app.reschedule_requests.all() if req.status == 'pending'
+        )
+        if pending_reschedules:
+            self.object.reschedule_badge = pending_reschedules
 
         # Perf audit N+1 #2: _app_row.html reads app.eligible_interviewers
         # per row — one full interviewer-table query + N Python eligibility
@@ -973,7 +983,6 @@ class InterviewDetailsView(LoginRequiredMixin, View):
         # against that interviewer's windows and existing bookings, clearing
         # it if it no longer fits.
         interviewer = app.assigned_to if scheduled else None
-        slot_duration = timedelta(minutes=60)
 
         with transaction.atomic():
             if interviewer:
@@ -995,16 +1004,17 @@ class InterviewDetailsView(LoginRequiredMixin, View):
                     )
                     return redirect('candidates:detail', pk=app.candidate_id)
 
-                clash = JobApplication.objects.filter(
-                    assigned_to=interviewer,
-                    interview_at__lt=scheduled + slot_duration,
-                    interview_at__gte=scheduled - slot_duration,
-                ).exclude(pk=app.pk).exists()
-                if clash:
+                if interviewer.has_booking_clash(scheduled, exclude_pk=app.pk):
+                    buffer_note = (
+                        f' (their {interviewer.interview_buffer_minutes}-minute '
+                        f'buffer between interviews is also enforced)'
+                        if interviewer.interview_buffer_minutes else ''
+                    )
                     messages.error(
                         request,
                         f'{interviewer.get_full_name() or interviewer.username} '
-                        f'already has an interview scheduled at that time.',
+                        f'already has an interview scheduled too close to that '
+                        f'time{buffer_note}.',
                     )
                     return redirect('candidates:detail', pk=app.candidate_id)
 
@@ -1097,35 +1107,70 @@ class InterviewerSlotsView(LoginRequiredMixin, View):
         )
         windows = list(interviewer.availability_windows.all())
 
-        # Pre-computed free slots: walk each weekly window over the next
-        # HORIZON_DAYS days, hourly steps, skipping the past and any slot
-        # within +-SLOT_MINUTES of an existing booking — same window the
-        # save-time clash check in InterviewDetailsView.post enforces, so
-        # this preview never offers a slot the save would reject.
+        # Pre-computed free slots: walk each weekly window (plus any extra
+        # hours) over the next HORIZON_DAYS days, hourly steps, skipping the
+        # past, blacked-out times, and any slot within +-SLOT_MINUTES of an
+        # existing booking OR inside the interviewer's buffer spacing — the
+        # same rules the save-time checks in InterviewDetailsView.post
+        # enforce, so this preview never offers a slot the save would reject.
         now = timezone.now()
         booked = list(
             JobApplication.objects.filter(
                 assigned_to=interviewer, interview_at__isnull=False,
             ).exclude(pk=app.pk).values_list('interview_at', flat=True)
         )
+        blackouts = defaultdict(list)   # date -> [(start_time, end_time), ...]
+        extras = defaultdict(list)      # date -> [(start_time, end_time), ...]
+        for exc in interviewer.availability_exceptions.all():
+            target = blackouts if exc.is_unavailable else extras
+            if exc.start_time is not None:
+                target[exc.date].append((exc.start_time, exc.end_time))
+            else:
+                # Full-day blackout marker.
+                target[exc.date].append((time.min, time.max))
+        buffer_delta = timedelta(minutes=interviewer.interview_buffer_minutes or 0)
         step = timedelta(minutes=self.SLOT_MINUTES)
         slot_duration = timedelta(minutes=self.SLOT_MINUTES)
         free_slots = []
-        if windows and role_fit:
+        if (windows or extras) and role_fit:
             for day in range(self.HORIZON_DAYS):
                 day_date = (now + timedelta(days=day)).date()
                 weekday = day_date.weekday()
-                for window in windows:
-                    if window.weekday != weekday:
-                        continue
-                    slot = timezone.make_aware(datetime.combine(day_date, window.start_time))
-                    end = timezone.make_aware(datetime.combine(day_date, window.end_time))
+                # Candidate start times: weekly window starts plus any
+                # extra-hours exception starts for this day.
+                day_starts = [w.start_time for w in windows if w.weekday == weekday]
+                day_starts += [s for s, _ in extras.get(day_date, [])]
+                if day_date in blackouts and any(
+                    s == time.min for s, _ in blackouts[day_date]
+                ):
+                    day_starts = []  # full-day blackout
+                for window_start in sorted(set(day_starts)):
+                    slot = timezone.make_aware(datetime.combine(day_date, window_start))
+                    # End of this candidate window: the matching weekly
+                    # window's end, or the extra-hours exception's end.
+                    window_ends = [
+                        w.end_time for w in windows
+                        if w.weekday == weekday and w.start_time == window_start
+                    ] or [e for s, e in extras.get(day_date, []) if s == window_start]
+                    end = timezone.make_aware(
+                        datetime.combine(day_date, max(window_ends))
+                    )
                     while slot + step <= end:
                         clashes = any(
                             slot - slot_duration <= booked_at < slot + slot_duration
+                            or (
+                                buffer_delta
+                                and booked_at - slot_duration - buffer_delta
+                                <= slot
+                                < booked_at + slot_duration + buffer_delta
+                            )
                             for booked_at in booked
                         )
-                        if slot >= now and not clashes:
+                        in_blackout = any(
+                            b_start <= slot.time() < b_end
+                            for b_start, b_end in blackouts.get(day_date, [])
+                        )
+                        if slot >= now and not clashes and not in_blackout:
                             free_slots.append(slot)
                         slot += step
                 if len(free_slots) >= 6:
@@ -1139,6 +1184,11 @@ class InterviewerSlotsView(LoginRequiredMixin, View):
             'windows': windows,
             'booked_count': len(booked),
             'free_slots': free_slots,
+            'buffer_note': (
+                f'A {interviewer.interview_buffer_minutes}-minute buffer between '
+                f'this interviewer\'s bookings is enforced.'
+                if interviewer.interview_buffer_minutes else ''
+            ),
         }
         return render(request, 'candidates/_slot_preview.html', {
             'preview': preview,

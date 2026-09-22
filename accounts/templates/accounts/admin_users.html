@@ -1,0 +1,119 @@
+{% extends 'base.html' %}
+{% block title %}User Management | Altrium Tracker{% endblock %}
+{% block page_title %}User Management{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">User management</h1>
+    <p class="page-sub">Every account in the system. Create accounts with one-time temporary passwords, deactivate or reactivate access, and reset credentials.</p>
+  </div>
+  <div class="page-actions">
+    <a href="{% url 'accounts:admin_user_create' %}" class="btn btn-primary">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      New account
+    </a>
+  </div>
+</div>
+
+<div class="app-card">
+  <form method="get" class="admin-users-filter" role="search">
+    <div class="admin-users-search">
+      <label for="user-search" class="sr-only">Search users</label>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="search" id="user-search" name="q" value="{{ search_query }}" placeholder="Search username, name, or email" class="form-input">
+    </div>
+    <div>
+      <label for="role-filter" class="sr-only">Filter by role</label>
+      <select id="role-filter" name="role" class="form-select">
+        <option value="">All roles</option>
+        {% for value, label in role_choices %}
+        <option value="{{ value }}" {% if role_filter == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button type="submit" class="btn btn-secondary">Filter</button>
+    {% if search_query or role_filter %}
+    <a href="{% url 'accounts:admin_users' %}" class="btn btn-ghost">Clear</a>
+    {% endif %}
+  </form>
+
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th scope="col">User</th>
+          <th scope="col">Role</th>
+          <th scope="col">Seniority</th>
+          <th scope="col">Domain</th>
+          <th scope="col">Status</th>
+          <th scope="col">Last login</th>
+          <th scope="col"><span class="sr-only">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in users %}
+        <tr>
+          <td>
+            <div class="admin-user-cell">
+              <span class="user-avatar" aria-hidden="true">{{ u.first_name|first|default:u.username|first|upper }}</span>
+              <div>
+                <span class="admin-user-name">{{ u.get_full_name|default:u.username }}</span>
+                <span class="admin-user-username">{{ u.username }}</span>
+              </div>
+            </div>
+          </td>
+          <td><span class="badge">{{ u.get_role_display }}</span></td>
+          <td>{{ u.get_seniority_display|default:'—' }}</td>
+          <td>{{ u.get_domain_display|default:'—' }}</td>
+          <td>
+            {% if u.is_active %}
+            <span class="badge badge-success">Active</span>
+            {% else %}
+            <span class="badge badge-danger">Deactivated</span>
+            {% endif %}
+          </td>
+          <td>{{ u.last_login|date:'M j, Y H:i'|default:'Never' }}</td>
+          <td class="admin-user-actions">
+            <form method="post" action="{% url 'accounts:admin_user_toggle_active' u.pk %}">
+              {% csrf_token %}
+              {% if u.is_active %}
+              <button type="submit" class="btn btn-ghost btn-sm" data-confirm-title="Deactivate {{ u.username }}?"
+                      data-confirm-body="This user will no longer be able to sign in. Their history and feedback are kept."
+                      data-admin-confirm>Deactivate</button>
+              {% else %}
+              <button type="submit" class="btn btn-ghost btn-sm" data-admin-confirm>Reactivate</button>
+              {% endif %}
+            </form>
+            <form method="post" action="{% url 'accounts:admin_user_reset_password' u.pk %}">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-ghost btn-sm" data-confirm-title="Reset password for {{ u.username }}?"
+                      data-confirm-body="A new temporary password will be issued and shown once. Their current password stops working immediately."
+                      data-admin-confirm>Reset password</button>
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7" class="text-muted" style="text-align:center;padding:var(--sp-6)">
+            No users match this search.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if is_paginated %}
+  <div class="pagination">
+    {% if page_obj.has_previous %}
+    <a class="btn btn-ghost btn-sm" href="?q={{ search_query|urlencode }}&amp;role={{ role_filter|urlencode }}&amp;page={{ page_obj.previous_page_number }}">&larr; Previous</a>
+    {% endif %}
+    <span class="text-muted text-sm">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}
+    <a class="btn btn-ghost btn-sm" href="?q={{ search_query|urlencode }}&amp;role={{ role_filter|urlencode }}&amp;page={{ page_obj.next_page_number }}">Next &rarr;</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -23,6 +23,30 @@ def get_item(dictionary, key):
 
 
 @register.filter
+def subtract(value, arg):
+    """value - arg for template arithmetic (e.g. week-over-week deltas)."""
+    try:
+        return int(value) - int(arg)
+    except (TypeError, ValueError):
+        return value
+
+
+@register.filter
+def avatar_url(user):
+    """URL of the user's profile photo, or '' when they have none.
+
+    Templates pair this with the existing ``initials`` filter so avatars
+    show the photo when present and initials otherwise:
+    ``{% if user|avatar_url %}<img src="{{ user|avatar_url }}">…
+    {% else %}{{ name|initials }}{% endif %}``
+    """
+    try:
+        return user.photo.url if getattr(user, 'photo', None) else ''
+    except ValueError:
+        return ''
+
+
+@register.filter
 def initials(value):
     """Return 1-2 uppercase initials from a full name.
 
@@ -58,3 +82,39 @@ NEEDS_REVIEW_REASON_LABELS = {
 def review_reason_label(code: str) -> str:
     """Map a raw needs-review reason code to its human-readable label."""
     return NEEDS_REVIEW_REASON_LABELS.get((code or '').strip(), code or '')
+
+
+def _viewer_tz(user):
+    """Resolve the viewing user's display timezone, defaulting to UTC.
+
+    Storage is UTC everywhere; this only localizes display. An unset,
+    blank, or unknown timezone_char silently falls back to UTC.
+    """
+    from datetime import timezone as dt_timezone
+    from zoneinfo import ZoneInfo
+
+    name = (getattr(user, 'timezone_char', '') or '').strip()
+    if name:
+        try:
+            return ZoneInfo(name)
+        except Exception:
+            pass
+    return dt_timezone.utc
+
+
+@register.filter
+def localtime(value, user):
+    """Render a UTC datetime in the viewing user's timezone.
+
+    Usage: ``{{ dt|localtime:request.user|date:"H:i" }}``. Interviewers
+    see their own timezone_char; everyone else (blank/unknown/UTC) sees
+    UTC. Returns the value unchanged for empty input or naive datetimes.
+    """
+    from django.utils import timezone as tz
+
+    if value is None:
+        return value
+    target = _viewer_tz(user)
+    if tz.is_aware(value):
+        return value.astimezone(target)
+    return value

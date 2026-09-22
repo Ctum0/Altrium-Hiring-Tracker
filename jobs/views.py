@@ -20,10 +20,10 @@ from django.views.generic import (
 
 from ai.matching import auto_apply
 from candidates.models import JobApplication
-from pipeline.models import PipelineMove
 from candidates.views import visible_applications
 from feedback.models import InterviewFeedback
 from notifications.mail import send_candidate_email
+from pipeline.models import PipelineMove
 
 from .forms import JobForm, RoundForm
 from .models import InterviewRound, Job

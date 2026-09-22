@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+{% block title %}New Account | Altrium Tracker{% endblock %}
+{% block page_title %}New Account{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Create an account</h1>
+    <p class="page-sub">A one-time temporary password is generated for you after saving — the user must change it at first sign-in.</p>
+  </div>
+  <div class="page-actions">
+    <a href="{% url 'accounts:admin_users' %}" class="btn btn-secondary">Back to users</a>
+  </div>
+</div>
+
+<form method="post" novalidate>
+  {% csrf_token %}
+  <div class="form-card" style="max-width:640px">
+    {% if form.non_field_errors %}
+    <div class="alert alert-error">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    <div class="form-field">
+      <label class="form-label" for="{{ form.username.id_for_label }}">Username</label>
+      {{ form.username }}
+      {% if form.username.errors %}<p class="form-error" id="{{ form.username.id_for_label }}_error" role="alert">{{ form.username.errors.0 }}</p>{% endif %}
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-3)">
+      <div class="form-field">
+        <label class="form-label" for="{{ form.first_name.id_for_label }}">First name</label>
+        {{ form.first_name }}
+        {% if form.first_name.errors %}<p class="form-error" id="{{ form.first_name.id_for_label }}_error" role="alert">{{ form.first_name.errors.0 }}</p>{% endif %}
+      </div>
+      <div class="form-field">
+        <label class="form-label" for="{{ form.last_name.id_for_label }}">Last name</label>
+        {{ form.last_name }}
+        {% if form.last_name.errors %}<p class="form-error" id="{{ form.last_name.id_for_label }}_error" role="alert">{{ form.last_name.errors.0 }}</p>{% endif %}
+      </div>
+    </div>
+
+    <div class="form-field">
+      <label class="form-label" for="{{ form.email.id_for_label }}">Email</label>
+      {{ form.email }}
+      {% if form.email.errors %}<p class="form-error" id="{{ form.email.id_for_label }}_error" role="alert">{{ form.email.errors.0 }}</p>{% endif %}
+    </div>
+
+    <div class="form-field">
+      <label class="form-label" for="{{ form.role.id_for_label }}">Role</label>
+      {{ form.role }}
+      {% if form.role.errors %}<p class="form-error" id="{{ form.role.id_for_label }}_error" role="alert">{{ form.role.errors.0 }}</p>{% endif %}
+      <p class="form-help">Admin accounts manage users and passwords. Interviewer accounts can be assigned to interviews.</p>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-3)">
+      <div class="form-field">
+        <label class="form-label" for="{{ form.seniority.id_for_label }}">Seniority</label>
+        {{ form.seniority }}
+        {% if form.seniority.errors %}<p class="form-error" id="{{ form.seniority.id_for_label }}_error" role="alert">{{ form.seniority.errors.0 }}</p>{% endif %}
+      </div>
+      <div class="form-field">
+        <label class="form-label" for="{{ form.domain.id_for_label }}">Domain</label>
+        {{ form.domain }}
+        {% if form.domain.errors %}<p class="form-error" id="{{ form.domain.id_for_label }}_error" role="alert">{{ form.domain.errors.0 }}</p>{% endif %}
+      </div>
+    </div>
+
+    <div class="form-field">
+      <label class="form-label" for="{{ form.specialty.id_for_label }}">Specialty</label>
+      {{ form.specialty }}
+      {% if form.specialty.errors %}<p class="form-error" id="{{ form.specialty.id_for_label }}_error" role="alert">{{ form.specialty.errors.0 }}</p>{% endif %}
+      <p class="form-help">{{ form.specialty.help_text }}</p>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">Create account</button>
+      <a href="{% url 'accounts:admin_users' %}" class="btn btn-secondary">Cancel</a>
+    </div>
+  </div>
+</form>
+{% endblock %}

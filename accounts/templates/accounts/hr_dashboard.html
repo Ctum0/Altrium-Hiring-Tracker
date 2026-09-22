@@ -512,6 +512,35 @@
       {% endif %}
     </div>
 
+    <!-- This Week vs Last Week: management trend panel -->
+    <div class="panel panel-pad ref-card">
+      <div class="ref-card-header">
+        <h2 class="ref-card-title">This Week vs Last Week</h2>
+        <span class="text-xs text-muted">week-over-week deltas</span>
+      </div>
+      <div class="trend-delta-grid">
+        {% include 'accounts/_trend_delta.html' with label='Applications' this=trend_apps_this_week last=trend_apps_last_week only %}
+        {% include 'accounts/_trend_delta.html' with label='Hired' this=trend_hires_this_week last=trend_hires_last_week only %}
+        {% include 'accounts/_trend_delta.html' with label='Rejections' this=trend_rejections_this_week last=trend_rejections_last_week only %}
+        <div class="trend-delta-item">
+          <span class="trend-delta-label">Pending Feedback</span>
+          <span class="trend-delta-value">{{ trend_feedback_pending }}</span>
+          <span class="kpi-trend {% if trend_feedback_pending > 0 %}kpi-trend-pending{% else %}kpi-trend-up{% endif %}">
+            {% if trend_feedback_pending > 0 %}Action needed{% else %}All clear{% endif %}
+          </span>
+        </div>
+      </div>
+      <div class="trend-chart-block">
+        <div class="ref-card-header" style="margin-top:var(--sp-3)">
+          <h2 class="ref-card-title" style="font-size:var(--text-sm)">Hires per Week</h2>
+          <span class="text-xs text-muted">last 8 weeks</span>
+        </div>
+        <div style="position:relative;height:150px">
+          <canvas id="hiresPerWeekChart" aria-label="Hires per week over the last 8 weeks" role="img"></canvas>
+        </div>
+      </div>
+    </div>
+
   </div>
 
 </div>
@@ -519,6 +548,17 @@
 
 {% block scripts %}
 <script>
+function chartTheme() {
+  var dark = document.documentElement.dataset.theme !== 'light';
+  return {
+    grid: dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+    tick: dark ? 'rgba(255,255,255,0.75)' : 'rgba(0,0,0,0.65)',
+    tooltipBg: dark ? 'rgba(6,11,40,0.95)' : 'rgba(255,255,255,0.97)',
+    tooltipBorder: dark ? 'rgba(0,117,255,0.4)' : 'rgba(0,117,255,0.3)',
+    tooltipColor: dark ? '#ffffff' : '#0f172a',
+  };
+}
+
 (function() {
   var trendCanvas = document.getElementById('trendChart');
   var scoreCanvas = document.getElementById('scoreChart');
@@ -527,17 +567,6 @@
   var stageLabels = [{% for s in stage_distribution %}'{{ s.label }}'{% if not forloop.last %},{% endif %}{% endfor %}];
   var stageCounts = [{% for s in stage_distribution %}{{ s.count }}{% if not forloop.last %},{% endif %}{% endfor %}];
   var maxCount = Math.max.apply(null, stageCounts);
-
-  function chartTheme() {
-    var dark = document.documentElement.dataset.theme !== 'light';
-    return {
-      grid: dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
-      tick: dark ? 'rgba(255,255,255,0.75)' : 'rgba(0,0,0,0.65)',
-      tooltipBg: dark ? 'rgba(6,11,40,0.95)' : 'rgba(255,255,255,0.97)',
-      tooltipBorder: dark ? 'rgba(0,117,255,0.4)' : 'rgba(0,117,255,0.3)',
-      tooltipColor: dark ? '#ffffff' : '#0f172a',
-    };
-  }
 
   function applyChartTheme() {
     var t = chartTheme();
@@ -712,6 +741,73 @@ function switchMainChart(mode) {
     e.preventDefault();
     next.focus();
     if (next.getAttribute('aria-selected') !== 'true') switchMainChart(modeFor(next));
+  });
+})();
+
+/* Hires-per-week mini chart (management trend panel) */
+(function() {
+  var canvas = document.getElementById('hiresPerWeekChart');
+  if (!canvas || typeof Chart === 'undefined') return;
+
+  var labels = [{% for w in hires_per_week %}'{{ w.label }}'{% if not forloop.last %},{% endif %}{% endfor %}];
+  var counts = [{% for w in hires_per_week %}{{ w.count }}{% if not forloop.last %},{% endif %}{% endfor %}];
+
+  var theme = chartTheme();
+  var brandColor = getComputedStyle(document.documentElement).getPropertyValue('--brand').trim() || '#22D3EE';
+
+  window.hiresPerWeekChartObj = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Hires',
+        data: counts,
+        backgroundColor: brandColor,
+        borderWidth: 0,
+        borderRadius: 6,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 600 },
+      layout: { padding: { top: 8, bottom: 0, left: 6, right: 12 } },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: theme.tooltipBg,
+          borderColor: theme.tooltipBorder,
+          borderWidth: 1,
+          padding: 8,
+          cornerRadius: 8,
+          titleColor: theme.tooltipColor,
+          bodyColor: theme.tooltipColor,
+        }
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: theme.tick, font: { size: 11, weight: '600' } } },
+        y: {
+          beginAtZero: true,
+          suggestedMax: Math.max.apply(null, counts) + 1,
+          grid: { color: theme.grid },
+          ticks: { color: theme.tick, font: { size: 11, weight: '600' }, precision: 0 }
+        }
+      }
+    }
+  });
+
+  document.addEventListener('themechange', function() {
+    var chart = window.hiresPerWeekChartObj;
+    if (!chart) return;
+    var t = chartTheme();
+    chart.options.scales.x.ticks.color = t.tick;
+    chart.options.scales.y.grid.color = t.grid;
+    chart.options.scales.y.ticks.color = t.tick;
+    chart.options.plugins.tooltip.backgroundColor = t.tooltipBg;
+    chart.options.plugins.tooltip.borderColor = t.tooltipBorder;
+    chart.options.plugins.tooltip.titleColor = t.tooltipColor;
+    chart.options.plugins.tooltip.bodyColor = t.tooltipColor;
+    chart.update();
   });
 })();
 </script>

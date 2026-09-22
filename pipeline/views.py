@@ -5,6 +5,7 @@ from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, render
 from django.views import View
 
+from accounts.models import AuditLog
 from candidates.models import JobApplication
 from candidates.views import workload_context  # noqa: F401 (re-exported import kept)
 from jobs.models import InterviewRound
@@ -140,6 +141,18 @@ class PipelineMoveView(LoginRequiredMixin, View):
             from_status=from_status,
             to_status=app.status,
             moved_by=request.user,
+        )
+
+        AuditLog.record(
+            request.user,
+            AuditLog.Action.MOVE,
+            object_type='JobApplication',
+            object_id=app.pk,
+            detail=f'{app.candidate.full_name}: '
+            + (f'round {getattr(from_round, "name", None) or "—"} -> '
+               f'{getattr(app.current_round, "name", None) or "—"}'
+               if to_round_id is not None or to_unrouted
+               else f'status {from_status} -> {app.status}'),
         )
 
         # Candidate-facing milestone emails (Feature 4). Fire AFTER the

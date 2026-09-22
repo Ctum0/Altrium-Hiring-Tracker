@@ -71,4 +71,65 @@
   <p class="empty-state-body">Add your first weekly window above so HR can schedule interviews with you.</p>
 </div>
 {% endif %}
+
+<div class="panel panel-pad glass-panel" style="margin-top:var(--sp-5)">
+  <h2 class="panel-heading">Exceptions</h2>
+  <p class="text-xs text-muted" style="margin:0 0 var(--sp-3)">One-off changes for specific dates: block a day you're out, or open extra hours beyond your weekly windows.</p>
+  {% if exception_form.non_field_errors %}
+  <div class="alert alert-error">{{ exception_form.non_field_errors }}</div>
+  {% endif %}
+  <form method="post" novalidate>
+    {% csrf_token %}
+    <div class="flex gap-3" style="flex-wrap:wrap;align-items:flex-start">
+      <div class="form-field" style="margin:0">
+        <label class="form-label" for="{{ exception_form.date.id_for_label }}">Date</label>
+        {{ exception_form.date }}
+        {% if exception_form.date.errors %}<p class="form-error" id="{{ exception_form.date.id_for_label }}_error" role="alert">{{ exception_form.date.errors.0 }}</p>{% endif %}
+      </div>
+      <div class="form-field" style="margin:0;padding-top:26px">
+        <label class="flex gap-2 text-sm" style="align-items:center;margin:0">
+          {{ exception_form.is_unavailable }}
+          <span>{{ exception_form.is_unavailable.label }}</span>
+        </label>
+      </div>
+      <div class="form-field" style="margin:0">
+        <label class="form-label" for="{{ exception_form.start_time.id_for_label }}">Start <span class="text-muted">(optional for blackout)</span></label>
+        {{ exception_form.start_time }}
+        {% if exception_form.start_time.errors %}<p class="form-error" id="{{ exception_form.start_time.id_for_label }}_error" role="alert">{{ exception_form.start_time.errors.0 }}</p>{% endif %}
+      </div>
+      <div class="form-field" style="margin:0">
+        <label class="form-label" for="{{ exception_form.end_time.id_for_label }}">End</label>
+        {{ exception_form.end_time }}
+        {% if exception_form.end_time.errors %}<p class="form-error" id="{{ exception_form.end_time.id_for_label }}_error" role="alert">{{ exception_form.end_time.errors.0 }}</p>{% endif %}
+      </div>
+      <div class="form-field" style="margin:0;padding-top:26px">
+        <button type="submit" class="btn btn-primary btn-sm">Add exception</button>
+      </div>
+    </div>
+  </form>
+
+  {% if exceptions %}
+  <div style="margin-top:var(--sp-4)">
+    {% for exc in exceptions %}
+    <div class="flex gap-2" style="align-items:center;margin-bottom:var(--sp-1)">
+      <span class="badge {% if exc.is_unavailable %}badge-rejected{% else %}badge-hired{% endif %}">
+        {% if exc.is_unavailable %}Blackout{% else %}Extra hours{% endif %}
+      </span>
+      <span class="text-xs" style="white-space:nowrap">{{ exc.date|date:'D, M j, Y' }}</span>
+      {% if exc.start_time %}
+      <span class="text-xs text-muted">{{ exc.start_time|time:'H:i' }}&ndash;{{ exc.end_time|time:'H:i' }}</span>
+      {% elif exc.is_unavailable %}
+      <span class="text-xs text-muted">full day</span>
+      {% endif %}
+      <form method="post" style="display:inline">
+        {% csrf_token %}
+        <button type="submit" name="remove_exception" value="{{ exc.pk }}" class="btn btn-danger btn-xs">Remove</button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="text-xs text-muted" style="margin:var(--sp-3) 0 0">No exceptions on file.</p>
+  {% endif %}
+</div>
 {% endblock %}

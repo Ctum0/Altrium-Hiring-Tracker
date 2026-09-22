@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+{% load accounts_extras %}
+
+{% block breadcrumb %}Account{% endblock %}
+{% block page_title %}My Profile{% endblock %}
+{% block active_nav %}profile{% endblock %}
+
+{% block content %}
+<div class="profile-page">
+  <div class="glass-panel profile-card">
+    <div class="profile-header">
+      <span class="profile-avatar" aria-hidden="true">
+        {% if user.photo %}
+          <img src="{{ user.photo.url }}" alt="" width="72" height="72" class="profile-avatar-img">
+        {% else %}
+          <span class="user-avatar avatar-lg cand-avatar-{{ user.get_full_name|default:user.username|avatar_index }}">{{ user.get_full_name|default:user.username|initials }}</span>
+        {% endif %}
+      </span>
+      <div>
+        <h2 class="profile-name">{{ user.get_full_name|default:user.username }}</h2>
+        <span class="badge badge-role">{{ user.get_role_display }}</span>
+      </div>
+    </div>
+
+    <form method="post" enctype="multipart/form-data" action="{% url 'accounts:profile' %}" class="profile-form">
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+        <div class="alert alert-error" role="alert">{% for e in form.non_field_errors %}<span>{{ e }}</span>{% endfor %}</div>
+      {% endif %}
+
+      <div class="form-row">
+        <label for="{{ form.first_name.id_for_label }}">First name</label>
+        {{ form.first_name }}
+        {% for e in form.first_name.errors %}<p class="form-error">{{ e }}</p>{% endfor %}
+      </div>
+
+      <div class="form-row">
+        <label for="{{ form.last_name.id_for_label }}">Last name</label>
+        {{ form.last_name }}
+        {% for e in form.last_name.errors %}<p class="form-error">{{ e }}</p>{% endfor %}
+      </div>
+
+      <div class="form-row">
+        <label for="{{ form.email.id_for_label }}">Email</label>
+        {{ form.email }}
+        {% for e in form.email.errors %}<p class="form-error">{{ e }}</p>{% endfor %}
+      </div>
+
+      <div class="form-row">
+        <label for="{{ form.photo.id_for_label }}">Profile photo</label>
+        {% if user.photo %}<p class="text-xs text-muted">Current photo is shown in the sidebar and topbar. Uploading replaces it.</p>{% endif %}
+        {{ form.photo }}
+        <p class="text-xs text-muted">JPEG, PNG or WebP. Max 2 MB. Cropped to a square and resized to 256×256.</p>
+        {% for e in form.photo.errors %}<p class="form-error">{{ e }}</p>{% endfor %}
+      </div>
+
+      <div class="form-row">
+        <label>Timezone</label>
+        <p class="form-static">UTC (managed by scheduling)</p>
+      </div>
+
+      <div class="profile-actions">
+        <button type="submit" class="btn btn-primary">Save changes</button>
+        <a href="{% url 'accounts:password_change' %}" class="btn btn-ghost">Change password</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

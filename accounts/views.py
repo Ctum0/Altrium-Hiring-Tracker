@@ -1,13 +1,19 @@
 import csv
+import secrets
+import string
+from datetime import timedelta
 from itertools import groupby
 
 from django.contrib import messages
-from django.contrib.auth import get_user_model
+from django.contrib.auth import get_user_model, update_session_auth_hash
 from django.contrib.auth import views as auth_views
+from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.files.storage import default_storage
+from django.db import transaction
 from django.db.models import Avg, Count, Prefetch, Q
 from django.http import HttpResponse
-from django.shortcuts import get_object_or_404, redirect
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.views.generic import (
@@ -19,11 +25,25 @@ from django.views.generic import (
     View,
 )
 
-from accounts.forms import AvailabilityWindowForm, InterviewerProfileForm, OnboardUserForm
-from accounts.models import InterviewerAvailability, Role
+from accounts.forms import (
+    AdminUserCreateForm,
+    AvailabilityExceptionForm,
+    AvailabilityWindowForm,
+    InterviewerProfileForm,
+    OnboardUserForm,
+    ProfileUpdateForm,
+)
+from accounts.models import (
+    AuditLog,
+    AvailabilityException,
+    InterviewerAvailability,
+    RescheduleRequest,
+    Role,
+)
 from candidates.models import Candidate, JobApplication
 from feedback.models import InterviewFeedback
 from jobs.models import InterviewRound, Job
+from notifications.models import Notification
 from pipeline.models import PipelineMove
 
 User = get_user_model()
@@ -159,14 +179,32 @@ class LoginView(auth_views.LoginView):
     template_name = 'accounts/login.html'
     redirect_authenticated_user = True
 
+    def form_valid(self, form):
+        """Log the successful sign-in, then run Django's normal login."""
+        AuditLog.record(
+            form.get_user(),
+            AuditLog.Action.LOGIN,
+            object_type='User',
+            object_id=form.get_user().pk,
+            detail=f'Signed in from {self.request.META.get("REMOTE_ADDR", "")}',
+        )
+        return super().form_valid(form)
+
     def get_success_url(self):
         # A ?next= target (e.g. the page a session drop interrupted) wins
         # over the role default — the user returns to where they were.
         # Relative paths only (open-redirect guard).
         next_url = self.request.POST.get('next') or self.request.GET.get('next') or ''
         if next_url.startswith('/') and not next_url.startswith('//'):
+            # A forced password change outranks ?next=: a user with a
+            # temporary password must land on the change page regardless
+            # of where their session drop interrupted them.
+            if self.request.user.force_password_change:
+                return reverse_lazy('accounts:password_change')
             return next_url
         user = self.request.user
+        if user.force_password_change:
+            return reverse_lazy('accounts:password_change')
         if user.is_hr() or user.is_management():
             return reverse_lazy('accounts:hr_dashboard')
         elif user.is_interviewer():
@@ -176,6 +214,88 @@ class LoginView(auth_views.LoginView):
 
 class LogoutView(auth_views.LogoutView):
     """POST-only logout (Django 5 default); the navbar uses a POST form."""
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated:
+            AuditLog.record(
+                request.user,
+                AuditLog.Action.LOGOUT,
+                object_type='User',
+                object_id=request.user.pk,
+            )
+        return super().dispatch(request, *args, **kwargs)
+
+
+def _resize_photo(django_file, size=256):
+    """Square-crop and resize an uploaded image with Pillow.
+
+    Returns (django_file, extension) for re-saving onto the model, or
+    None if the file cannot be decoded. Center-crops to a square first so
+    avatars never come out stretched; JPEG output keeps storage small.
+    """
+    from io import BytesIO
+
+    from django.core.files.base import File as DjangoFile
+    from PIL import Image
+
+    try:
+        img = Image.open(django_file)
+        img.load()
+        fmt = (img.format or '').upper()
+    except Exception:
+        return None
+    if fmt not in ('JPEG', 'PNG', 'WEBP'):
+        return None
+    side = min(img.size)
+    left = (img.width - side) // 2
+    top = (img.height - side) // 2
+    img = img.crop((left, top, left + side, top + side)).resize((size, size))
+    if img.mode not in ('RGB', 'L'):
+        img = img.convert('RGB')
+    buf = BytesIO()
+    img.save(buf, format='JPEG', quality=85)
+    buf.seek(0)
+    return DjangoFile(buf, name='avatar.jpg'), 'jpg'
+
+
+class ProfileUpdateView(LoginRequiredMixin, View):
+    """Every role's own profile: name, email and photo (GET form / POST)."""
+
+    template_name = 'accounts/profile.html'
+
+    def get(self, request, *args, **kwargs):
+        form = ProfileUpdateForm(instance=request.user)
+        return self.render(request, form)
+
+    def post(self, request, *args, **kwargs):
+        old_photo = request.user.photo.name if request.user.photo else None
+        form = ProfileUpdateForm(request.POST, request.FILES, instance=request.user)
+        if form.is_valid():
+            user = form.save(commit=False)
+            if request.FILES.get('photo'):
+                photo_file = request.FILES['photo']
+                with photo_file.open('rb'):
+                    resized = _resize_photo(photo_file)
+                if resized is None:
+                    form.add_error(
+                        'photo', 'Could not process that image. Upload a JPEG, PNG or WebP.'
+                    )
+                    return self.render(request, form)
+                new_file, _ext = resized
+                user.photo.save(f'avatar_{user.pk}.jpg', new_file, save=False)
+                if old_photo and old_photo != user.photo.name:
+                    default_storage.delete(old_photo)
+            user.save()
+            messages.success(request, 'Profile updated.')
+            return redirect('accounts:profile')
+        return self.render(request, form)
+
+    def render(self, request, form):
+        return render(
+            request,
+            self.template_name,
+            {'form': form, 'active_nav': 'profile'},
+        )
 
 
 
@@ -204,7 +324,8 @@ class HRDashboardView(LoginRequiredMixin, ListView):
     def dispatch(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
             return self.handle_no_permission()
-        if not (request.user.is_hr() or request.user.is_management()):
+        if not (request.user.is_hr() or request.user.is_management()
+                or request.user.is_admin()):
             return redirect('accounts:home')
         return super().dispatch(request, *args, **kwargs)
 
@@ -604,6 +725,54 @@ class HRDashboardView(LoginRequiredMixin, ListView):
 
         context['stage_performance'] = compute_stage_performance()
 
+        # Week-over-week trend panel ('This Week vs Last Week'). Kept as
+        # separate small aggregate queries — the view's existing structure
+        # is perf-tuned and untouched; this adds 4 queries total.
+        week_start = (now - timedelta(days=now.weekday())).replace(
+            hour=0, minute=0, second=0, microsecond=0,
+        )
+        last_week_start = week_start - timedelta(weeks=1)
+
+        context['trend_apps_this_week'] = JobApplication.objects.filter(
+            created_at__gte=week_start, created_at__lt=week_start + timedelta(weeks=1),
+        ).count()
+        context['trend_apps_last_week'] = JobApplication.objects.filter(
+            created_at__gte=last_week_start, created_at__lt=week_start,
+        ).count()
+        context['trend_hires_this_week'] = PipelineMove.objects.filter(
+            to_status='hired', moved_at__gte=week_start,
+            moved_at__lt=week_start + timedelta(weeks=1),
+        ).values('application_id').distinct().count()
+        context['trend_hires_last_week'] = PipelineMove.objects.filter(
+            to_status='hired', moved_at__gte=last_week_start, moved_at__lt=week_start,
+        ).values('application_id').distinct().count()
+        context['trend_rejections_this_week'] = PipelineMove.objects.filter(
+            to_status='rejected', moved_at__gte=week_start,
+            moved_at__lt=week_start + timedelta(weeks=1),
+        ).values('application_id').distinct().count()
+        context['trend_rejections_last_week'] = PipelineMove.objects.filter(
+            to_status='rejected', moved_at__gte=last_week_start, moved_at__lt=week_start,
+        ).values('application_id').distinct().count()
+        # Pending feedback reuses the existing feedback_pending key.
+        context['trend_feedback_pending'] = context['feedback_pending']
+
+        # Hires-per-week mini chart: last 8 weekly buckets (oldest first).
+        # Pull timestamps once, bucket in Python.
+        hire_times = list(
+            PipelineMove.objects.filter(
+                to_status='hired', moved_at__gte=week_start - timedelta(weeks=7),
+            ).values_list('moved_at', flat=True)
+        )
+        context['hires_per_week'] = []
+        for i in range(8):
+            bucket_start = week_start - timedelta(weeks=7 - i)
+            bucket_end = bucket_start + timedelta(weeks=1)
+            count = sum(1 for t in hire_times if bucket_start <= t < bucket_end)
+            context['hires_per_week'].append({
+                'label': bucket_start.strftime('%b %-d'),
+                'count': count,
+            })
+
         return context
 
 
@@ -748,6 +917,47 @@ class InterviewerDashboardView(LoginRequiredMixin, TemplateView):
             user.availability_windows.all()
         )
         context['has_availability'] = user.has_availability()
+
+        # KPI: feedback the interviewer personally submitted this calendar
+        # month. Same scoping rule as the table above: own feedback only.
+        month_start = timezone.now().replace(
+            day=1, hour=0, minute=0, second=0, microsecond=0,
+        )
+        context['feedback_this_month'] = InterviewFeedback.objects.filter(
+            interviewer=user, submitted_at__gte=month_start,
+        ).count()
+
+        # KPI: interviews scheduled within the next 7 days (still active).
+        now = timezone.now()
+        context['upcoming_this_week'] = assigned_qs.filter(
+            interview_at__gte=now,
+            interview_at__lt=now + timedelta(days=7),
+        ).exclude(status__in=['hired', 'rejected']).count()
+
+        # Mini bar chart: feedback submitted per week over the last 8 weeks
+        # (oldest bucket first). One aggregated query; buckets are computed
+        # in Python from the submitted_at timestamps.
+        week_start = (now - timedelta(days=now.weekday())).replace(
+            hour=0, minute=0, second=0, microsecond=0,
+        )
+        window_start = week_start - timedelta(weeks=7)
+        submitted_times = list(
+            InterviewFeedback.objects.filter(
+                interviewer=user, submitted_at__gte=window_start,
+            ).values_list('submitted_at', flat=True)
+        )
+        weekly_feedback_counts = []
+        for i in range(8):
+            bucket_start = window_start + timedelta(weeks=i)
+            bucket_end = bucket_start + timedelta(weeks=1)
+            count = sum(
+                1 for t in submitted_times if bucket_start <= t < bucket_end
+            )
+            weekly_feedback_counts.append({
+                'label': bucket_start.strftime('%b %-d'),
+                'count': count,
+            })
+        context['weekly_feedback_counts'] = weekly_feedback_counts
 
         context['active_nav'] = 'dashboard'
         return context
@@ -935,6 +1145,12 @@ class MyAvailabilityView(LoginRequiredMixin, TemplateView):
         context['weekday_groups'] = grouped
         context['has_availability'] = windows.exists()
         context['form'] = kwargs.get('form') or AvailabilityWindowForm()
+        context['exception_form'] = (
+            kwargs.get('exception_form') or AvailabilityExceptionForm()
+        )
+        context['exceptions'] = list(
+            AvailabilityException.objects.filter(interviewer=self.request.user)
+        )
         context['active_nav'] = 'availability'
         return context
 
@@ -951,6 +1167,29 @@ class MyAvailabilityView(LoginRequiredMixin, TemplateView):
             window.delete()
             messages.success(request, 'Availability window removed.')
             return redirect('accounts:my_availability')
+        if 'remove_exception' in request.POST:
+            exception = get_object_or_404(
+                AvailabilityException,
+                pk=request.POST['remove_exception'],
+                interviewer=request.user,
+            )
+            exception.delete()
+            messages.success(request, 'Availability exception removed.')
+            return redirect('accounts:my_availability')
+        if 'exception-date' in request.POST or 'exception-is_unavailable' in request.POST:
+            # Exceptions section has its own submit; the weekly-window form
+            # keys off 'weekday', so the prefixed 'exception-*' fields
+            # disambiguate which form this POST belongs to.
+            exception_form = AvailabilityExceptionForm(request.POST)
+            if exception_form.is_valid():
+                saved = exception_form.save_for(request.user)
+                if saved is not None:
+                    kind = 'Blackout date added' if saved.is_unavailable else 'Extra hours added'
+                    messages.success(request, f'{kind}.')
+                    return redirect('accounts:my_availability')
+            return self.render_to_response(
+                self.get_context_data(exception_form=exception_form)
+            )
         form = AvailabilityWindowForm(request.POST)
         if form.is_valid():
             saved = form.save_for(request.user)
@@ -980,6 +1219,7 @@ class MyCalendarView(LoginRequiredMixin, TemplateView):
             .filter(assigned_to=self.request.user, interview_at__isnull=False)
             .exclude(status__in=['hired', 'rejected'])
             .select_related('candidate', 'job', 'current_round')
+            .prefetch_related('reschedule_requests')
             .order_by('interview_at')
         )
         days = []
@@ -1119,3 +1359,418 @@ class RetentionReportView(LoginRequiredMixin, ListView):
         for job in context['closed_jobs']:
             job.days_since_closure = (now - job.closed_at).days if job.closed_at else None
         return context
+
+
+# ---------------------------------------------------------------------------
+# Admin: user management + password change (Wave 2a)
+# ---------------------------------------------------------------------------
+
+def generate_temp_password(length=14):
+    """Server-generated temporary password, shown to the admin exactly once."""
+    alphabet = string.ascii_letters + string.digits
+    # Guarantee at least one of each character class so AUTH_PASSWORD_VALIDATORS'
+    # complexity expectations (lower/upper/digit) are met without surprise.
+    while True:
+        pwd = ''.join(secrets.choice(alphabet) for _ in range(length))
+        if (any(c.islower() for c in pwd) and any(c.isupper() for c in pwd)
+                and any(c.isdigit() for c in pwd)):
+            return pwd
+
+
+class AdminRequiredMixin:
+    """Gate: admins only (staff with role=Admin, or superuser).
+    Everyone else bounces to home."""
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
+        if not request.user.is_admin():
+            return redirect('accounts:home')
+        return super().dispatch(request, *args, **kwargs)
+
+
+class AdminUserListView(LoginRequiredMixin, AdminRequiredMixin, ListView):
+    """Admin-only directory of every account with search + role filter."""
+
+    template_name = 'accounts/admin_users.html'
+    context_object_name = 'users'
+    paginate_by = 25
+
+    def get_queryset(self):
+        qs = User.objects.all().order_by('username')
+        query = (self.request.GET.get('q') or '').strip()
+        if query:
+            qs = qs.filter(
+                Q(username__icontains=query)
+                | Q(first_name__icontains=query)
+                | Q(last_name__icontains=query)
+                | Q(email__icontains=query)
+            )
+        role = self.request.GET.get('role') or ''
+        if role:
+            qs = qs.filter(role=role)
+        return qs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['active_nav'] = 'admin_users'
+        context['search_query'] = (self.request.GET.get('q') or '').strip()
+        context['role_filter'] = self.request.GET.get('role') or ''
+        context['role_choices'] = Role.choices
+        return context
+
+
+class AdminUserCreateView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """Admin-only account creation with a server-generated temporary password.
+
+    The temp password is rendered ONCE on the confirmation screen; it is
+    never stored in plaintext and the user must change it at first login
+    (force_password_change)."""
+
+    template_name = 'accounts/admin_user_create.html'
+
+    def get(self, request):
+        form = AdminUserCreateForm()
+        return render(request, self.template_name, {'form': form, 'active_nav': 'admin_users'})
+
+    def post(self, request):
+        form = AdminUserCreateForm(request.POST)
+        if not form.is_valid():
+            return render(request, self.template_name, {'form': form, 'active_nav': 'admin_users'})
+
+        user = form.save(commit=False)
+        temp_password = generate_temp_password()
+        user.set_password(temp_password)
+        user.is_staff = user.role == Role.ADMIN
+        user.force_password_change = True
+        user.save()
+        form.save_m2m()  # no-op for now, keeps the ModelForm contract
+        AuditLog.record(
+            request.user,
+            AuditLog.Action.CREATE,
+            object_type='User',
+            object_id=user.pk,
+            detail=f'Created {user.get_role_display()} account "{user.username}" '
+           f'with a temporary password.',
+        )
+        return render(request, 'accounts/admin_user_created.html', {
+            'created_user': user,
+            'temp_password': temp_password,
+            'active_nav': 'admin_users',
+        })
+
+
+class AdminUserToggleActiveView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """Deactivate/reactivate an account.
+
+    Protections: an admin cannot deactivate themselves, and the last
+    active admin cannot be deactivated (or the instance would be
+    unmanageable)."""
+
+    def post(self, request, pk):
+        target = get_object_or_404(User, pk=pk)
+        if target == request.user:
+            messages.error(request, 'You cannot deactivate your own account.')
+            return redirect('accounts:admin_users')
+        if target.is_active and target.is_admin() and not (
+            User.objects.filter(is_active=True, is_staff=True, role=Role.ADMIN)
+            .exclude(pk=target.pk).exists()
+        ) and not User.objects.filter(
+            is_superuser=True, is_active=True
+        ).exclude(pk=target.pk).exists():
+            messages.error(
+                request,
+                'Cannot deactivate the last active admin — promote another admin first.',
+            )
+            return redirect('accounts:admin_users')
+        target.is_active = not target.is_active
+        target.save(update_fields=['is_active'])
+        AuditLog.record(
+            request.user,
+            AuditLog.Action.UPDATE,
+            object_type='User',
+            object_id=target.pk,
+            detail=f'{"Deactivated" if not target.is_active else "Reactivated"} '
+                   f'account "{target.username}".',
+        )
+        messages.success(
+            request,
+            f'Account "{target.username}" '
+            f'{"deactivated" if not target.is_active else "reactivated"}.',
+        )
+        return redirect('accounts:admin_users')
+
+
+class AdminUserResetPasswordView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """Issue a fresh temporary password: shown once, forces a change at
+    next login. The old password stops working immediately."""
+
+    def post(self, request, pk):
+        target = get_object_or_404(User, pk=pk)
+        temp_password = generate_temp_password()
+        target.set_password(temp_password)
+        target.force_password_change = True
+        target.save(update_fields=['password', 'force_password_change'])
+        AuditLog.record(
+            request.user,
+            AuditLog.Action.PASSWORD_RESET,
+            object_type='User',
+            object_id=target.pk,
+            detail=f'Issued a temporary password for "{target.username}".',
+        )
+        return render(request, 'accounts/admin_user_password_reset.html', {
+            'target_user': target,
+            'temp_password': temp_password,
+            'active_nav': 'admin_users',
+        })
+
+
+class PasswordChangeView(LoginRequiredMixin, View):
+    """All roles change their own password. Clears force_password_change
+    on success; keeps the session alive instead of forcing a re-login."""
+
+    template_name = 'accounts/password_change.html'
+
+    def get(self, request):
+        form = PasswordChangeForm(request.user)
+        return render(request, self.template_name, {'form': form, 'active_nav': 'password'})
+
+    def post(self, request):
+        form = PasswordChangeForm(request.user, request.POST)
+        if not form.is_valid():
+            return render(request, self.template_name, {'form': form, 'active_nav': 'password'})
+
+        user = form.save()  # sets + hashes the new password
+        update_session_auth_hash(request, user)  # keep the session logged in
+        user.force_password_change = False
+        user.save(update_fields=['force_password_change'])
+        AuditLog.record(
+            request.user,
+            AuditLog.Action.PASSWORD_RESET,
+            object_type='User',
+            object_id=user.pk,
+            detail='Changed own password.',
+        )
+        messages.success(request, 'Your password has been changed.')
+        return redirect('accounts:profile')
+
+
+class RescheduleRequestCreateView(LoginRequiredMixin, View):
+    """Interviewer asks HR to move one of their booked interviews.
+
+    POST from My Calendar: up to 3 proposed slots (ISO datetimes) plus an
+    optional note. Creates the request and notifies the assigned HR user
+    (in-app Notification, same pattern as assignment/scheduling notices).
+    """
+
+    MAX_SLOTS = 3
+
+    def post(self, request, pk):
+        if not request.user.is_interviewer():
+            messages.error(request, 'Only interviewers can request reschedules.')
+            return redirect('accounts:home')
+        app = get_object_or_404(JobApplication, pk=pk)
+        if app.assigned_to_id != request.user.pk:
+            messages.error(request, 'You can only request reschedules for your own interviews.')
+            return redirect('accounts:my_calendar')
+        if not app.interview_at:
+            messages.error(request, 'This interview has no booked slot to reschedule.')
+            return redirect('accounts:my_calendar')
+
+        from datetime import datetime as dt
+        from datetime import timezone as dt_timezone
+
+        proposed = []
+        for raw in request.POST.getlist('proposed_slot')[:self.MAX_SLOTS]:
+            raw = (raw or '').strip()
+            if not raw:
+                continue
+            try:
+                parsed = dt.fromisoformat(raw)
+                if timezone.is_naive(parsed):
+                    parsed = timezone.make_aware(parsed, dt_timezone.utc)
+            except ValueError:
+                messages.error(
+                    request,
+                    f'Could not read proposed slot "{raw}". Use YYYY-MM-DD HH:MM.',
+                )
+                return redirect('accounts:my_calendar')
+            if parsed <= timezone.now():
+                messages.error(request, 'Proposed slots must be in the future.')
+                return redirect('accounts:my_calendar')
+            proposed.append(parsed.isoformat())
+
+        if not proposed:
+            messages.error(request, 'Propose at least one alternative slot.')
+            return redirect('accounts:my_calendar')
+
+        req = RescheduleRequest.objects.create(
+            application=app,
+            requested_by=request.user,
+            original_slot=app.interview_at,
+            proposed_slots=proposed,
+            note=request.POST.get('note', '').strip(),
+        )
+        AuditLog.record(
+            request.user,
+            AuditLog.Action.CREATE,
+            object_type='RescheduleRequest',
+            object_id=req.pk,
+            detail=f'Reschedule requested for {app.candidate.full_name} ({app.job.title}).',
+        )
+        # Notify HR: the application's creator when identifiable, else all
+        # active HR users (same fallback spirit as dispatch_escalations).
+        hr_recipients = User.objects.filter(role=Role.HR, is_active=True)
+        creator = getattr(app, 'created_by', None)
+        if creator is not None and creator.is_hr():
+            hr_recipients = User.objects.filter(pk=creator.pk)
+        link = reverse('accounts:reschedule_requests')
+        for hr in hr_recipients:
+            Notification.objects.create(
+                recipient=hr,
+                message=(
+                    f'{request.user.get_full_name() or request.user.username} '
+                    f'requests to reschedule {app.candidate.full_name} '
+                    f'({app.job.title}) currently booked at '
+                    f'{app.interview_at:%Y-%m-%d %H:%M} UTC.'
+                ),
+                link=link,
+            )
+        messages.success(request, 'Reschedule request sent to HR.')
+        return redirect('accounts:my_calendar')
+
+
+class RescheduleRequestListView(LoginRequiredMixin, ListView):
+    """HR console for pending reschedule requests.
+
+    Accept applies the FIRST proposed slot to the application (re-running
+    the same availability/clash validation a direct booking would, so an
+    accepted slot can never be one the save would reject). Decline just
+    marks it. Interviewers get redirected home; management is read-only.
+    """
+
+    template_name = 'accounts/reschedule_requests.html'
+    context_object_name = 'requests'
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
+        if not request.user.is_hr():
+            return redirect('accounts:home')
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_queryset(self):
+        return (
+            RescheduleRequest.objects
+            .select_related('application__candidate', 'application__job', 'requested_by')
+            .order_by('-created_at')
+        )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['pending_count'] = self.get_queryset().filter(status='pending').count()
+        context['active_nav'] = 'calendar'
+        return context
+
+    def post(self, request, *args, **kwargs):
+        if not request.user.is_hr():
+            return redirect('accounts:home')
+        req = get_object_or_404(
+            RescheduleRequest,
+            pk=request.POST.get('request_pk'),
+            status=RescheduleRequest.Status.PENDING,
+        )
+        app = req.application
+        decision = request.POST.get('decision')
+        if decision == 'accept':
+            proposed = req.proposed_slots or []
+            if not proposed:
+                messages.error(request, 'This request has no proposed slots left.')
+                return redirect('accounts:reschedule_requests')
+            from datetime import datetime as dt
+            from datetime import timezone as dt_timezone
+
+            try:
+                new_slot = dt.fromisoformat(proposed[0])
+                if timezone.is_naive(new_slot):
+                    new_slot = timezone.make_aware(new_slot, dt_timezone.utc)
+            except (ValueError, TypeError):
+                messages.error(request, 'The proposed slot could not be parsed.')
+                return redirect('accounts:reschedule_requests')
+            if new_slot < timezone.now():
+                messages.error(
+                    request,
+                    'The proposed slot is already in the past; decline it instead.',
+                )
+                return redirect('accounts:reschedule_requests')
+
+            interviewer = app.assigned_to
+            if not interviewer:
+                messages.error(request, 'The application no longer has an assigned interviewer.')
+                return redirect('accounts:reschedule_requests')
+
+            with transaction.atomic():
+                User.objects.select_for_update().get(pk=interviewer.pk)
+                if not interviewer.is_available_at(new_slot):
+                    messages.error(
+                        request,
+                        f'{interviewer.get_full_name() or interviewer.username} is '
+                        f'not available at the proposed slot; it was NOT applied. '
+                        f'Decline the request or pick another slot.',
+                    )
+                    return redirect('accounts:reschedule_requests')
+                if interviewer.has_booking_clash(new_slot, exclude_pk=app.pk):
+                    messages.error(
+                        request,
+                        f'{interviewer.get_full_name() or interviewer.username} has '
+                        f'another booking too close to the proposed slot; it was '
+                        f'NOT applied.',
+                    )
+                    return redirect('accounts:reschedule_requests')
+                app.interview_at = new_slot
+                app.save(update_fields=['interview_at', 'updated_at'])
+                req.status = RescheduleRequest.Status.ACCEPTED
+                req.save(update_fields=['status'])
+            Notification.objects.create(
+                recipient=req.requested_by,
+                message=(
+                    f'Your reschedule request for {app.candidate.full_name} '
+                    f'({app.job.title}) was accepted. New slot: '
+                    f'{new_slot:%Y-%m-%d %H:%M} UTC.'
+                ),
+                link=reverse('candidates:detail', kwargs={'pk': app.candidate_id}),
+            )
+            AuditLog.record(
+                request.user,
+                AuditLog.Action.UPDATE,
+                object_type='RescheduleRequest',
+                object_id=req.pk,
+                detail=f'Accepted; slot moved to {new_slot:%Y-%m-%d %H:%M} UTC.',
+            )
+            messages.success(
+                request,
+                f'Reschedule accepted. Interview moved to {new_slot:%Y-%m-%d %H:%M} UTC.',
+            )
+        elif decision == 'decline':
+            req.status = RescheduleRequest.Status.DECLINED
+            req.save(update_fields=['status'])
+            Notification.objects.create(
+                recipient=req.requested_by,
+                message=(
+                    f'Your reschedule request for {app.candidate.full_name} '
+                    f'({app.job.title}) was declined. The current slot '
+                    f'({req.original_slot:%Y-%m-%d %H:%M} UTC) stays booked.'
+                ),
+                link=reverse('candidates:detail', kwargs={'pk': app.candidate_id}),
+            )
+            AuditLog.record(
+                request.user,
+                AuditLog.Action.UPDATE,
+                object_type='RescheduleRequest',
+                object_id=req.pk,
+                detail='Declined.',
+            )
+            messages.info(request, 'Reschedule request declined.')
+        else:
+            messages.error(request, 'Unknown action.')
+        return redirect('accounts:reschedule_requests')

@@ -2728,3 +2728,56 @@ class ReviewReturnContextTests(CandidatesBaseTestCase):
         self.client.get(reverse('candidates:list'), {'needs_review': '1'})
         r = self.client.get(reverse('candidates:review', args=[self.candidate.pk]))
         self.assertContains(r, 'needs_review=1')
+
+
+class OffboardingContextTests(CandidatesBaseTestCase):
+    """Wave 1a: Offboarding must highlight the Candidates nav entry and
+    render a breadcrumb (it was a silent dead end in the sidebar)."""
+
+    def test_offboarding_highlights_candidates_nav(self):
+        self.login('hr')
+        r = self.client.get(reverse('candidates:offboarding'))
+        self.assertEqual(r.context['active_nav'], 'candidates')
+        self.assertContains(r, 'nav-link active')
+
+    def test_offboarding_renders_breadcrumb(self):
+        self.login('hr')
+        r = self.client.get(reverse('candidates:offboarding'))
+        self.assertContains(r, 'Candidates')
+        self.assertContains(r, 'breadcrumb-sep')
+        self.assertContains(r, 'Offboarding')
+
+
+class AiFitSummaryUITests(CandidatesBaseTestCase):
+    """Wave 1a: the AI fit summary partial must render as a labeled card
+    with htmx indicator wiring so the loading state is visible."""
+
+    def _render_summary(self):
+        # The fit panel (which includes _fit_summary.html) only renders for
+        # jobs with requirements; the base fixture job has none.
+        if not self.job.requirements:
+            self.job.requirements = 'Python, Django'
+            self.job.save(update_fields=['requirements'])
+        return reverse('candidates:detail', args=[self.candidate.pk])
+
+    def test_empty_state_has_indicator_and_button(self):
+        self.login('hr')
+        r = self.client.get(self._render_summary())
+        self.assertContains(r, 'fit-summary--empty')
+        self.assertContains(r, 'htmx-indicator')
+        self.assertContains(r, 'hx-indicator="closest .fit-summary"')
+
+    def test_filled_state_has_card_header_and_regenerate(self):
+        self.application.ai_fit_summary = 'Strengths\n- Solid Django experience.'
+        self.application.save(update_fields=['ai_fit_summary'])
+        self.login('hr')
+        r = self.client.get(self._render_summary())
+        self.assertContains(r, 'AI Assessment')
+        self.assertContains(r, 'fit-summary-head')
+        self.assertContains(r, 'fit-summary-foot')
+        self.assertContains(r, 'Regenerate')
+
+    def test_management_sees_no_generate_button(self):
+        self.login('mgmt')
+        r = self.client.get(self._render_summary())
+        self.assertNotContains(r, 'ai-fit')

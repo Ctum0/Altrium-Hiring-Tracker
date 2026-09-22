@@ -1,12 +1,18 @@
 {% if app.ai_fit_summary %}
 <div class="fit-summary" id="fit-summary-{{ app.pk }}">
+  <div class="fit-summary-head">
+    <svg class="fit-summary-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg>
+    <span class="fit-summary-label">AI Assessment</span>
+  </div>
   <div class="fit-summary-body">{{ app.ai_fit_summary|linebreaks }}</div>
   {% if not user.is_management %}
-  <div class="flex gap-2">
+  <div class="fit-summary-foot">
+    <span class="htmx-indicator fit-summary-spinner" aria-hidden="true"><span class="fit-summary-spinner-dot"></span> Assessing…</span>
     <button type="button" class="btn btn-ghost btn-sm"
             hx-post="{% url 'candidates:ai_fit' app.pk %}"
             hx-target="#fit-summary-{{ app.pk }}"
             hx-swap="outerHTML"
+            hx-indicator="closest .fit-summary"
             hx-include="[name='csrfmiddlewaretoken']">
       Regenerate
     </button>
@@ -17,10 +23,12 @@
 <div class="fit-summary fit-summary--empty" id="fit-summary-{{ app.pk }}">
   <span class="text-xs text-muted">No AI assessment yet.{% if user.is_management %} HR or the assigned interviewer can generate one.{% endif %}</span>
   {% if not user.is_management %}
+  <span class="htmx-indicator fit-summary-spinner" aria-hidden="true"><span class="fit-summary-spinner-dot"></span> Assessing…</span>
   <button type="button" class="btn btn-primary btn-sm"
           hx-post="{% url 'candidates:ai_fit' app.pk %}"
           hx-target="#fit-summary-{{ app.pk }}"
           hx-swap="outerHTML"
+          hx-indicator="closest .fit-summary"
           hx-include="[name='csrfmiddlewaretoken']">
     Generate AI assessment
   </button>

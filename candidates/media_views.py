@@ -43,6 +43,15 @@ class ProtectedMediaView(LoginRequiredMixin, View):
             if not assigned:
                 return HttpResponse('Forbidden', status=403)
 
+            # Profile photos belong to the account owner: only that user (or
+            # HR/Management) may fetch one. Path is 'profile_photos/<file>'.
+            if path.startswith('profile_photos/') and not (
+                request.user.is_hr()
+                or request.user.is_management()
+                or os.path.basename(path).startswith(f'avatar_{request.user.pk}.')
+            ):
+                return HttpResponse('Forbidden', status=403)
+
         # Small local files; dev-only route. Range requests unnecessary.
         with open(full, 'rb') as fh:
             response = HttpResponse(fh.read())
@@ -52,6 +61,10 @@ class ProtectedMediaView(LoginRequiredMixin, View):
             '.pdf': 'application/pdf',
             '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
             '.doc': 'application/msword',
+            '.jpg': 'image/jpeg',
+            '.jpeg': 'image/jpeg',
+            '.png': 'image/png',
+            '.webp': 'image/webp',
         }
         if ext in types:
             response['Content-Type'] = types[ext]

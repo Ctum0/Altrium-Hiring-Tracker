@@ -9,6 +9,7 @@ from django.urls import reverse
 from django.views import View
 from django.views.generic import DetailView, ListView
 
+from accounts.models import AuditLog
 from ai.services import general_feedback_summary, polish_notes, suggest_scores
 from candidates.models import JobApplication
 from jobs.models import InterviewRound
@@ -337,6 +338,17 @@ class FeedbackFormView(LoginRequiredMixin, View):
             request,
             f'Feedback {action} for {self.application.candidate.full_name} '
             f'({self.round_obj.name}).',
+        )
+        AuditLog.record(
+            request.user,
+            AuditLog.Action.FEEDBACK,
+            object_type='InterviewFeedback',
+            object_id=feedback.pk,
+            detail=(
+                f'{"Updated" if existing else "Submitted"} feedback '
+                f'(score {feedback.score}) for {self.application.candidate.full_name} '
+                f'at round {self.round_obj.name}.'
+            ),
         )
         # Return to the entry point (?next=, relative paths only) so the
         # interviewer keeps their working context; default stays feedback:list.

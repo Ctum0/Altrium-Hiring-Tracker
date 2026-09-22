@@ -2,6 +2,7 @@
 {% load accounts_extras %}
 {% block title %}My Candidates | Altrium Tracker{% endblock %}
 {% block page_title %}My Candidates{% endblock %}
+{% block head %}<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>{% endblock %}
 {% block content %}
 <div class="page-header" style="margin-bottom:var(--sp-4)">
   <div>
@@ -35,8 +36,26 @@
 </div>
 {% endif %}
 
-<!-- Summary Panel -->
-<div class="ref-kpi-row" style="grid-template-columns: repeat(2, 1fr); max-width: 640px; margin-bottom: var(--sp-5)">
+{% if pending_feedback %}
+<!-- Pending Feedback Action Queue: the interviewer's #1 daily action,
+     surfaced as one-click CTAs instead of requiring navigation into
+     each candidate profile. Kept above the KPI row for prominence. -->
+<div class="callout-pending" style="margin-bottom:var(--sp-5)">
+  <p class="text-xs" style="margin:0 0 var(--sp-2) 0"><strong>{{ pending_feedback }} candidate{{ pending_feedback|pluralize }} waiting for your feedback.</strong> Submitting feedback unlocks their progression to the next round.</p>
+  <div class="flex gap-2" style="flex-wrap:wrap">
+    {% for app in assigned_apps %}
+      {% if not app.feedback_submitted and app.current_round %}
+      <a href="{% url 'feedback:form' app.pk app.current_round.pk %}?next={% url 'accounts:interviewer_dashboard' %}" class="btn btn-primary btn-sm">
+        {{ app.candidate.full_name }} &middot; {{ app.job.title|truncatechars:24 }}
+      </a>
+      {% endif %}
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- KPI Row: 4 cards, HR-dashboard component style -->
+<div class="ref-kpi-row" style="margin-bottom: var(--sp-5)">
   <div class="ref-kpi-card glass-panel vui-card vui-card-hover">
     <div class="ref-kpi-meta">
       <span class="ref-kpi-label">Assigned Candidates</span>
@@ -60,25 +79,42 @@
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
     </div>
   </div>
-</div>
 
-{% if pending_feedback %}
-<!-- Pending Feedback Action Queue: the interviewer's #1 daily action,
-     surfaced as one-click CTAs instead of requiring navigation into
-     each candidate profile. -->
-<div class="callout-pending" style="margin-bottom:var(--sp-5)">
-  <p class="text-xs" style="margin:0 0 var(--sp-2) 0"><strong>{{ pending_feedback }} candidate{{ pending_feedback|pluralize }} waiting for your feedback.</strong> Submitting feedback unlocks their progression to the next round.</p>
-  <div class="flex gap-2" style="flex-wrap:wrap">
-    {% for app in assigned_apps %}
-      {% if not app.feedback_submitted and app.current_round %}
-      <a href="{% url 'feedback:form' app.pk app.current_round.pk %}?next={% url 'accounts:interviewer_dashboard' %}" class="btn btn-primary btn-sm">
-        {{ app.candidate.full_name }} &middot; {{ app.job.title|truncatechars:24 }}
-      </a>
-      {% endif %}
-    {% endfor %}
+  <div class="ref-kpi-card glass-panel vui-card vui-card-hover">
+    <div class="ref-kpi-meta">
+      <span class="ref-kpi-label">Feedback Given This Month</span>
+      <span class="ref-kpi-value">{{ feedback_this_month }}</span>
+      <span class="kpi-trend kpi-trend-up">Since the 1st</span>
+    </div>
+    <div class="ref-kpi-icon-box ref-kpi-icon-teal" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01"/><polyline points="9 11.01 12 14.01 16 9"/></svg>
+    </div>
+  </div>
+
+  <div class="ref-kpi-card glass-panel vui-card vui-card-hover {% if upcoming_this_week > 0 %}kpi-card-pending-3d{% endif %}">
+    <div class="ref-kpi-meta">
+      <span class="ref-kpi-label">Upcoming This Week</span>
+      <span class="ref-kpi-value">{{ upcoming_this_week }}</span>
+      <span class="kpi-trend {% if upcoming_this_week > 0 %}kpi-trend-pending{% else %}kpi-trend-neutral{% endif %}">
+        {% if upcoming_this_week > 0 %}Next 7 days{% else %}Nothing scheduled{% endif %}
+      </span>
+    </div>
+    <div class="ref-kpi-icon-box {% if upcoming_this_week > 0 %}ref-kpi-icon-pending{% else %}ref-kpi-icon-blue{% endif %}" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+    </div>
   </div>
 </div>
-{% endif %}
+
+<!-- Feedback Activity: last 8 weeks mini bar chart -->
+<div class="panel panel-pad glass-panel" style="margin-bottom:var(--sp-5)">
+  <div class="ref-card-header">
+    <h2 class="ref-card-title">Feedback Activity</h2>
+    <span class="text-xs text-muted">submitted per week &middot; last 8 weeks</span>
+  </div>
+  <div style="position:relative;height:150px">
+    <canvas id="weeklyFeedbackChart" aria-label="Feedback submitted per week over the last 8 weeks" role="img"></canvas>
+  </div>
+</div>
 
 {% if assigned_apps %}
 <div class="table-wrap">
@@ -167,4 +203,85 @@
   <p class="empty-state-body">When HR assigns candidates to you, they will appear here for interview and feedback.</p>
 </div>
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+  var canvas = document.getElementById('weeklyFeedbackChart');
+  if (!canvas || typeof Chart === 'undefined') return;
+
+  var labels = [{% for w in weekly_feedback_counts %}'{{ w.label }}'{% if not forloop.last %},{% endif %}{% endfor %}];
+  var counts = [{% for w in weekly_feedback_counts %}{{ w.count }}{% if not forloop.last %},{% endif %}{% endfor %}];
+
+  function chartTheme() {
+    var dark = document.documentElement.dataset.theme !== 'light';
+    return {
+      grid: dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+      tick: dark ? 'rgba(255,255,255,0.75)' : 'rgba(0,0,0,0.65)',
+      tooltipBg: dark ? 'rgba(6,11,40,0.95)' : 'rgba(255,255,255,0.97)',
+      tooltipBorder: dark ? 'rgba(0,117,255,0.4)' : 'rgba(0,117,255,0.3)',
+      tooltipColor: dark ? '#ffffff' : '#0f172a',
+    };
+  }
+
+  var theme = chartTheme();
+  var brandColor = getComputedStyle(document.documentElement).getPropertyValue('--brand').trim() || '#22D3EE';
+
+  window.weeklyFeedbackChartObj = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Feedback',
+        data: counts,
+        backgroundColor: brandColor,
+        borderWidth: 0,
+        borderRadius: 6,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 600 },
+      layout: { padding: { top: 8, bottom: 0, left: 6, right: 12 } },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: theme.tooltipBg,
+          borderColor: theme.tooltipBorder,
+          borderWidth: 1,
+          padding: 8,
+          cornerRadius: 8,
+          titleColor: theme.tooltipColor,
+          bodyColor: theme.tooltipColor,
+        }
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: theme.tick, font: { size: 11, weight: '600' } } },
+        y: {
+          beginAtZero: true,
+          suggestedMax: Math.max.apply(null, counts) + 1,
+          grid: { color: theme.grid },
+          ticks: { color: theme.tick, font: { size: 11, weight: '600' }, precision: 0 }
+        }
+      }
+    }
+  });
+
+  document.addEventListener('themechange', function() {
+    var chart = window.weeklyFeedbackChartObj;
+    if (!chart) return;
+    var t = chartTheme();
+    chart.options.scales.x.ticks.color = t.tick;
+    chart.options.scales.y.grid.color = t.grid;
+    chart.options.scales.y.ticks.color = t.tick;
+    chart.options.plugins.tooltip.backgroundColor = t.tooltipBg;
+    chart.options.plugins.tooltip.borderColor = t.tooltipBorder;
+    chart.options.plugins.tooltip.titleColor = t.tooltipColor;
+    chart.options.plugins.tooltip.bodyColor = t.tooltipColor;
+    chart.update();
+  });
+})();
+</script>
 {% endblock %}

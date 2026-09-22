@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% block title %}Account Created | Altrium Tracker{% endblock %}
+{% block page_title %}Account Created{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Account created</h1>
+    <p class="page-sub">{{ created_user.get_full_name|default:created_user.username }} ({{ created_user.username }}) is ready as {{ created_user.get_role_display }}.</p>
+  </div>
+  <div class="page-actions">
+    <a href="{% url 'accounts:admin_users' %}" class="btn btn-secondary">Back to users</a>
+  </div>
+</div>
+
+<div class="app-card" style="max-width:560px">
+  <div class="temp-password-panel">
+    <h2 class="temp-password-title">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      Temporary password
+    </h2>
+    <p class="temp-password-warning">
+      <strong>Copy it now — this is the only time it is shown.</strong> It is not stored anywhere in readable form.
+    </p>
+    <output class="temp-password-value" aria-label="Temporary password">{{ temp_password }}</output>
+    <p class="form-help">Share it with {{ created_user.username }} through a secure channel. At first sign-in they will be required to set their own password before they can use the app.</p>
+  </div>
+</div>
+{% endblock %}

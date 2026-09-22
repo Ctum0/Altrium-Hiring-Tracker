@@ -1,0 +1,71 @@
+{% extends 'base.html' %}
+{% load accounts_extras %}
+{% block title %}Reschedule Requests | Altrium Tracker{% endblock %}
+{% block page_title %}Reschedule Requests{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Reschedule Requests</h1>
+    <p class="page-sub">Interviewer requests to move booked interviews. Accepting applies the first proposed slot — it is re-validated against the interviewer's availability and buffer before it lands.</p>
+  </div>
+  {% if pending_count %}
+  <span class="badge badge-in_progress">{{ pending_count }} pending</span>
+  {% endif %}
+</div>
+
+{% if requests %}
+  {% for req in requests %}
+  <div class="glass-panel" style="padding:var(--sp-4);margin-bottom:var(--sp-3)">
+    <div style="display:flex;justify-content:space-between;gap:var(--sp-3);align-items:flex-start;flex-wrap:wrap">
+      <div>
+        <a href="{% url 'candidates:detail' pk=req.application.candidate_id %}" style="font-weight:600;color:inherit;text-decoration:none">
+          {{ req.application.candidate.full_name }}
+        </a>
+        <span class="text-muted text-sm">&middot; {{ req.application.job.title }}</span>
+        <div class="text-xs text-muted" style="margin-top:var(--sp-1)">
+          Requested by {{ req.requested_by.get_full_name|default:req.requested_by.username }}
+          &middot; {{ req.created_at|date:'M j, Y H:i' }} UTC
+          &middot; current slot {{ req.original_slot|date:'M j, Y H:i' }} UTC
+        </div>
+      </div>
+      <span class="badge {% if req.status == 'pending' %}badge-in_progress{% elif req.status == 'accepted' %}badge-hired{% else %}badge-rejected{% endif %}">{{ req.get_status_display }}</span>
+    </div>
+
+    {% if req.note %}
+    <div class="text-sm" style="margin-top:var(--sp-2);padding:var(--sp-2);border-left:3px solid var(--glass-border);white-space:pre-line">&ldquo;{{ req.note }}&rdquo;</div>
+    {% endif %}
+
+    <div style="margin-top:var(--sp-3)">
+      <div class="text-xs text-muted" style="margin-bottom:var(--sp-1)">Proposed slots:</div>
+      <div class="flex gap-2" style="flex-wrap:wrap">
+        {% for slot in req.proposed_slots %}
+        <span class="badge badge-secondary">{{ slot|slice:':16'|cut:'T' }} UTC</span>
+        {% endfor %}
+      </div>
+    </div>
+
+    {% if req.status == 'pending' and user.is_hr %}
+    <div class="flex gap-2" style="margin-top:var(--sp-3)">
+      <form method="post" style="display:inline">
+        {% csrf_token %}
+        <input type="hidden" name="request_pk" value="{{ req.pk }}">
+        <button type="submit" name="decision" value="accept" class="btn btn-primary btn-sm">Accept first slot</button>
+      </form>
+      <form method="post" style="display:inline">
+        {% csrf_token %}
+        <input type="hidden" name="request_pk" value="{{ req.pk }}">
+        <button type="submit" name="decision" value="decline" class="btn btn-danger btn-sm">Decline</button>
+      </form>
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+{% else %}
+<div class="empty-state">
+  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto 12px;color:var(--muted)" aria-hidden="true"><path d="M21 12a9 9 0 1 1-9-9"/><polyline points="21 3 21 9 15 9"/></svg>
+  <p class="empty-state-title">No reschedule requests</p>
+  <p class="empty-state-body">When an interviewer requests to move an interview, it appears here for you to accept or decline.</p>
+</div>
+{% endif %}
+{% endblock %}

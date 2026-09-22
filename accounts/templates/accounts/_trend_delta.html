@@ -1,0 +1,25 @@
+{% load accounts_extras %}
+{% comment %}
+Week-over-week delta tile. Params: label, this (this-week count), last (last-week count).
+Arrow is semantic: up = more activity this week (green), down = fewer (red), flat = muted.
+{% endcomment %}
+<div class="trend-delta-item">
+  <span class="trend-delta-label">{{ label }}</span>
+  <span class="trend-delta-value-row">
+    <span class="trend-delta-value">{{ this }}</span>
+    {% if this > last %}
+    <svg class="trend-delta-arrow trend-delta-up" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="up vs last week"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>
+    {% elif this < last %}
+    <svg class="trend-delta-arrow trend-delta-down" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="down vs last week"><line x1="7" y1="7" x2="17" y2="17"/><polyline points="17 7 17 17 7 17"/></svg>
+    {% else %}
+    <svg class="trend-delta-arrow trend-delta-flat" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="unchanged vs last week"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    {% endif %}
+  </span>
+  {% if this > last %}
+  <span class="kpi-trend kpi-trend-up">up {{ this|subtract:last }} vs last week</span>
+  {% elif this < last %}
+  <span class="kpi-trend kpi-trend-down">down {{ last|subtract:this }} vs last week</span>
+  {% else %}
+  <span class="kpi-trend kpi-trend-neutral">same as last week</span>
+  {% endif %}
+</div>
