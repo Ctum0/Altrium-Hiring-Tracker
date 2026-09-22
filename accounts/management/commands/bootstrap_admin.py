@@ -90,18 +90,30 @@ class Command(BaseCommand):
         self.stderr.write(self.style.SUCCESS(
             f'Admin "{username}" created.'
         ))
-        # My own login probes may have locked this username out via
-        # django-axes (it counts failures per username+IP even before the
-        # account existed). Clear the lockout so the first login works.
-        try:
-            from django.core.management import call_command
-            call_command('axes_reset', username=username)
-            self.stderr.write('Axes lockout cleared for the new account.')
-        except Exception as exc:
-            self.stderr.write(f'Axes reset skipped: {exc}')
+
         if generated:
             self.stderr.write(self.style.WARNING(
                 f'Temporary password: {password}\n'
                 'Copy it now — it is not stored in plaintext and the account '
                 'must change it at first login.'
             ))
+        # Final-state proof: read back the account so the deploy log shows
+        # exactly what exists (name, role, forced-change flag).
+        final = User.objects.filter(username=username).first()
+        if final:
+            self.stderr.write(self.style.SUCCESS(
+                f'VERIFIED: user "{final.username}" exists — role={final.role}, '
+                f'is_staff={final.is_staff}, force_password_change={final.force_password_change}'
+            ))
+        else:
+            self.stderr.write(self.style.ERROR(
+                f'VERIFICATION FAILED: user "{username}" not found after creation!'
+            ))
+        # Clear any axes lockout accumulated against this username/IP from
+        # pre-creation login probes, so the very first login attempt works.
+        try:
+            from django.core.management import call_command
+            call_command('axes_reset')
+            self.stderr.write('Axes lockouts cleared.')
+        except Exception as exc:
+            self.stderr.write(f'Axes reset failed: {exc}')
