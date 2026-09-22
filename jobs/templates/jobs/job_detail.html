@@ -104,6 +104,9 @@
           <th scope="col">Order</th>
           <th scope="col">Round name</th>
           <th scope="col">Candidates in round</th>
+          <th scope="col">Passed &rarr;</th>
+          <th scope="col">Rejected</th>
+          <th scope="col">Pass rate</th>
           <th scope="col">Assigned interviewer</th>
           <th scope="col">Next interview</th>
           {% if can_edit %}<th scope="col"></th>{% endif %}
@@ -124,6 +127,15 @@
             {% if round.is_final %}<span class="badge badge-hold" style="margin-left:var(--sp-2)">Final</span>{% endif %}
           </td>
           <td class="mono">{{ round.candidate_count }}</td>
+          <td class="mono">{{ round.passed_count }}</td>
+          <td class="mono">{{ round.failed_count }}</td>
+          <td>
+            {% if round.pass_rate_pct is not None %}
+            <span class="mono">{{ round.pass_rate_pct }}%</span>
+            {% else %}
+            <span class="text-xs text-muted">No moves yet</span>
+            {% endif %}
+          </td>
           <td>{{ round.assigned_interviewers|join:', '|default:'-' }}</td>
           <td>
             {% if round.next_interview_at %}{{ round.next_interview_at|date:'M j, Y H:i' }}{% else %}-{% endif %}

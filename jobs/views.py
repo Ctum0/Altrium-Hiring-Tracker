@@ -2,7 +2,7 @@ import logging
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import Count, Max, Prefetch
+from django.db.models import Count, Max, Prefetch, Q
 from django.db.utils import IntegrityError
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
@@ -20,6 +20,7 @@ from django.views.generic import (
 
 from ai.matching import auto_apply
 from candidates.models import JobApplication
+from pipeline.models import PipelineMove
 from candidates.views import visible_applications
 from feedback.models import InterviewFeedback
 from notifications.mail import send_candidate_email
@@ -265,6 +266,30 @@ class JobDetailView(LoginRequiredMixin, DetailView):
             r.candidate_count = count_by_round.get(r.pk, 0)
             r.assigned_interviewers = d['interviewers']
             r.next_interview_at = d['next_interview_at']
+        # Per-round health (Feature 7 depth): outbound move outcomes per
+        # round, one grouped query. Passed = advanced to another round or
+        # terminal-positive; Failed = rejected out of the round.
+        health = (
+            PipelineMove.objects.filter(from_round_id__in=round_ids)
+            .values('from_round_id')
+            .annotate(
+                passed=Count('pk', filter=(
+                    Q(to_round__isnull=False)
+                    | Q(to_status__in=['hired', 'on_hold'])
+                )),
+                failed=Count('pk', filter=Q(to_status='rejected')),
+            )
+        )
+        health_by_round = {
+            row['from_round_id']: (row['passed'], row['failed'])
+            for row in health
+        }
+        for r in rounds:
+            passed, failed = health_by_round.get(r.pk, (0, 0))
+            total = passed + failed
+            r.passed_count = passed
+            r.failed_count = failed
+            r.pass_rate_pct = round(passed * 100 / total) if total else None
         context['rounds'] = rounds
         context['round_form'] = RoundForm()
         context['can_edit'] = self.request.user.is_hr()

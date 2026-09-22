@@ -608,8 +608,12 @@ class HRDashboardView(LoginRequiredMixin, ListView):
 
 
 class ReportExportView(LoginRequiredMixin, View):
-    """HR/Management: CSV export, one row per job (Feature 7: Pipeline
-    Reporting). Covers every job — active and closed."""
+    """HR/Management: CSV export (Feature 7: Pipeline Reporting).
+
+    ?detail=1 switches to the per-application export: one row per
+    application with candidate, stage, scores, assignment, and stage-age
+    data. Default remains the per-job summary for backward compatibility.
+    """
 
     def dispatch(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
@@ -619,6 +623,9 @@ class ReportExportView(LoginRequiredMixin, View):
         return super().dispatch(request, *args, **kwargs)
 
     def get(self, request, *args, **kwargs):
+        if request.GET.get('detail') == '1':
+            return self._detailed_export()
+
         jobs = (
             Job.objects.annotate(app_count=Count('applications'))
             .order_by('-created_at')
@@ -643,6 +650,52 @@ class ReportExportView(LoginRequiredMixin, View):
                 'Active' if job.is_active else 'Closed',
             ])
 
+        return response
+
+    def _detailed_export(self):
+        """One row per application: the candidate-level pipeline detail the
+        per-job summary can't carry (candidate identity, stage, scores,
+        assignment, stage age, feedback state)."""
+        rows = (
+            JobApplication.objects
+            .select_related('candidate', 'job', 'current_round', 'assigned_to')
+            .order_by('job__title', '-created_at')
+        )
+        now = timezone.now()
+        filename = f'pipeline_report_detail_{timezone.now().date().isoformat()}.csv'
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+        writer = csv.writer(response)
+        writer.writerow([
+            'Job Title', 'Job Status', 'Candidate', 'Email', 'Phone',
+            'Stage', 'Current Round', 'Auto-Match Score', 'HR Score',
+            'Needs Review', 'Assigned Interviewer', 'Feedback Submitted',
+            'Days In Current Stage', 'Applied At',
+        ])
+        for app in rows:
+            days_in_stage = (
+                (now - app.stage_entered_at).days
+                if app.stage_entered_at else ''
+            )
+            writer.writerow([
+                app.job.title,
+                'Active' if app.job.is_active else 'Closed',
+                app.candidate.full_name,
+                app.candidate.email or '',
+                app.candidate.phone or '',
+                app.get_status_display(),
+                app.current_round.name if app.current_round else '',
+                app.shortlist_score if app.shortlist_score is not None else '',
+                app.candidate.score if app.candidate.score is not None else '',
+                'Yes' if app.candidate.needs_review else 'No',
+                (
+                    app.assigned_to.get_full_name() or app.assigned_to.username
+                ) if app.assigned_to else '',
+                'Yes' if app.feedback_submitted else 'No',
+                days_in_stage,
+                app.created_at.date().isoformat() if app.created_at else '',
+            ])
         return response
 
 

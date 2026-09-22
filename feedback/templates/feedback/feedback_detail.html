@@ -13,6 +13,7 @@
     </p>
   </div>
   <div class="page-actions">
+    <a href="{% url 'candidates:detail' feedback.application.candidate_id %}" class="btn btn-secondary">Open candidate profile</a>
     {% if user == feedback.interviewer %}
     <a href="{% url 'feedback:form' feedback.application_id feedback.round_id %}" class="btn btn-secondary">Edit</a>
     {% endif %}
