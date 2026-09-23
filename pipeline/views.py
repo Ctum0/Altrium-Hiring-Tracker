@@ -17,11 +17,11 @@ from .models import PipelineMove
 class PanelConsensusView(LoginRequiredMixin, View):
     """Full-page AI Panel Consensus & Conflict Resolver for one application.
 
-    The candidate-detail page renders this same consensus card inline at the
-    bottom of an expanded application row, where it sits far down the page
-    and feels cramped. This dedicated page shows the identical panel
-    (same _panel_consensus.html include, same data source) as a standalone
-    page so it can be read at full width.
+    The candidate-detail page links here instead of rendering the consensus
+    card inline, so the analysis gets a dedicated, full-width, richer
+    reading surface (verdict header, per-round weighting table, evaluator
+    scorecards, criteria comparison, strengths/conflicts, recommendation,
+    and panel composition).
 
     Access mirrors CandidateDetailView: HR and Management see any
     application; interviewers only ones they are assigned to or panel
@@ -32,7 +32,8 @@ class PanelConsensusView(LoginRequiredMixin, View):
         app = get_object_or_404(
             JobApplication.objects.select_related(
                 'candidate', 'job', 'current_round', 'assigned_to',
-            ),
+            ).prefetch_related('feedbacks__interviewer', 'feedbacks__round',
+                               'panel_interviewers', 'job__rounds'),
             pk=pk,
         )
         user = request.user
@@ -40,10 +41,26 @@ class PanelConsensusView(LoginRequiredMixin, View):
             app.assigned_to_id == user.pk or app.is_panel_member_of(user)
         ):
             return HttpResponse('You can only view assigned candidates.', status=403)
+
+        # Round weighting ladder used by the synthesizer, surfaced here so
+        # the weighting is transparent rather than a black box.
+        round_weights = {1: 1.0, 2: 1.5}
+        rounds_info = []
+        for r in app.job.rounds.all():
+            rounds_info.append({
+                'name': r.name,
+                'order': r.order,
+                'weight': round_weights.get(r.order, 2.0 if r.order >= 3 else 1.0),
+                'feedback_count': sum(1 for fb in app.feedbacks.all() if fb.round_id == r.pk),
+            })
+
+        from ai.matching import job_fit
         return render(request, 'pipeline/panel_consensus.html', {
             'app': app,
             'is_hr': user.is_hr(),
             'active_nav': 'candidates',
+            'rounds_info': rounds_info,
+            'job_fit': app.fit,
         })
 
 

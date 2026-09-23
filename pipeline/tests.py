@@ -511,19 +511,61 @@ class PanelConsensusPageTests(TestCase):
         self.assertIn('/login/', r.url)
 
     def test_links_from_candidate_detail_when_consensus_exists(self):
-        """The 'AI Consensus →' footer link renders only for applications
-        with 2+ evaluations (the same gate as the inline card)."""
+        """The 'AI Consensus →' footer link renders for every application
+        row; the page itself handles all data states (none / single /
+        multi-evaluator)."""
+        self.client.login(username='hr', password='pass12345')
+        r = self.client.get(reverse('candidates:detail', args=[self.cand.pk]))
+        self.assertContains(r, reverse('pipeline:panel_consensus', args=[self.app.pk]))
+
+    def test_inline_consensus_card_removed_from_detail(self):
+        """The consensus card no longer renders inline in the candidate
+        detail app row — the dedicated page replaced it."""
         InterviewFeedback.objects.create(
             application=self.app, round=self.round1, interviewer=self.iv, score=6,
         )
-        self.client.login(username='hr', password='pass12345')
-        r = self.client.get(reverse('candidates:detail', args=[self.cand.pk]))
-        self.assertNotContains(r, 'pipeline:panel_consensus')
         InterviewFeedback.objects.create(
             application=self.app, round=self.round1,
             interviewer=User.objects.create_user(
                 username='iv2', password='pass12345', role=Role.INTERVIEWER),
             score=8,
         )
+        self.client.login(username='hr', password='pass12345')
         r = self.client.get(reverse('candidates:detail', args=[self.cand.pk]))
-        self.assertContains(r, reverse('pipeline:panel_consensus', args=[self.app.pk]))
+        self.assertNotContains(r, 'panel-consensus-card')
+
+    def test_page_renders_with_no_evaluations(self):
+        """Zero-feedback applications get the honest empty state, not a
+        broken page."""
+        self.client.login(username='hr', password='pass12345')
+        r = self.client.get(self._url())
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'No panel evaluations yet')
+
+    def test_page_renders_rich_sections_with_data(self):
+        """With 2+ evaluations the page renders the hero verdict, vote
+        breakdown, round weighting, evaluator scorecards, criteria
+        comparison, and recommendation."""
+        InterviewFeedback.objects.create(
+            application=self.app, round=self.round1, interviewer=self.iv, score=85,
+            criteria_scores=[{'criterion': 'Technical Skill', 'score': 90}],
+            notes='Strong technicals.',
+        )
+        InterviewFeedback.objects.create(
+            application=self.app, round=self.round1,
+            interviewer=User.objects.create_user(
+                username='iv2', password='pass12345', role=Role.INTERVIEWER),
+            score=40,
+            criteria_scores=[{'criterion': 'Technical Skill', 'score': 30}],
+            notes='Concerns about depth.',
+        )
+        self.client.login(username='hr', password='pass12345')
+        r = self.client.get(self._url())
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'consensus-hero')
+        self.assertContains(r, 'Panel Vote Breakdown')
+        self.assertContains(r, 'Round Weighting')
+        self.assertContains(r, 'Interviewer Evaluations')
+        self.assertContains(r, 'Criteria Comparison')
+        self.assertContains(r, 'Skill Fit Context')
+        self.assertContains(r, 'AI Consensus Action Recommendation')

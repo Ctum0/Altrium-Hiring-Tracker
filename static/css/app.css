@@ -5445,6 +5445,171 @@ body.no-scroll {
   background: var(--surface-2);
 }
 
+/* ===== Rich consensus page (standalone /pipeline/consensus/<pk>/) ===== */
+.consensus-section {
+  margin-bottom: var(--sp-4);
+}
+.consensus-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+  padding: var(--sp-4) var(--sp-5);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  margin-bottom: var(--sp-4);
+}
+.consensus-hero-green {
+  background: var(--status-hired-bg);
+  border-color: var(--status-hired);
+}
+.consensus-hero-red {
+  background: var(--status-rejected-bg);
+  border-color: var(--status-rejected);
+}
+.consensus-hero-amber {
+  background: var(--status-pending-bg);
+  border-color: var(--status-pending);
+}
+.consensus-hero-blue {
+  background: var(--status-new-bg);
+  border-color: var(--status-new);
+}
+.consensus-hero-main {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+.consensus-hero-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius);
+  background: var(--brand-soft);
+  color: var(--brand);
+  flex-shrink: 0;
+}
+.consensus-hero-verdict {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+.consensus-hero-sub {
+  font-size: var(--text-xs);
+  color: var(--muted);
+  margin-top: 2px;
+}
+.consensus-hero-stats {
+  display: flex;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+}
+.consensus-hero-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 64px;
+}
+.consensus-hero-stat-value {
+  font-family: var(--font-mono);
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.1;
+}
+.consensus-hero-stat-value small {
+  font-size: var(--text-micro);
+  color: var(--muted);
+  font-weight: 600;
+}
+.consensus-hero-stat-label {
+  font-size: var(--text-micro);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.consensus-vote-bar-lg {
+  height: 12px;
+  margin-bottom: var(--sp-2);
+}
+.consensus-vote-legend {
+  display: flex;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+  font-size: var(--text-xs);
+  color: var(--ink-secondary);
+}
+.consensus-vote-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+.consensus-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-pill);
+  display: inline-block;
+}
+.consensus-rounds-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--sp-3);
+}
+.consensus-round-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--sp-3);
+  min-width: 0;
+}
+.consensus-round-name {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--ink);
+}
+.consensus-round-meta {
+  font-size: var(--text-xs);
+  color: var(--brand);
+  font-weight: 600;
+  margin-top: 2px;
+}
+.consensus-round-count {
+  font-size: var(--text-micro);
+  color: var(--muted);
+  margin-top: 2px;
+}
+.consensus-eval-notes {
+  margin: var(--sp-2) 0 0;
+  font-style: italic;
+}
+.consensus-fit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--sp-4);
+}
+.consensus-fit-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.consensus-fit-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+}
+.consensus-empty-state {
+  text-align: center;
+  padding: var(--sp-8) var(--sp-6);
+}
+
 /* ---- Consensus upgrade: per-evaluator rows, criteria bars, verdict ---- */
 .consensus-verdict-box { text-align: left; }
 .consensus-verdict-value {

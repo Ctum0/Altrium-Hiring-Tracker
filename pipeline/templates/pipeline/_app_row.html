@@ -169,11 +169,6 @@
       </div>
       {% endif %}
 
-      <!-- AI Panel Consensus & Conflict Resolver (rendered only when 2+
-           evaluations exist; a single evaluation is summarized by the
-           status badge and feedback state on the summary row) -->
-      {% include 'pipeline/_panel_consensus.html' %}
-
       <!-- Card Footer -->
       {% if app.status == 'hired' %}
       <div class="panel-pad" role="note" style="background:var(--status-hired-bg);border:1px solid var(--status-hired);border-radius:var(--radius);margin:var(--sp-2) 0">
@@ -196,9 +191,7 @@
           {% endwith %}
         </div>
         <div class="flex gap-2">
-          {% if app.panel_consensus and app.panel_consensus.total_evaluators >= 2 %}
           <a href="{% url 'pipeline:panel_consensus' app.pk %}" class="btn btn-ghost btn-sm">AI Consensus &rarr;</a>
-          {% endif %}
           <a href="{% url 'feedback:list' %}?application={{ app.pk }}" class="btn btn-ghost btn-sm">View Feedback History &rarr;</a>
         </div>
       </div>

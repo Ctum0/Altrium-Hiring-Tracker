@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load accounts_extras %}
 {% block title %}AI Panel Consensus — {{ app.candidate.full_name }} | Altrium Tracker{% endblock %}
 {% block page_title %}AI Panel Consensus{% endblock %}
 {% block breadcrumb %}
@@ -16,19 +17,236 @@ Consensus
     <p class="page-sub">
       <a href="{% url 'candidates:detail' app.candidate.pk %}" class="strong" style="color:inherit">{{ app.candidate.full_name }}</a>
       &middot; {{ app.job.title }}
+      {% if app.current_round %} &middot; {{ app.current_round.name }}{% endif %}
+      &middot; <span class="badge badge-{{ app.status }}">{{ app.get_status_display }}</span>
     </p>
+  </div>
+  <div class="page-actions">
+    <a href="{% url 'feedback:list' %}?application={{ app.pk }}" class="btn btn-secondary btn-sm">Feedback history</a>
+    {% if is_hr %}
+    <a href="{% url 'candidates:detail' app.candidate.pk %}" class="btn btn-secondary btn-sm">Candidate page</a>
+    {% endif %}
   </div>
 </div>
 
-<div class="panel-consensus-page">
-  {% include 'pipeline/_panel_consensus.html' %}
+{% with c=app.panel_consensus %}
+
+{% if c %}
+
+<!-- ===== Verdict hero: status + confidence + weighted average ===== -->
+<div class="consensus-hero consensus-hero-{{ c.status_tone }}">
+  <div class="consensus-hero-main">
+    <span class="consensus-hero-icon" aria-hidden="true">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    </span>
+    <div>
+      <div class="consensus-hero-verdict">{{ c.status_label }}</div>
+      <div class="consensus-hero-sub">
+        {{ c.total_evaluators }} evaluator{{ c.total_evaluators|pluralize }}
+        {% if c.last_updated %} &middot; last evaluation {{ c.last_updated|date:'M j, Y H:i' }}{% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="consensus-hero-stats">
+    <div class="consensus-hero-stat">
+      <span class="consensus-hero-stat-value">{{ c.weighted_avg_10 }}<small> / 10</small></span>
+      <span class="consensus-hero-stat-label">Weighted average</span>
+    </div>
+    <div class="consensus-hero-stat">
+      <span class="consensus-hero-stat-value">{{ c.confidence_pct }}<small>%</small></span>
+      <span class="consensus-hero-stat-label">Confidence</span>
+    </div>
+    <div class="consensus-hero-stat">
+      <span class="consensus-hero-stat-value consensus-vote-hire">{{ c.hire_votes }}</span>
+      <span class="consensus-hero-stat-label">Hire</span>
+    </div>
+    <div class="consensus-hero-stat">
+      <span class="consensus-hero-stat-value consensus-vote-hold">{{ c.hold_votes }}</span>
+      <span class="consensus-hero-stat-label">Hold</span>
+    </div>
+    <div class="consensus-hero-stat">
+      <span class="consensus-hero-stat-value consensus-vote-reject">{{ c.reject_votes }}</span>
+      <span class="consensus-hero-stat-label">Reject</span>
+    </div>
+  </div>
 </div>
 
-{% if not app.panel_consensus or app.panel_consensus.total_evaluators < 2 %}
-<div class="panel panel-pad text-sm text-muted">
-  Panel consensus appears once two or more interviewer evaluations exist for
-  this application. A single evaluation is summarized on the candidate page.
+<!-- ===== Vote breakdown bar ===== -->
+<div class="panel panel-pad ref-card consensus-section">
+  <div class="ref-card-header">
+    <h2 class="ref-card-title">Panel Vote Breakdown</h2>
+    <span class="text-xs text-muted">
+      spread {{ c.score_spread }} pts{% if c.is_divergent %} &middot; <span class="consensus-vote-reject">divergent</span>{% endif %}
+    </span>
+  </div>
+  <div class="consensus-vote-bar consensus-vote-bar-lg">
+    {% if c.hire_votes %}<div class="consensus-bar-hire" style="flex:{{ c.hire_votes }}" title="Hire: {{ c.hire_votes }}"></div>{% endif %}
+    {% if c.hold_votes %}<div class="consensus-bar-hold" style="flex:{{ c.hold_votes }}" title="Hold: {{ c.hold_votes }}"></div>{% endif %}
+    {% if c.reject_votes %}<div class="consensus-bar-reject" style="flex:{{ c.reject_votes }}" title="Reject: {{ c.reject_votes }}"></div>{% endif %}
+  </div>
+  <div class="consensus-vote-legend">
+    <span><span class="consensus-legend-dot consensus-bar-hire"></span>Hire ({{ c.hire_votes }})</span>
+    <span><span class="consensus-legend-dot consensus-bar-hold"></span>Hold ({{ c.hold_votes }})</span>
+    <span><span class="consensus-legend-dot consensus-bar-reject"></span>Reject ({{ c.reject_votes }})</span>
+  </div>
+</div>
+
+<!-- ===== Per-round weighting transparency ===== -->
+<div class="panel panel-pad ref-card consensus-section">
+  <div class="ref-card-header">
+    <h2 class="ref-card-title">Round Weighting</h2>
+    <span class="text-xs text-muted">later rounds count more toward the average</span>
+  </div>
+  <div class="consensus-rounds-grid">
+    {% for r in rounds_info %}
+    <div class="consensus-round-card">
+      <div class="consensus-round-name">{{ r.name }}</div>
+      <div class="consensus-round-meta">Round {{ r.order }} &middot; weight &times;{{ r.weight }}</div>
+      <div class="consensus-round-count">{{ r.feedback_count }} evaluation{{ r.feedback_count|pluralize }}</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- ===== Interviewer scorecards ===== -->
+<div class="panel panel-pad ref-card consensus-section">
+  <div class="ref-card-header">
+    <h2 class="ref-card-title">Interviewer Evaluations</h2>
+    <span class="text-xs text-muted">per-criterion breakdown per interviewer</span>
+  </div>
+  {% for ev in c.evaluators %}
+  <div class="consensus-eval-row {% if not forloop.last %}consensus-eval-row-border{% endif %}">
+    <div class="consensus-eval-head">
+      <span class="strong">{{ ev.name }} <span class="text-micro text-muted">({{ ev.role }})</span></span>
+      <span class="text-micro text-muted">{{ ev.round_name }} &middot; {{ ev.submitted_at|date:'D, M j Y H:i' }}</span>
+    </div>
+    <div class="consensus-eval-body">
+      {% if ev.criteria %}
+      <div class="consensus-eval-criteria">
+        {% for cr in ev.criteria %}
+        <div class="consensus-criterion">
+          <span class="consensus-criterion-label text-micro">{{ cr.criterion }}</span>
+          <span class="consensus-criterion-bar" role="presentation">
+            <span class="consensus-criterion-fill {% if cr.score_10 >= 7 %}consensus-fill-hire{% elif cr.score_10 >= 5 %}consensus-fill-hold{% else %}consensus-fill-reject{% endif %}"
+                  style="width:{% widthratio cr.score_10 10 100 %}%"></span>
+          </span>
+          <span class="consensus-criterion-score text-micro">{{ cr.score_10|default:'—' }} / 10</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% if ev.notes %}
+      <p class="consensus-eval-notes text-xs text-muted">&ldquo;{{ ev.notes }}&rdquo;</p>
+      {% endif %}
+      <div class="consensus-eval-overall">
+        <span class="consensus-metric-label text-micro">Overall</span>
+        <span class="consensus-eval-score">{{ ev.score_10 }} / 10</span>
+        <span class="badge {% if ev.vote == 'Hire' %}badge-success{% elif ev.vote == 'Reject' %}badge-danger{% else %}badge-warning{% endif %}">{{ ev.vote }}</span>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- ===== Criteria comparison vs benchmark ===== -->
+{% if c.criteria_averages %}
+<div class="panel panel-pad ref-card consensus-section">
+  <div class="ref-card-header">
+    <h2 class="ref-card-title">Criteria Comparison</h2>
+    <span class="text-xs text-muted">panel average per criterion &middot; dashed line = 6.0 benchmark</span>
+  </div>
+  {% for cr in c.criteria_averages %}
+  <div class="consensus-criterion">
+    <span class="consensus-criterion-label text-sm">{{ cr.criterion }}</span>
+    <span class="consensus-criterion-bar consensus-bar-wide" role="presentation">
+      <span class="consensus-criterion-fill {% if cr.avg_10 >= 7 %}consensus-fill-hire{% elif cr.avg_10 >= 5 %}consensus-fill-hold{% else %}consensus-fill-reject{% endif %}"
+            style="width:{% widthratio cr.avg_10 10 100 %}%"></span>
+      <span class="consensus-benchmark-mark" aria-hidden="true"></span>
+    </span>
+    <span class="consensus-criterion-score text-sm">{{ cr.avg_10 }} / 10</span>
+  </div>
+  {% endfor %}
 </div>
 {% endif %}
+
+<!-- ===== Strengths / conflicts ===== -->
+<div class="consensus-grid consensus-section">
+  <div class="consensus-strengths-box">
+    <h5 class="consensus-box-label consensus-label-strengths">Agreed Strengths</h5>
+    <ul class="consensus-list">
+      {% for strength in c.agreed_strengths %}<li>{{ strength }}</li>{% endfor %}
+    </ul>
+  </div>
+  {% if c.is_divergent %}
+  <div class="consensus-conflict-box">
+    <h5 class="consensus-box-label consensus-label-conflict">Panel Divergence Notes</h5>
+    <ul class="consensus-list">
+      {% for pt in c.conflict_points %}<li>{{ pt }}</li>{% endfor %}
+    </ul>
+  </div>
+  {% else %}
+  <div class="consensus-neutral-box">
+    <h5 class="consensus-box-label">Panel Alignment Notes</h5>
+    <ul class="consensus-list">
+      {% for pt in c.conflict_points %}<li>{{ pt }}</li>{% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+</div>
+
+<!-- ===== Skill fit context ===== -->
+<div class="panel panel-pad ref-card consensus-section">
+  <div class="ref-card-header">
+    <h2 class="ref-card-title">Skill Fit Context</h2>
+    <span class="text-xs text-muted">candidate skills vs {{ app.job.title }} requirements</span>
+  </div>
+  <div class="consensus-fit-grid">
+    <div class="consensus-fit-col">
+      <span class="fit-tag matched">Matched ({{ job_fit.matched|length }})</span>
+      <div class="consensus-fit-chips">
+        {% for s in job_fit.matched %}<span class="fit-tag matched">{{ s }}</span>{% empty %}<span class="text-xs text-muted">None recorded</span>{% endfor %}
+      </div>
+    </div>
+    <div class="consensus-fit-col">
+      <span class="fit-tag missing">Missing ({{ job_fit.missing|length }})</span>
+      <div class="consensus-fit-chips">
+        {% for s in job_fit.missing %}<span class="fit-tag missing">{{ s }}</span>{% empty %}<span class="text-xs text-muted">All requirements covered</span>{% endfor %}
+      </div>
+    </div>
+    {% if job_fit.extra %}
+    <div class="consensus-fit-col">
+      <span class="fit-tag extra">Additional ({{ job_fit.extra|length }})</span>
+      <div class="consensus-fit-chips">
+        {% for s in job_fit.extra %}<span class="fit-tag extra">{{ s }}</span>{% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ===== AI recommendation ===== -->
+<div class="consensus-recommendation consensus-section">
+  <svg class="cd-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M12 8V5"/><circle cx="12" cy="4" r="1"/><path d="M9 13h.01M15 13h.01M9.5 17h5"/></svg>
+  <span><strong>AI Consensus Action Recommendation:</strong> {{ c.recommendation }}</span>
+</div>
+
+{% else %}
+
+<!-- ===== No evaluations yet ===== -->
+<div class="panel panel-pad consensus-empty-state">
+  <h2 class="ref-card-title">No panel evaluations yet</h2>
+  <p class="text-sm text-muted">
+    Panel consensus is synthesized once interviewers submit round feedback
+    for this application. Assign interviewers and collect at least one
+    evaluation to populate this page.
+  </p>
+  {% if is_hr %}
+  <a href="{% url 'candidates:detail' app.candidate.pk %}" class="btn btn-primary btn-sm" style="margin-top:var(--sp-3)">Open candidate page</a>
+  {% endif %}
+</div>
+
+{% endif %}
+
+{% endwith %}
 
 {% endblock %}
