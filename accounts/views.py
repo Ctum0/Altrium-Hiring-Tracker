@@ -542,24 +542,27 @@ class HRDashboardView(LoginRequiredMixin, ListView):
                         'count': count,
                     })
 
-            ai_insights.append({
-                'id': 'best_fit',
-                'category': 'Candidate Matching',
-                'icon': '🎯',
-                'finding': best_role['title'],
-                'skill_factors': skill_factors,
-                'job_pks': ','.join(str(pk) for pk in best_role['pks']),
-                'reason': 'Most common skills among current candidates',
-                'recommendation': 'Prioritize technical interview scheduling',
-                # pks is a list; interpolating it directly rendered
-                # '?job=[97]' which 500s the candidate list (int('[97]')
-                # ValueError). Join comma-separated like the top_role card.
-                'action_url': (
-                    f'{reverse("candidates:list")}'
-                    f'?job={",".join(str(pk) for pk in best_role["pks"])}'
-                ),
-                'action_accent': 'violet',
-            })
+            if skill_factors:
+                # Empty skill data renders a near-blank card — skip it
+                # entirely rather than showing a useless panel.
+                ai_insights.append({
+                    'id': 'best_fit',
+                    'category': 'Candidate Matching',
+                    'icon': '🎯',
+                    'finding': best_role['title'],
+                    'skill_factors': skill_factors,
+                    'job_pks': ','.join(str(pk) for pk in best_role['pks']),
+                    'reason': 'Most common skills among current candidates',
+                    'recommendation': 'Prioritize technical interview scheduling',
+                    # pks is a list; interpolating it directly rendered
+                    # '?job=[97]' which 500s the candidate list (int('[97]')
+                    # ValueError). Join comma-separated like the top_role card.
+                    'action_url': (
+                        f'{reverse("candidates:list")}'
+                        f'?job={",".join(str(pk) for pk in best_role["pks"])}'
+                    ),
+                    'action_accent': 'violet',
+                })
 
         # --- Card 3: PIPELINE HEALTH ---
         # Active ratio: share of applications still moving (not hired/rejected).
