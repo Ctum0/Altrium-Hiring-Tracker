@@ -1500,10 +1500,8 @@ class AuditLogListView(LoginRequiredMixin, AdminRequiredMixin, ListView):
         # Resolve friendly object labels for the current page only (<=50
         # rows) so the Object column reads "User · Demo Check" instead of
         # the raw "User #35".
-        labels = {}
         for entry in context['entries']:
-            labels[entry.pk] = self._object_label(entry)
-        context['object_labels'] = labels
+            entry.object_label = self._object_label(entry)
         return context
 
 
