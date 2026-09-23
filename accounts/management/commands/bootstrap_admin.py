@@ -13,6 +13,7 @@ import secrets
 
 from django.core.management.base import BaseCommand
 from django.db import transaction
+from django.db.models import Q
 
 from accounts.models import AuditLog, Role, User
 
@@ -36,11 +37,12 @@ class Command(BaseCommand):
         # is_superuser=True; deactivating it left production with zero
         # working admin access, and the old is_superuser check here
         # ignored is_active and kept reporting "an admin already exists".)
-        existing = User.objects.filter(
-            role=Role.ADMIN, is_active=True,
-        ).exists() or User.objects.filter(is_superuser=True, is_active=True).exists()
-        if existing:
-            self.stderr.write('An admin already exists — nothing to do.')
+        existing_qs = User.objects.filter(
+            Q(role=Role.ADMIN, is_active=True) | Q(is_superuser=True, is_active=True),
+        )
+        if existing_qs.exists():
+            names = ', '.join(existing_qs.values_list('username', flat=True))
+            self.stderr.write(f'An admin already exists ({names}) — nothing to do.')
             return
 
         # Two activation paths: the explicit BOOTSTRAP_ADMIN=true gate, or
