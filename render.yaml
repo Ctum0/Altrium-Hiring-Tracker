@@ -9,20 +9,17 @@ services:
     name: altrium-tracker
     runtime: docker
     plan: free
-    # seed_users creates demo accounts with a hardcoded password
-    # (testpass123). Never run it unconditionally on a prod boot -- only
-    # opt in explicitly (e.g. for a disposable demo/staging deploy) via
-    # SEED_DEMO_USERS=true. Default (unset) is NOT to run it.
-    # SEED_DEMO_DATA=true additionally runs clean_and_seed_db, which WIPES
-    # all jobs/candidates/applications/feedback and seeds the enterprise
-    # demo scenario. WARNING: destructive to business data -- opt-in only.
-    # NOTE: this MUST be `dockerCommand`, not `startCommand` -- the latter
-    # is silently ignored for `runtime: docker` services (Render still ran
-    # the Dockerfile's own CMD instead). Confirmed as a real prod bug: this
-    # field's SEED_DEMO_USERS/SEED_DEMO_DATA/bootstrap_admin/cleanup_photos
-    # wiring never took effect; the Dockerfile CMD is now updated to match
-    # and is kept in sync with this line -- change both together.
-    dockerCommand: python manage.py collectstatic --noinput && python manage.py migrate --noinput && python manage.py axes_reset; if [ "$SEED_DEMO_USERS" = "true" ]; then python manage.py seed_users --noinput; fi && if [ "$SEED_DEMO_DATA" = "true" ]; then python manage.py clean_and_seed_db; fi && python manage.py bootstrap_admin && python manage.py cleanup_photos && if [ "$CLEANUP_DEMO_CRUFT" = "true" ]; then python manage.py cleanup_demo_cruft; fi && gunicorn altrium_tracker.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120
+    # Boot sequence lives in docker-entrypoint.sh (single source of truth,
+    # shared with the Dockerfile's CMD). NOTE: this MUST be `dockerCommand`,
+    # not `startCommand` -- the latter is silently ignored for
+    # `runtime: docker` services (Render ran the Dockerfile's own CMD
+    # instead). Confirmed as a real prod bug: bootstrap_admin/
+    # cleanup_photos/cleanup_demo_cruft never executed on any deploy.
+    # ALSO: dockerCommand is not guaranteed shell-aware -- a raw
+    # "a && b && c" (or even "sh -c '...'") string can get naively
+    # argv-split and crash before anything runs (confirmed in production).
+    # A single script path sidesteps all quoting/tokenization ambiguity.
+    dockerCommand: /app/docker-entrypoint.sh
     envVars:
       - key: SEED_DEMO_DATA
         sync: false

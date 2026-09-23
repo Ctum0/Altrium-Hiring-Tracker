@@ -412,10 +412,13 @@ class DeploySeedUsersGatingTest(TestCase):
         from pathlib import Path
 
         base = Path(__file__).resolve().parent.parent
+        # render.yaml is deliberately excluded: it only references
+        # docker-entrypoint.sh by path now (see
+        # test_docker_runtime_service_uses_dockerCommand_not_startCommand),
+        # it no longer implements the gating logic inline.
         return {
-            'render.yaml': (base / 'render.yaml').read_text(),
             'Procfile': (base / 'Procfile').read_text(),
-            'Dockerfile': (base / 'Dockerfile').read_text(),
+            'docker-entrypoint.sh': (base / 'docker-entrypoint.sh').read_text(),
         }
 
     def test_seed_users_is_gated_behind_env_var_in_every_deploy_file(self):
@@ -441,9 +444,15 @@ class DeploySeedUsersGatingTest(TestCase):
         production for real: bootstrap_admin/cleanup_photos/
         cleanup_demo_cruft were wired into render.yaml's `startCommand`
         and never executed on any deploy. The web service must use
-        `dockerCommand`, and its command list must match the Dockerfile's
-        CMD so neither one silently drifts out of sync again."""
-        import re as re_module
+        `dockerCommand`.
+
+        Also guards a second real bug found in the same incident:
+        dockerCommand is not guaranteed shell-aware, so an inline
+        "a && b && c" compound command (even wrapped in "sh -c '...'")
+        can get naively argv-split and crash before anything runs. Both
+        dockerCommand and the Dockerfile's CMD must point at the single
+        entrypoint script instead, and that script must contain every
+        required boot step."""
         import yaml
         from pathlib import Path
         base = Path(__file__).resolve().parent.parent
@@ -460,15 +469,24 @@ class DeploySeedUsersGatingTest(TestCase):
                 f'dockerCommand -- startCommand is silently ignored',
             )
             self.assertIn('dockerCommand', svc)
+            # No compound shell operators: a single script path only.
+            for operator in ('&&', ';', '"'):
+                self.assertNotIn(
+                    operator, svc['dockerCommand'],
+                    f'{svc.get("name")}: dockerCommand must be a single '
+                    f'script path, not an inline compound command '
+                    f'(dockerCommand is not guaranteed shell-aware)',
+                )
 
         dockerfile = (base / 'Dockerfile').read_text()
-        cmd_match = re_module.search(r'^CMD sh -c "(.+)"$', dockerfile, re_module.MULTILINE)
-        self.assertIsNotNone(cmd_match, 'Dockerfile must define a shell CMD')
-        # Same one-shot commands must appear in both places (order-independent
-        # check is enough here -- the point is neither list silently drops one).
+        self.assertIn(
+            'docker-entrypoint.sh', dockerfile,
+            'Dockerfile CMD must invoke the same entrypoint script as dockerCommand',
+        )
+
+        entrypoint = (base / 'docker-entrypoint.sh').read_text()
         for step in ('bootstrap_admin', 'cleanup_photos', 'cleanup_demo_cruft', 'gunicorn'):
-            self.assertIn(step, cmd_match.group(1), f'Dockerfile CMD missing {step}')
-            self.assertIn(step, docker_services[0]['dockerCommand'], f'render.yaml dockerCommand missing {step}')
+            self.assertIn(step, entrypoint, f'docker-entrypoint.sh missing {step}')
 
 
 def _make_job(hr, title='Backend Engineer', department='Engineering', seniority='mid'):
