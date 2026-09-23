@@ -16,18 +16,21 @@ JOBS = [
     {
         'title': 'Senior Backend Engineer',
         'department': 'Engineering',
+        'domain': 'engineering',
         'description': 'Build and scale our core API platform serving millions of requests.',
         'requirements': 'Python, Django, PostgreSQL, Docker, AWS',
     },
     {
         'title': 'Product Designer',
         'department': 'Design',
+        'domain': 'design',
         'description': 'Design user experiences for our B2B SaaS platform.',
         'requirements': 'Figma, UX Research, Design Systems, Prototyping',
     },
     {
         'title': 'DevOps Engineer',
         'department': 'Engineering',
+        'domain': 'infrastructure',
         'description': 'Manage our cloud infrastructure and CI/CD pipelines.',
         'requirements': 'AWS, Docker, Kubernetes, Terraform, CI/CD',
     },

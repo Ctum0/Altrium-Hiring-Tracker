@@ -528,6 +528,7 @@ class PublicJobsListView(ListView):
     model = Job
     template_name = 'candidates/public_jobs_list.html'
     context_object_name = 'jobs'
+    paginate_by = 24
 
     def get_queryset(self):
         return Job.objects.filter(is_active=True).order_by('-created_at')

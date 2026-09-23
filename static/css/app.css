@@ -1870,6 +1870,8 @@ a:hover {
   display: flex;
   align-items: center;
   gap: var(--sp-3);
+  flex-wrap: wrap;
+  row-gap: var(--sp-2);
 }
 
 /* ===== Buttons ===== */
@@ -4656,10 +4658,15 @@ body.no-scroll {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
+  backdrop-filter: var(--vui-blur-card);
+  -webkit-backdrop-filter: var(--vui-blur-card);
   padding: var(--sp-4);
   min-width: 240px;
   max-width: 320px;
   box-shadow: var(--shadow-md);
+}
+.kanban-kb-menu::backdrop {
+  background: oklch(0 0 0 / 0.45);
 }
 .kanban-kb-options {
   display: flex;
@@ -4800,6 +4807,7 @@ body.no-scroll {
 }
 .cd-page-actions {
   gap: var(--sp-2);
+  flex-wrap: wrap;
 }
 .cd-icon {
   width: 13px;
@@ -4859,6 +4867,7 @@ body.no-scroll {
   align-items: center;
   justify-content: space-between;
   gap: var(--sp-2);
+  flex-wrap: wrap;
 }
 .cd-apps-title {
   font-size: var(--text-lg);
@@ -5631,6 +5640,29 @@ body.no-scroll {
 .page-candidates .table td {
   padding-top: var(--sp-4);
   padding-bottom: var(--sp-4);
+}
+
+/* Quick-filter tabs (Active/All/Hired/Rejected/Needs Review/Offboarding):
+   scroll the row itself on narrow viewports instead of letting the
+   overflow drag the whole .main-content sideways (that dragged the page
+   header and filter card along with it — see DESIGN.md "data never
+   clipped without a scroll affordance"). */
+.quick-filter-tabs {
+  overflow-x: auto;
+  flex-wrap: nowrap;
+  padding-bottom: 2px;
+}
+
+/* Bulk-assign bar: 4 inline controls (label, select, button, hint text)
+   collide on narrow viewports without wrap. */
+.bulk-assign-bar {
+  flex-wrap: wrap;
+}
+
+/* Job detail header: inline "close job" form (label + select + button)
+   needs its own wrap — it's not a .page-actions descendant. */
+.job-close-form {
+  flex-wrap: wrap;
 }
 
 /* ===== MODERNIZATION: panel inset floor =====

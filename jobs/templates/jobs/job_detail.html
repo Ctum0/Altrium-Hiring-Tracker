@@ -2,6 +2,7 @@
 {% block title %}{{ job.title }} | Altrium Tracker{% endblock %}
 {% block breadcrumb %}<a class="breadcrumb-link" href="{% url 'jobs:list' %}">Jobs</a><span class="breadcrumb-sep">/</span>{{ job.title }}{% endblock %}
 {% block page_title %}{{ job.title }}{% endblock %}
+{% block content_class %}job-detail{% endblock %}
 {% block content %}
 {% if can_edit and job.is_active and job.is_fully_hired %}
 <div class="alert alert-success" role="status" style="margin-bottom:var(--sp-4)">
@@ -22,7 +23,7 @@
     <a href="{% url 'jobs:board' job.pk %}" class="btn btn-secondary">Board</a>
     <a href="{% url 'jobs:list' %}" class="btn btn-secondary">All jobs</a>
     {% if can_edit and job.is_active %}
-    <form method="post" action="{% url 'jobs:close' job.pk %}" class="flex gap-2" style="align-items:center" onsubmit="event.preventDefault();confirmAction(this,'Close job','Close this job? It will stop accepting new CV uploads. Existing candidates keep their current stage and status.')">
+    <form method="post" action="{% url 'jobs:close' job.pk %}" class="flex gap-2 job-close-form" style="align-items:center" onsubmit="event.preventDefault();confirmAction(this,'Close job','Close this job? It will stop accepting new CV uploads. Existing candidates keep their current stage and status.')">
       {% csrf_token %}
       <label class="form-label" for="closure-reason" style="margin:0">Reason</label>
       <select name="closure_reason" id="closure-reason" class="form-select" required style="width:auto">
@@ -89,10 +90,12 @@
 
   {% if rounds %}
   {% if can_edit %}
-  {# One form for the whole table: every row's order posts together, so a
-     swap is a single save. (Per-row forms made real reordering impossible —
-     unsubmitted rows fell back to their current order and the renormalizer
-     preserved the status quo.) #}
+  {% comment %}
+  One form for the whole table: every row's order posts together, so a
+  swap is a single save. (Per-row forms made real reordering impossible —
+  unsubmitted rows fell back to their current order and the renormalizer
+  preserved the status quo.)
+  {% endcomment %}
   <form method="post" action="{% url 'jobs:round_reorder' job.pk %}">
   {% csrf_token %}
   <input type="hidden" name="next" value="{% url 'jobs:detail' job.pk %}">

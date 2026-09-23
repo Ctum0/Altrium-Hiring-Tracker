@@ -40,7 +40,7 @@
       <div class="text-xs text-muted" style="margin-bottom:var(--sp-1)">Proposed slots:</div>
       <div class="flex gap-2" style="flex-wrap:wrap">
         {% for slot in req.proposed_slots %}
-        <span class="badge badge-secondary">{{ slot|slice:':16'|cut:'T' }} UTC</span>
+        <span class="badge badge-secondary">{{ slot|slice:':10' }} {{ slot|slice:'11:16' }} UTC</span>
         {% endfor %}
       </div>
     </div>

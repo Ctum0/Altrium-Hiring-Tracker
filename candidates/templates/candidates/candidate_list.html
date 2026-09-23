@@ -18,7 +18,7 @@
 </div>
 <!-- Quick-filter tabs (preserve search/filters when switching) -->
 {% with tab_extra='q='|add:filter_q|add:'&job='|add:filter_job|add:'&min_score='|add:filter_min_score %}
-<div class="flex gap-2" style="margin-bottom:var(--sp-4)">
+<div class="flex gap-2 quick-filter-tabs" style="margin-bottom:var(--sp-4)">
   <a href="{% url 'candidates:list' %}?{{ tab_extra }}"
      class="btn btn-sm {% if not show_all and not filter_stage %}btn-primary{% else %}btn-secondary{% endif %}">Active</a>
   <a href="?all=1&{{ tab_extra }}"
@@ -96,7 +96,7 @@
 <div class="panel panel-pad glass-panel" style="box-shadow:var(--shadow-md)">
   {% if user.is_hr %}
   {# Audit gap: shortlist→assign cost one page-load per candidate. Bulk bar assigns all checked rows in one POST. #}
-  <form method="post" action="{% url 'candidates:bulk_assign' %}" id="bulk-assign-form" class="flex items-center gap-2" style="margin-bottom:var(--sp-2)">
+  <form method="post" action="{% url 'candidates:bulk_assign' %}" id="bulk-assign-form" class="flex items-center gap-2 bulk-assign-bar" style="margin-bottom:var(--sp-2)">
     {% csrf_token %}
     <input type="hidden" name="next" value="{{ request.get_full_path }}">
     <label class="text-xs text-muted" for="bulk-interviewer">Assign selected to</label>

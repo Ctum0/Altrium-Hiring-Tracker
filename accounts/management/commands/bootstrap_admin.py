@@ -23,13 +23,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         gate = os.environ.get('BOOTSTRAP_ADMIN', '')
-        note = f'bootstrap_admin: BOOTSTRAP_ADMIN={gate!r}'
-        self.stderr.write(note)
-        try:
-            with open('/tmp/bootstrap.log', 'a') as f:
-                f.write(note + '\n')
-        except Exception:
-            pass
+        self.stderr.write(f'bootstrap_admin: BOOTSTRAP_ADMIN={gate!r}')
 
         username = os.environ.get('ADMIN_USERNAME', '').strip()
 

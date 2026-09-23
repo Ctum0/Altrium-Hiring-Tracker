@@ -2,7 +2,7 @@ from django import forms
 from django.contrib.auth import password_validation
 from django.db import IntegrityError, transaction
 
-from accounts.models import AvailabilityException, InterviewerAvailability, User
+from accounts.models import AvailabilityException, InterviewerAvailability, Role, User
 
 MAX_PHOTO_BYTES = 2 * 1024 * 1024  # 2 MB
 ALLOWED_PHOTO_TYPES = {'jpeg': 'image/jpeg', 'png': 'image/png', 'webp': 'image/webp'}
@@ -91,6 +91,22 @@ class OnboardUserForm(forms.ModelForm):
         self.fields['email'].required = True
         for name in ('role', 'seniority', 'domain'):
             self.fields[name].empty_label = None
+        # HR onboarding never grants Admin: that role requires is_staff=True,
+        # which only AdminUserCreateForm's dedicated, AdminRequiredMixin-gated
+        # path sets. Selecting it here would silently create a dead-end
+        # account with no elevated access — confusing, and one future
+        # is_staff-from-role refactor away from a real privilege escalation.
+        self.fields['role'].choices = [
+            (value, label) for value, label in self.fields['role'].choices
+            if value != Role.ADMIN
+        ]
+        # seniority/domain are plain CharField choices, blank=True at the
+        # model level: HR/Management accounts legitimately have neither set
+        # (hr_demo/mgmt_demo both do in production). Only Interviewer
+        # accounts need them to drive the assignment-eligibility rules, so
+        # they're enforced conditionally in clean() below rather than
+        # unconditionally required here — onboarding HR/Management must
+        # keep being able to submit them blank.
 
     def clean(self):
         cleaned_data = super().clean()
@@ -112,6 +128,11 @@ class OnboardUserForm(forms.ModelForm):
                 password_validation.validate_password(password1, probe)
             except forms.ValidationError as e:
                 self.add_error('password1', e)
+        if cleaned_data.get('role') == Role.INTERVIEWER:
+            if not cleaned_data.get('seniority'):
+                self.add_error('seniority', 'Required for interviewer accounts.')
+            if not cleaned_data.get('domain'):
+                self.add_error('domain', 'Required for interviewer accounts.')
         return cleaned_data
 
     def save(self, commit=True):

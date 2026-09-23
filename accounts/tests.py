@@ -547,7 +547,50 @@ class OnboardUserTests(AuthAndRoleTestBase):
         r = c.post(reverse('accounts:onboard_user'), self._payload(password1='password', password2='password'))
         self.assertEqual(r.status_code, 200)
         self.assertFalse(User.objects.filter(username='newiv').exists())
+
+    def test_onboard_cannot_grant_admin_role(self):
+        """SECURITY: Admin was a selectable option in the HR-facing role
+        dropdown despite that path never setting is_staff, so it silently
+        created a dead-end account. Beyond the confusing UX, one future
+        is_staff-from-role refactor away from real privilege escalation.
+        The choice is now excluded server-side, not just hidden in the UI."""
+        c = Client()
+        assert c.login(username='hr', password='pass12345')
+        r = c.post(reverse('accounts:onboard_user'), self._payload(role='admin'))
+        self.assertEqual(r.status_code, 200)
+        self.assertFalse(User.objects.filter(username='newiv').exists())
+        self.assertContains(r, 'valid choice')
         self.assertContains(r, 'password')
+
+    def test_onboard_interviewer_requires_matching_fields(self):
+        """GAP regression: empty_label=None is a no-op on a plain CharField
+        choice (only ModelChoiceField respects it), so the blank
+        "---------" placeholder stayed selectable and interviewers could be
+        onboarded with no seniority/domain, silently defeating the
+        eligibility rules the docstring promises are enforced from day one."""
+        c = Client()
+        assert c.login(username='hr', password='pass12345')
+        r = c.post(reverse('accounts:onboard_user'), self._payload(seniority='', domain=''))
+        self.assertEqual(r.status_code, 200)
+        self.assertFalse(User.objects.filter(username='newiv').exists())
+        self.assertContains(r, 'Required for interviewer accounts.', count=2)
+
+    def test_onboard_hr_role_does_not_require_matching_fields(self):
+        """Regression guard: an earlier fix for the above made seniority/
+        domain unconditionally required, which broke onboarding HR/
+        Management accounts (hr_demo/mgmt_demo both legitimately have
+        neither set in production). Only Interviewer accounts need them."""
+        c = Client()
+        assert c.login(username='hr', password='pass12345')
+        r = c.post(reverse('accounts:onboard_user'), self._payload(
+            username='newhr', email='newhr@example.com', role=Role.HR,
+            specialty='', seniority='', domain='',
+        ), follow=True)
+        self.assertRedirects(r, reverse('accounts:interviewer_roster'))
+        user = User.objects.get(username='newhr')
+        self.assertEqual(user.role, Role.HR)
+        self.assertEqual(user.seniority, '')
+        self.assertEqual(user.domain, '')
 
 
 class MyAvailabilityTests(AuthAndRoleTestBase):

@@ -17,30 +17,35 @@ REALISTIC_JOBS = [
     {
         'title': 'Senior Backend Engineer',
         'department': 'Engineering',
+        'domain': 'engineering',
         'description': 'Lead Python/Django backend architecture, microservices, and database performance for our core enterprise hiring engine.',
         'requirements': 'Python, Django, PostgreSQL, Docker, Redis, REST API',
     },
     {
         'title': 'Frontend Engineer (React / HTMX)',
         'department': 'Engineering',
+        'domain': 'engineering',
         'description': 'Craft modern, responsive, high-density glassmorphism UI components and interactive pipelines using HTMX, React, and CSS design tokens.',
         'requirements': 'React, JavaScript, HTMX, CSS, TypeScript, UI/UX',
     },
     {
         'title': 'DevOps & Infrastructure Lead',
         'department': 'Infrastructure',
+        'domain': 'infrastructure',
         'description': 'Manage Cloudflare R2 object storage, Railway container deployment pipelines, PostgreSQL clustering, and security hardening.',
         'requirements': 'AWS, Docker, Kubernetes, Terraform, CI/CD, Linux, PostgreSQL',
     },
     {
         'title': 'Product Designer (UI / UX)',
         'department': 'Design',
+        'domain': 'design',
         'description': 'Own user journey mapping, design system component libraries, and interactive prototyping for recruitment workspace surfaces.',
         'requirements': 'Figma, UI/UX, Design System, Prototyping, Agile',
     },
     {
         'title': 'QA Automation Lead',
         'department': 'Quality Assurance',
+        'domain': 'quality_assurance',
         'description': 'Develop automated test suites, Playwright e2e browser checks, and API regression testing for enterprise hiring workflows.',
         'requirements': 'Python, Pytest, Selenium, Playwright, Automated Testing, API Testing',
     },
@@ -131,6 +136,7 @@ class Command(BaseCommand):
                 job = Job.objects.create(
                     title=spec['title'],
                     department=spec['department'],
+                    domain=spec['domain'],
                     description=spec['description'],
                     requirements=spec['requirements'],
                     hiring_manager=mgmt_main,
