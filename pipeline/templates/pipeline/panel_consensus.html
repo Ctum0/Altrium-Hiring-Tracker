@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+{% block title %}AI Panel Consensus — {{ app.candidate.full_name }} | Altrium Tracker{% endblock %}
+{% block page_title %}AI Panel Consensus{% endblock %}
+{% block breadcrumb %}
+<a href="{% url 'candidates:list' %}" class="breadcrumb-link">Candidates</a>
+<span class="breadcrumb-sep">/</span>
+<a href="{% url 'candidates:detail' app.candidate.pk %}" class="breadcrumb-link">{{ app.candidate.full_name }}</a>
+<span class="breadcrumb-sep">/</span>
+Consensus
+{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">AI Panel Consensus &amp; Conflict Resolver</h1>
+    <p class="page-sub">
+      <a href="{% url 'candidates:detail' app.candidate.pk %}" class="strong" style="color:inherit">{{ app.candidate.full_name }}</a>
+      &middot; {{ app.job.title }}
+    </p>
+  </div>
+</div>
+
+<div class="panel-consensus-page">
+  {% include 'pipeline/_panel_consensus.html' %}
+</div>
+
+{% if not app.panel_consensus or app.panel_consensus.total_evaluators < 2 %}
+<div class="panel panel-pad text-sm text-muted">
+  Panel consensus appears once two or more interviewer evaluations exist for
+  this application. A single evaluation is summarized on the candidate page.
+</div>
+{% endif %}
+
+{% endblock %}

@@ -458,3 +458,72 @@ class QuickActionRowTests(TestCase):
         self.client.login(username='iv', password='pass12345')
         r = self._detail()
         self.assertNotContains(r, 'app-summary-actions')
+
+
+class PanelConsensusPageTests(TestCase):
+    """Standalone /pipeline/consensus/<pk>/ page (extracted from the inline
+    candidate-detail consensus card so it can be read full-width)."""
+
+    def setUp(self):
+        self.hr = User.objects.create_user(username='hr', password='pass12345', role=Role.HR)
+        self.iv = User.objects.create_user(username='iv', password='pass12345', role=Role.INTERVIEWER)
+        self.mgmt = User.objects.create_user(username='mgmt', password='pass12345', role=Role.MANAGEMENT)
+        self.job = Job.objects.create(title='Dev', created_by=self.hr)
+        self.round1 = InterviewRound.objects.create(job=self.job, name='Screen', order=1)
+        self.cand = Candidate.objects.create(email='a@example.com', first_name='Anna')
+        self.app = JobApplication.objects.create(candidate=self.cand, job=self.job)
+
+    def _url(self):
+        return reverse('pipeline:panel_consensus', args=[self.app.pk])
+
+    def test_hr_can_view(self):
+        self.client.login(username='hr', password='pass12345')
+        r = self.client.get(self._url())
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'AI Panel Consensus')
+
+    def test_management_can_view(self):
+        self.client.login(username='mgmt', password='pass12345')
+        r = self.client.get(self._url())
+        self.assertEqual(r.status_code, 200)
+
+    def test_assigned_interviewer_can_view(self):
+        self.app.assigned_to = self.iv
+        self.app.save()
+        self.client.login(username='iv', password='pass12345')
+        r = self.client.get(self._url())
+        self.assertEqual(r.status_code, 200)
+
+    def test_unassigned_interviewer_forbidden(self):
+        self.client.login(username='iv', password='pass12345')
+        r = self.client.get(self._url())
+        self.assertEqual(r.status_code, 403)
+
+    def test_panel_member_interviewer_can_view(self):
+        self.app.panel_interviewers.add(self.iv)
+        self.client.login(username='iv', password='pass12345')
+        r = self.client.get(self._url())
+        self.assertEqual(r.status_code, 200)
+
+    def test_requires_login(self):
+        r = self.client.get(self._url())
+        self.assertEqual(r.status_code, 302)
+        self.assertIn('/login/', r.url)
+
+    def test_links_from_candidate_detail_when_consensus_exists(self):
+        """The 'AI Consensus →' footer link renders only for applications
+        with 2+ evaluations (the same gate as the inline card)."""
+        InterviewFeedback.objects.create(
+            application=self.app, round=self.round1, interviewer=self.iv, score=6,
+        )
+        self.client.login(username='hr', password='pass12345')
+        r = self.client.get(reverse('candidates:detail', args=[self.cand.pk]))
+        self.assertNotContains(r, 'pipeline:panel_consensus')
+        InterviewFeedback.objects.create(
+            application=self.app, round=self.round1,
+            interviewer=User.objects.create_user(
+                username='iv2', password='pass12345', role=Role.INTERVIEWER),
+            score=8,
+        )
+        r = self.client.get(reverse('candidates:detail', args=[self.cand.pk]))
+        self.assertContains(r, reverse('pipeline:panel_consensus', args=[self.app.pk]))

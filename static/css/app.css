@@ -1544,6 +1544,27 @@ a:hover {
   min-width: 0;
 }
 
+/* Back button + breadcrumb share a row; the title sits below. */
+.topbar-left-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.topbar-back {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  margin: -4px 0;
+  color: var(--ink-secondary);
+}
+
+.topbar-back:hover {
+  color: var(--ink);
+  background: var(--surface-hover);
+}
+
 .topbar-breadcrumb {
   font-size: var(--text-micro);
   font-weight: 600;
@@ -1551,6 +1572,10 @@ a:hover {
   letter-spacing: 0.05em;
   text-transform: uppercase;
   margin-bottom: 1px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .breadcrumb-link {
@@ -4524,12 +4549,17 @@ body.no-scroll {
 }
 .job-card-count { font-size: var(--text-micro); color: var(--muted); }
 
-/* Enhanced Bar Fills with Gradients — only .bar-glass-hired/.bar-glass-pending
-   are used (accounts/templates/accounts/hr_dashboard.html Feedback
-   Completion bars). The .bar-score/.bar-new/.bar-job-*/.bar-shortlisted/
-   .bar-in_progress/.bar-rejected/.bar-on_hold family below in the flat-fill
-   block and their gradient counterparts here were dead (zero template
-   references) and have been removed rather than fixed. */
+/* Enhanced Bar Fills with Gradients — only .bar-glass-hired and
+   .bar-glass-pending are used (accounts/templates/accounts/hr_dashboard.html
+   Feedback Completion bars). The .bar-score/.bar-new/.bar-job-x and
+   .bar-shortlisted/.bar-in_progress/.bar-rejected/.bar-on_hold family below
+   in the flat-fill block and their gradient counterparts here were dead
+   (zero template references) and have been removed rather than fixed.
+   NOTE: the previous wording of this comment contained an identifier
+   ending in a star-slash sequence, which terminated the comment early;
+   the leftover text parsed as garbage selectors that swallowed the
+   .bar-glass-hired rule below, leaving the Feedback Completion
+   "Completed" bar invisible. */
 .bar-glass-hired, .bar-hired { background: var(--grad-emerald) !important; }
 .bar-glass-pending, .bar-pending { background: var(--grad-amber) !important; }
 
@@ -5405,6 +5435,14 @@ body.no-scroll {
 }
 .consensus-recommendation strong {
   color: var(--brand);
+}
+
+/* Standalone consensus page: same card, full-width readable column. */
+.panel-consensus-page {
+  max-width: 860px;
+}
+.panel-consensus-page .panel-consensus-card {
+  background: var(--surface-2);
 }
 
 /* ---- Consensus upgrade: per-evaluator rows, criteria bars, verdict ---- */

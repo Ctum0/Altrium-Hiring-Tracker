@@ -196,6 +196,9 @@
           {% endwith %}
         </div>
         <div class="flex gap-2">
+          {% if app.panel_consensus and app.panel_consensus.total_evaluators >= 2 %}
+          <a href="{% url 'pipeline:panel_consensus' app.pk %}" class="btn btn-ghost btn-sm">AI Consensus &rarr;</a>
+          {% endif %}
           <a href="{% url 'feedback:list' %}?application={{ app.pk }}" class="btn btn-ghost btn-sm">View Feedback History &rarr;</a>
         </div>
       </div>

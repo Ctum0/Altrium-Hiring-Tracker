@@ -150,7 +150,12 @@
   <div class="main">
     <header class="topbar glass-topbar">
       <div class="topbar-left">
-        <span class="topbar-breadcrumb">{% block breadcrumb %}Altrium Tracker{% endblock %}</span>
+        <div class="topbar-left-row">
+          <button type="button" class="btn-icon topbar-back" id="topbar-back" aria-label="Go back">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><polyline points="12 19 5 12 12 5"/></svg>
+          </button>
+          <span class="topbar-breadcrumb">{% block breadcrumb %}Altrium Tracker{% endblock %}</span>
+        </div>
         <p class="topbar-title">{% block page_title %}{% endblock %}</p>
       </div>
       <div class="topbar-center">
@@ -243,6 +248,23 @@
     var token = document.querySelector('meta[name="csrf-token"]');
     if (token) e.detail.headers['X-CSRFToken'] = token.getAttribute('content');
   });
+
+  // Global back button: browser history back when there is an in-app page
+  // to return to, otherwise fall back to the workspace home. The
+  // history-length check is unreliable across new tabs, so also treat a
+  // same-origin referrer as proof that an in-app back target exists.
+  var backBtn = document.getElementById('topbar-back');
+  if (backBtn) {
+    backBtn.addEventListener('click', function() {
+      var sameOriginReferrer = document.referrer &&
+        new URL(document.referrer, window.location.href).origin === window.location.origin;
+      if (window.history.length > 1 && sameOriginReferrer) {
+        window.history.back();
+      } else {
+        window.location.href = '/';
+      }
+    });
+  }
 
   // Mark a notification read without blocking the popover link's normal
   // navigation. An hx-post on the same <a> would preventDefault() the click

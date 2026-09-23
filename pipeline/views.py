@@ -14,6 +14,39 @@ from notifications.mail import send_candidate_email, send_rejection_email
 from .models import PipelineMove
 
 
+class PanelConsensusView(LoginRequiredMixin, View):
+    """Full-page AI Panel Consensus & Conflict Resolver for one application.
+
+    The candidate-detail page renders this same consensus card inline at the
+    bottom of an expanded application row, where it sits far down the page
+    and feels cramped. This dedicated page shows the identical panel
+    (same _panel_consensus.html include, same data source) as a standalone
+    page so it can be read at full width.
+
+    Access mirrors CandidateDetailView: HR and Management see any
+    application; interviewers only ones they are assigned to or panel
+    members of.
+    """
+
+    def get(self, request, pk):
+        app = get_object_or_404(
+            JobApplication.objects.select_related(
+                'candidate', 'job', 'current_round', 'assigned_to',
+            ),
+            pk=pk,
+        )
+        user = request.user
+        if user.is_interviewer() and not (
+            app.assigned_to_id == user.pk or app.is_panel_member_of(user)
+        ):
+            return HttpResponse('You can only view assigned candidates.', status=403)
+        return render(request, 'pipeline/panel_consensus.html', {
+            'app': app,
+            'is_hr': user.is_hr(),
+            'active_nav': 'candidates',
+        })
+
+
 class PipelineMoveView(LoginRequiredMixin, View):
     """HTMX endpoint: move a candidate between stages via the inline dropdown
     or the Kanban board's drag-and-drop.
