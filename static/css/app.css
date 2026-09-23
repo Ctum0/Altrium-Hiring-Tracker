@@ -300,7 +300,7 @@
   --status-progress-bg: rgba(99, 102, 241, 0.14);
   --status-hired: #036447;  /* darkened from #04815a: 4.03:1 -> ~5.2:1 on its tinted bg (WCAG AA small text) */
   --status-hired-bg: rgba(5, 150, 105, 0.14);
-  --status-rejected: #DC2626;
+  --status-rejected: #B91C1C;  /* darkened from #DC2626: 3.89:1 -> ~5.21:1 on its tinted bg (WCAG AA small text); matches --danger's precedent */
   --status-rejected-bg: rgba(220, 38, 38, 0.14);
   --status-hold: #3E5C7B;
   --status-hold-bg: rgba(62, 92, 123, 0.14);
@@ -735,7 +735,7 @@ a:hover {
 .main-content.dashboard-single-screen .dash-chart-header { margin-bottom: var(--sp-3); }
 .main-content.dashboard-single-screen .chart-canvas-wrap { height: 192px; }
 .main-content.dashboard-single-screen .seg-control { padding: var(--sp-1); gap: var(--sp-1); }
-.main-content.dashboard-single-screen .seg-btn { padding: var(--sp-1) var(--sp-3); font-size: var(--text-xs); }
+.main-content.dashboard-single-screen .seg-btn { padding: 8px var(--sp-3); font-size: var(--text-xs); }
 
 .main-content.dashboard-single-screen .ref-card { padding: var(--sp-3) var(--sp-4); }
 .main-content.dashboard-single-screen .ref-card-title { font-size: var(--text-base); }
@@ -751,6 +751,11 @@ a:hover {
   font-weight: 600;
   text-decoration: none;
   white-space: nowrap;
+  /* Visual text stays the same size; padding + negative margin expands
+     the actual click/tap target to the WCAG 2.2 24px minimum without
+     shifting surrounding layout. */
+  padding: 7px 0;
+  margin: -7px 0;
 }
 .ref-card-link:hover { text-decoration: underline; }
 .main-content.dashboard-single-screen .ref-card-stack { display: flex; flex-direction: column; }
@@ -1294,6 +1299,17 @@ a:hover {
 :root[data-theme='light'] .ref-kpi-card,
 :root[data-theme='light'] .dash-chart-card {
   border: 1px solid rgba(10, 33, 56, 0.16) !important;
+  box-shadow: 0 8px 24px rgba(10, 33, 56, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.90) !important;
+}
+
+/* The generic light-theme border reset above (via .ref-kpi-card) has
+   higher specificity than .kpi-card-pending-3d's own !important border,
+   so it silently won the fight and the amber escalation cue never
+   rendered in light theme -- the one theme DESIGN.md calls flagship. */
+:root[data-theme='light'] .main-content.dashboard-single-screen .kpi-card-pending-3d,
+:root[data-theme='light'] .kpi-card-pending-3d {
+  border: 1px solid var(--status-pending) !important;
+  background: var(--status-pending-bg) !important;
   box-shadow: 0 8px 24px rgba(10, 33, 56, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.90) !important;
 }
 
@@ -3715,6 +3731,7 @@ a.ref-kpi-card.kpi-card-link:focus-visible {
     grid-template-columns: 1fr;
   }
   .ref-dash-grid {
+    grid-template-columns: 1fr;
     gap: 16px;
   }
   .main-content.dashboard-single-screen .ai-insight-card {
@@ -3865,6 +3882,7 @@ a.ref-kpi-card.kpi-card-link:focus-visible {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 
@@ -3935,7 +3953,7 @@ a.ref-kpi-card.kpi-card-link:focus-visible {
   color: var(--ink-secondary);
   font-size: var(--text-xs);
   font-weight: 600;
-  padding: 4px 14px;
+  padding: 8px 14px;
   border-radius: var(--radius-pill);
   cursor: pointer;
   transition: background-color 180ms ease, color 180ms ease;
@@ -4330,6 +4348,7 @@ body.no-scroll {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
+  flex-wrap: wrap;
   margin-bottom: 14px;
   gap: var(--sp-3);
 }
@@ -4531,16 +4550,6 @@ body.no-scroll {
 :focus-visible {
   outline: 2px solid var(--brand) !important;
   outline-offset: 2px !important;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *, ::before, ::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-    transform: none !important;
-  }
 }
 
 /* Interviewer slot preview (assign flow) */
