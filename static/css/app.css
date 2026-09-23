@@ -733,7 +733,10 @@ a:hover {
 
 .main-content.dashboard-single-screen .dash-chart-card { padding: var(--sp-3) var(--sp-4) var(--sp-2); }
 .main-content.dashboard-single-screen .dash-chart-header { margin-bottom: var(--sp-3); }
-.main-content.dashboard-single-screen .chart-canvas-wrap { height: 192px; }
+/* Fixed 192px only for the chart tabs; the Trends tab's delta cards +
+   mini chart are ~414px tall and were clipped mid-card by the fixed
+   height, so the wrap grows to fit the tallest visible tab instead. */
+.main-content.dashboard-single-screen .chart-canvas-wrap { min-height: 192px; height: auto; }
 .main-content.dashboard-single-screen .seg-control { padding: var(--sp-1); gap: var(--sp-1); }
 .main-content.dashboard-single-screen .seg-btn { padding: 8px var(--sp-3); font-size: var(--text-xs); }
 
@@ -4325,6 +4328,13 @@ body.no-scroll {
 .chart-canvas-wrap canvas {
   width: 100% !important;
   height: 100% !important;
+}
+/* Canvas-based tabs keep the fixed-height wrap (Chart.js needs a bounded
+   parent); text/card-based tabs (Trends) must size the wrap instead, so
+   the dashboard's height:auto override needs the panel to stop being
+   height-locked when the wrap itself is content-sized. */
+.main-content.dashboard-single-screen .chart-canvas-wrap > [role="tabpanel"] {
+  height: auto;
 }
 .dash-chart-card {
   background: var(--glass-bg);
