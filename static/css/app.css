@@ -3544,17 +3544,20 @@ a.ref-kpi-card.kpi-card-link:focus-visible {
   display: grid;
   grid-template-columns: minmax(0, 1.75fr) minmax(0, 1fr);
   gap: 12px;
-  align-items: stretch;
+  align-items: start;
   min-height: 0;
 }
-/* Both columns scroll internally (original single-screen design): column
-   content varies in length and must never drive the page height or get
-   clipped by the viewport-pinned grid. */
+/* Each column renders at its own natural content height and scrolls with
+   the page via .main-content's single scrollbar (like every other page).
+   A prior "single-screen" design gave each column its own overflow-y:auto
+   + max-height:100% so content would never grow the page — but nested
+   inside an already-scrollable .main-content, that created two
+   independent internal scrollbars on one screen: scrolling one column
+   left the other in place, and roughly a third to 40% of each column's
+   content (e.g. 2 of 4 AI Insight cards) sat below the fold with no
+   visible cue to scroll further. */
 .ref-dash-grid > .ref-dash-col {
-  overflow-y: auto;
   min-height: 0;
-  max-height: 100%;
-  padding-right: 2px;
 }
 
 .ref-dash-col {
@@ -3563,12 +3566,11 @@ a.ref-kpi-card.kpi-card-link:focus-visible {
   gap: 12px;
   min-width: 0;
 }
-/* Each panel must render at its natural content height. Without this,
-   default flex-shrink lets the flex column silently compress every
-   panel proportionally to fit the viewport-pinned column instead of
-   overflowing into the column's own internal scroll (see .ref-dash-col
-   overflow-y: auto above) — collapsing panels like Recent Activity to
-   a sliver instead of showing their content. */
+/* Each panel must render at its natural content height rather than being
+   proportionally squashed by the flex column's default flex-shrink:1
+   (which would otherwise silently compress every panel to fit) —
+   collapsing panels like Recent Activity to a sliver instead of showing
+   their content. */
 .ref-dash-col > * {
   flex-shrink: 0;
 }
