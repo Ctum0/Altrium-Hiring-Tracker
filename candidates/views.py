@@ -1134,6 +1134,18 @@ class InterviewerSlotsView(LoginRequiredMixin, View):
         if not interviewer_id or interviewer_id == '__unassign__':
             return render(request, 'candidates/_slot_preview.html', {'preview': None})
 
+        # Picking the CURRENTLY assigned interviewer in the dropdown is a
+        # no-op, not a new choice: rendering a chooser preview for them
+        # duplicated the live preview already in the Interview group
+        # (user-reported). Render the empty placeholder instead.
+        if app.assigned_to_id and str(app.assigned_to_id) == interviewer_id:
+            return render(request, 'candidates/_slot_preview.html', {
+                'preview': {
+                    'interviewer': app.assigned_to,
+                    'already_assigned': True,
+                },
+            })
+
         try:
             interviewer = get_object_or_404(User, pk=interviewer_id, role='IV')
         except (ValueError, TypeError):

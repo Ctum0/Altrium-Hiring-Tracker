@@ -1,7 +1,10 @@
 {% comment %} HTMX partial: interviewer fit + availability preview. {% endcomment %}
 {% if preview %}
   <div class="slot-preview-card glass-panel">
-    {% if not preview.role_fit %}
+    {% if preview.already_assigned %}
+      <span class="badge badge-hired">Currently assigned</span>
+      <span class="text-muted">{{ preview.interviewer.get_full_name|default:preview.interviewer.username }} is already the assignee. Their live availability and free slots are in the Interview Link / Notes group above.</span>
+    {% elif not preview.role_fit %}
       <span class="badge badge-rejected">Not a match</span>
       <span class="text-muted">Specialty or seniority does not meet this role's requirement. Assignment will be blocked.</span>
     {% elif not preview.has_windows %}
