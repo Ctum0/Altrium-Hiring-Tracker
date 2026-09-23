@@ -743,6 +743,7 @@ a:hover {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: var(--sp-3);
   margin-bottom: var(--sp-3);
 }
@@ -875,38 +876,33 @@ a:hover {
 .main-content.dashboard-single-screen .ai-insights { flex: 0 0 auto; padding: var(--sp-1) var(--sp-4); container-type: inline-size; }
 .main-content.dashboard-single-screen .ai-insights .ref-card-header { margin-bottom: var(--sp-1); }
 .main-content.dashboard-single-screen .ai-insights-grid {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  /* One row, N equal-width columns (N = however many insight cards
+     rendered, 1-4) — the user explicitly wants all cards side by side,
+     not 3 in a row + a 4th wrapping alone below. grid-auto-flow:column
+     with grid-auto-columns:1fr always divides the row evenly regardless
+     of card count, unlike a fixed grid-template-columns count. */
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
   gap: var(--sp-3);
-  /* Cards stretch to equal height within the row (uniform look), but the
-     row itself is content-sized — no giant voids. Flex-basis (not a fixed
-     grid-column count) means the actual card count always divides evenly
-     across the row: 3 cards form 3 equal columns, not 3 cards + one empty
-     grid track. */
   align-items: stretch;
 }
 .main-content.dashboard-single-screen .ai-insight-card {
   height: auto;
-  flex: 1 1 280px;
-  /* Caps how far a card can grow when it wraps alone onto a trailing
-     row (e.g. 3 cards in a ~700px container: 2 fill row one, the 3rd
-     wraps alone and would otherwise stretch to the FULL row width —
-     a hollow, absurdly wide card). 460px sits comfortably above the
-     largest legitimate full-row stretch (3 cards sharing a 1389px
-     row settle at ~438px each) so complete rows are never capped,
-     but well below an orphan's uncapped width at any breakpoint —
-     works uniformly instead of only below one container-query
-     threshold, since the same wrap can happen at any width. */
-  max-width: 460px;
+  min-width: 0;
 }
+/* Below this container width, 4 equal columns get too narrow to read
+   comfortably — fall back to wrapping (2-up, then 1-up) instead of
+   forcing an unreadably thin single row. */
 @container (max-width: 680px) {
-  .main-content.dashboard-single-screen .ai-insight-card {
-    flex-basis: calc(50% - var(--sp-3) / 2);
+  .main-content.dashboard-single-screen .ai-insights-grid {
+    grid-auto-flow: row;
+    grid-template-columns: 1fr 1fr;
   }
 }
 @container (max-width: 380px) {
-  .main-content.dashboard-single-screen .ai-insight-card {
-    flex-basis: 100%;
+  .main-content.dashboard-single-screen .ai-insights-grid {
+    grid-template-columns: 1fr;
   }
 }
 /* AI Insights — Compact AI Analysis Panels.
@@ -1235,9 +1231,9 @@ a:hover {
   margin-top: auto;
   padding-top: 6px;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* Wraps to two lines at narrow card widths (the single-row 4-up layout
+     gives each card ~165px) instead of truncating the action mid-word. */
+  overflow-wrap: break-word;
   color: var(--ink);
   opacity: 0.95;
 }
@@ -3740,9 +3736,6 @@ a.ref-kpi-card.kpi-card-link:focus-visible {
   .ref-dash-grid {
     grid-template-columns: 1fr;
     gap: 16px;
-  }
-  .main-content.dashboard-single-screen .ai-insight-card {
-    flex-basis: 100%;
   }
 }
 

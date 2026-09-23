@@ -419,7 +419,7 @@ class HRDashboardView(LoginRequiredMixin, ListView):
                 }
                 seen_groups[key] = group
                 grouped_order.append(group)
-        context['top_positions'] = grouped_order[:3]
+        context['top_positions'] = grouped_order[:5]
 
         # Feedback status
         apps_in_round = JobApplication.objects.filter(
@@ -542,27 +542,28 @@ class HRDashboardView(LoginRequiredMixin, ListView):
                         'count': count,
                     })
 
-            if skill_factors:
-                # Empty skill data renders a near-blank card — skip it
-                # entirely rather than showing a useless panel.
-                ai_insights.append({
-                    'id': 'best_fit',
-                    'category': 'Candidate Matching',
-                    'icon': '🎯',
-                    'finding': best_role['title'],
-                    'skill_factors': skill_factors,
-                    'job_pks': ','.join(str(pk) for pk in best_role['pks']),
-                    'reason': 'Most common skills among current candidates',
-                    'recommendation': 'Prioritize technical interview scheduling',
-                    # pks is a list; interpolating it directly rendered
-                    # '?job=[97]' which 500s the candidate list (int('[97]')
-                    # ValueError). Join comma-separated like the top_role card.
-                    'action_url': (
-                        f'{reverse("candidates:list")}'
-                        f'?job={",".join(str(pk) for pk in best_role["pks"])}'
-                    ),
-                    'action_accent': 'violet',
-                })
+            # Always render the card: with real skill factors when the role
+            # has candidate data, or an honest empty state otherwise. The
+            # previous skip-when-empty behaviour made the AI Insights row
+            # show 3 cards instead of 4, which read as a broken layout.
+            ai_insights.append({
+                'id': 'best_fit',
+                'category': 'Candidate Matching',
+                'icon': '🎯',
+                'finding': best_role['title'],
+                'skill_factors': skill_factors,
+                'job_pks': ','.join(str(pk) for pk in best_role['pks']),
+                'reason': 'Most common skills among current candidates',
+                'recommendation': 'Prioritize technical interview scheduling',
+                # pks is a list; interpolating it directly rendered
+                # '?job=[97]' which 500s the candidate list (int('[97]')
+                # ValueError). Join comma-separated like the top_role card.
+                'action_url': (
+                    f'{reverse("candidates:list")}'
+                    f'?job={",".join(str(pk) for pk in best_role["pks"])}'
+                ),
+                'action_accent': 'violet',
+            })
 
         # --- Card 3: PIPELINE HEALTH ---
         # Active ratio: share of applications still moving (not hired/rejected).
