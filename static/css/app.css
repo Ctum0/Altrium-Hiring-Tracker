@@ -876,6 +876,14 @@ a:hover {
   gap: var(--sp-3);
   flex: 1;
   min-height: 0;
+  /* Cards size to their content and align to the top: stretching every
+     card to the tallest sibling (or the flexed panel height) produced
+     huge empty voids inside cards with little content. */
+  align-content: start;
+  align-items: start;
+}
+.main-content.dashboard-single-screen .ai-insight-card {
+  height: auto;
 }
 @container (max-width: 680px) {
   .main-content.dashboard-single-screen .ai-insights-grid {
