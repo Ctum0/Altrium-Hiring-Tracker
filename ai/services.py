@@ -110,6 +110,7 @@ COMMON_SKILLS = [
     'Pandas', 'NumPy', 'Scikit-learn', 'Machine Learning', 'AI', 'NLP',
     'Agile', 'Scrum', 'Jira', 'Figma', 'UI/UX', 'Automated Testing', 'Selenium',
     'Pytest', 'Playwright', 'JUnit', 'System Design', 'Cybersecurity',
+    'Cyber Security',
     # Security / offensive tooling & ops (pentest CV vocabulary)
     'Burp Suite', 'Nmap', 'Metasploit', 'Wireshark', 'SQLmap', 'Hydra',
     'Gobuster', 'ffuf', 'wfuzz', 'Feroxbuster', 'theHarvester', 'Shodan',
@@ -455,12 +456,20 @@ def parse_cv(text: str) -> dict:
 
     # A partial AI response (some fields populated, others not) must still be
     # blended with the local fallback so the missing fields get filled in
-    # rather than dropped. Only a fully-populated AI response skips this.
-    if not all(result[key] for key in result):
-        fallback = _fallback_parse_cv(text)
-        for key in result:
-            if not result[key]:
-                result[key] = fallback[key]
+    # rather than dropped. Skill lists are ALWAYS unioned with the fallback:
+    # the dictionary catches canonical skills the AI omits or spells
+    # differently (e.g. AI returns 'Cyber Security'-free list while the
+    # dictionary knows the term), keeping candidate pages consistent.
+    fallback = _fallback_parse_cv(text)
+    for key in result:
+        if key == 'skills':
+            merged = list(result['skills'])
+            for s in fallback['skills']:
+                if s not in merged:
+                    merged.append(s)
+            result['skills'] = merged
+        elif not result[key]:
+            result[key] = fallback[key]
 
     result['used_fallback'] = not ai_extracted
     return result

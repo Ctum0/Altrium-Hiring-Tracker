@@ -284,3 +284,28 @@ class FallbackSkillExtractionTests(SimpleTestCase):
         result = services._fallback_parse_cv(text)
         for expected in ('Python', 'Django', 'PostgreSQL', 'Docker', 'AWS'):
             self.assertIn(expected, result['skills'])
+
+
+class SkillVariantMatchingTests(SimpleTestCase):
+    """Spelling variants: 'Cyber Security' (CV) vs 'Cybersecurity' (job
+    requirement) must match — user-reported miss during demo rehearsal."""
+
+    def test_space_variant_matches(self):
+        from ai.matching import _skill_matched
+        self.assertTrue(_skill_matched('cybersecurity', ['cyber security']))
+        self.assertTrue(_skill_matched('cyber security', ['cybersecurity']))
+        self.assertTrue(_skill_matched('cyber-security', ['cybersecurity']))
+
+    def test_union_blend_keeps_dictionary_skills(self):
+        """When the AI path succeeds but omits a dictionary skill, the
+        fallback dictionary skill must still be unioned into the final
+        result (previously AI skills fully replaced the blend)."""
+        payload = ('{"first_name": "Jane", "last_name": "Doe", '
+                   '"email": "jane@example.com", "phone": "123", '
+                   '"skills": ["Python"]}')
+        text = 'Jane Doe jane@example.com 123 Django PostgreSQL Docker AWS Linux'
+        with override_settings(GROQ_API_KEY='key'), \
+             patch.object(services._client, 'post', return_value=_FakeResp(payload)):
+            result = services.parse_cv(text)
+        for expected in ('Python', 'Django', 'PostgreSQL', 'Docker', 'AWS', 'Linux'):
+            self.assertIn(expected, result['skills'])

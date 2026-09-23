@@ -37,15 +37,29 @@ def _normalize_requirement(text: str) -> list[str]:
     return parts
 
 
+def _canon_skill(text: str) -> str:
+    """Normalize a skill phrase so spelling variants compare equal:
+    'cybersecurity' / 'cyber security' / 'cyber-security' all canonicalize
+    the same way (spaces and hyphens collapse to nothing)."""
+    return re.sub(r'[\s\-]+', '', text.strip().lower())
+
+
 def _skill_matched(requirement: str, candidate_skills: list[str]) -> bool:
     """Whole-word match against candidate skills (either direction for
-    variants like node / nodejs stays out: exact or word-contained only)."""
+    variants like node / nodejs stays out: exact or word-contained only).
+    Spelling variants that differ only by spaces/hyphens ('cyber security'
+    vs 'cybersecurity') compare equal via _canon_skill."""
+    canon_req = _canon_skill(requirement)
     for cs in candidate_skills:
-        if cs == requirement:
+        if _canon_skill(cs) == canon_req:
             return True
         # Candidate skill lists may be longer phrases ("node.js development")
         # containing the requirement ("node.js").
         if _contains_skill(cs, requirement):
+            return True
+        # ...or the requirement phrase contains the candidate skill
+        # ("cybersecurity" requirement vs "cyber security" candidate skill).
+        if _contains_skill(requirement.lower(), cs) and ' ' in cs:
             return True
     return False
 
