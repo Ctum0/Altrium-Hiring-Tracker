@@ -902,9 +902,12 @@ class InterviewerDashboardView(LoginRequiredMixin, TemplateView):
 
         context['assigned_apps'] = assigned_qs.order_by('interview_at', '-updated_at')[:20]
         context['assigned_count'] = assigned_qs.count()
+        # Actionable only: hired/rejected apps have a final decision, so
+        # FeedbackFormView 403s on them — they must not be counted or the
+        # dashboard renders dead "Give feedback" buttons for them.
         context['pending_feedback'] = assigned_qs.filter(
             feedback_submitted=False, current_round__isnull=False
-        ).count()
+        ).exclude(status__in=['hired', 'rejected']).count()
 
         # Upcoming interviews: scheduled, in the future, ordered nearest first.
         context['upcoming_interviews'] = (
@@ -1455,6 +1458,31 @@ class AuditLogListView(LoginRequiredMixin, AdminRequiredMixin, ListView):
             qs = qs.filter(actor_id=actor_id)
         return qs
 
+    def _object_label(self, entry):
+        """Human-readable name for the audited object, '' when unavailable.
+
+        Falls back to the raw "Type #id" rendering when the object no longer
+        exists or its id is not a numeric pk."""
+        if not entry.object_type or not entry.object_id:
+            return ''
+        model = {
+            'User': User,
+            'Job': Job,
+            'InterviewFeedback': InterviewFeedback,
+            'RescheduleRequest': RescheduleRequest,
+        }.get(entry.object_type)
+        if model is None:
+            return ''
+        try:
+            obj = model.objects.filter(pk=entry.object_id).first()
+        except (ValueError, TypeError):
+            return ''
+        if obj is None:
+            return ''
+        if entry.object_type == 'User':
+            return obj.get_full_name() or obj.username
+        return str(obj)
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['active_nav'] = 'audit_log'
@@ -1469,6 +1497,13 @@ class AuditLogListView(LoginRequiredMixin, AdminRequiredMixin, ListView):
             .distinct()
             .order_by('username')
         )
+        # Resolve friendly object labels for the current page only (<=50
+        # rows) so the Object column reads "User · Demo Check" instead of
+        # the raw "User #35".
+        labels = {}
+        for entry in context['entries']:
+            labels[entry.pk] = self._object_label(entry)
+        context['object_labels'] = labels
         return context
 
 

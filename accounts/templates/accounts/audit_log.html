@@ -68,7 +68,7 @@
           </td>
           <td><span class="badge">{{ entry.get_action_display }}</span></td>
           <td class="text-sm">
-            {% if entry.object_type %}{{ entry.object_type }}{% if entry.object_id %}&nbsp;#{{ entry.object_id }}{% endif %}{% else %}&mdash;{% endif %}
+            {% if entry.object_type %}{{ entry.object_type }}{% if entry.object_id %}&nbsp;#{{ entry.object_id }}{% endif %}{% if object_labels.get(entry.pk) %}<span class="text-muted">&middot; {{ object_labels.get(entry.pk) }}</span>{% endif %}{% else %}&mdash;{% endif %}
           </td>
           <td class="text-sm text-muted">{{ entry.detail|default:'—' }}</td>
         </tr>

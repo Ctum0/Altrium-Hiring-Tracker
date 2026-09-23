@@ -36,7 +36,7 @@
       <span class="app-summary-meta">
         {% if app.feedback_submitted %}
         <span class="badge badge-hired">Feedback Submitted</span>
-        {% elif app.current_round %}
+        {% elif app.current_round and app.status != 'hired' and app.status != 'rejected' %}
         <span class="badge badge-pending">Feedback Pending</span>
         {% endif %}
         {% if app.shortlist_score is not None %}

@@ -44,7 +44,7 @@
   <p class="text-xs" style="margin:0 0 var(--sp-2) 0"><strong>{{ pending_feedback }} candidate{{ pending_feedback|pluralize }} waiting for your feedback.</strong> Submitting feedback unlocks their progression to the next round.</p>
   <div class="flex gap-2" style="flex-wrap:wrap">
     {% for app in assigned_apps %}
-      {% if not app.feedback_submitted and app.current_round %}
+      {% if not app.feedback_submitted and app.current_round and app.status != 'hired' and app.status != 'rejected' %}
       <a href="{% url 'feedback:form' app.pk app.current_round.pk %}?next={% url 'accounts:interviewer_dashboard' %}" class="btn btn-primary btn-sm">
         {{ app.candidate.full_name }} &middot; {{ app.job.title|truncatechars:24 }}
       </a>
@@ -171,7 +171,7 @@
           {% if app.own_feedbacks %}
           <a href="{% url 'feedback:detail' app.own_feedbacks.0.pk %}" class="btn btn-ghost btn-sm" style="margin-left:var(--sp-2)">View feedback</a>
           {% endif %}
-          {% elif app.current_round %}
+          {% elif app.current_round and app.status != 'hired' and app.status != 'rejected' %}
           <a href="{% url 'feedback:form' app.pk app.current_round.pk %}?next={% url 'accounts:interviewer_dashboard' %}" class="btn btn-primary btn-sm">Give feedback</a>
           {% else %}
           <span class="text-muted">—</span>

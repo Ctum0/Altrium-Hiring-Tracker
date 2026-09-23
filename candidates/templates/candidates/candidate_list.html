@@ -141,7 +141,7 @@
             </div>
             <div class="cand-name-info">
               <a href="{% url 'candidates:detail' app.candidate.pk %}" class="cand-name-main" style="text-decoration:none;color:inherit">{{ app.candidate.full_name }}</a>
-              {% if app.candidate.needs_review %}
+              {% if app.candidate.needs_review and user.is_hr %}
               <a href="{% url 'candidates:review' app.candidate.pk %}" class="btn btn-xs" style="background:var(--status-pending-bg);color:var(--status-pending);border:1px solid var(--status-pending);font-size:11px;padding:2px 8px;border-radius:999px;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-left:6px" title="Needs review: {{ app.candidate.needs_review_reasons }}">⚠ Review</a>
               {% endif %}
               <span class="cand-name-email">{{ app.candidate.email }}</span>

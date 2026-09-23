@@ -6236,11 +6236,11 @@ table form,
   display: inline-block;
 }
 
-/* D3: KPI label wrap consistency — single line with ellipsis. */
+/* D3: KPI label wrap consistency — wrap to a second line instead of
+   ellipsizing mid-word ("Feedback Given This Mon…"). */
 .ref-kpi-label {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow: visible;
 }
 
 /* L2: score bar width sanity — bars must reflect score proportionally

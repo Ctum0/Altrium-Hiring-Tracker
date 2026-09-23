@@ -1,0 +1,38 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Page not found — Altrium Tracker</title>
+  <meta name="robots" content="noindex">
+  <script>
+  (function () {
+    var KEY = 'altrium-theme';
+    function current() {
+      try {
+        var s = localStorage.getItem(KEY);
+        if (s === 'light' || s === 'dark') return s;
+      } catch (e) {}
+      return 'dark';
+    }
+    var root = document.documentElement;
+    root.dataset.theme = current();
+  })();
+  </script>
+  <link rel="stylesheet" href="{% static 'css/app.css' %}?v={{ app_css_version }}">
+</head>
+<body class="auth-body">
+  <main class="auth-shell" style="justify-items:center">
+    <div class="auth-card" style="text-align:center">
+      <p class="auth-title" style="font-size:var(--text-4xl,3rem);font-weight:800;letter-spacing:-0.02em;margin:0 0 var(--sp-3) 0">404</p>
+      <h1 class="auth-title" style="margin:0 0 var(--sp-2) 0">Page not found</h1>
+      <p class="auth-sub" style="margin:0 0 var(--sp-6) 0">The page you're looking for doesn't exist, was moved, or you don't have access to it.</p>
+      <div class="flex gap-2" style="justify-content:center;flex-wrap:wrap">
+        <a href="/" class="btn btn-primary">Go to dashboard</a>
+        <a href="/careers/" class="btn btn-ghost">View open roles</a>
+      </div>
+      {% if request_path %}<p class="text-xs text-muted" style="margin:var(--sp-5) 0 0 0">Requested path: <code>{{ request_path }}</code></p>{% endif %}
+    </div>
+  </main>
+</body>
+</html>
