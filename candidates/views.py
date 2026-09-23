@@ -11,6 +11,7 @@ from django.db.models import Count, F, Q
 from django.http import Http404, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from urllib.parse import urlencode
 from django.utils import timezone
 from django.views import View
 from django.views.generic import DetailView, ListView
@@ -219,6 +220,12 @@ class CandidateDetailView(LoginRequiredMixin, DetailView):
         context['applications'] = applications
         context['is_hr'] = self.request.user.is_hr()
         context['is_management'] = self.request.user.is_management()
+        # Inline scheduling error: InterviewDetailsView redirects here with
+        # ?interview_error=… when a booking is rejected (outside availability
+        # windows, clash). Rendered inside the interview control group so it
+        # cannot be missed, unlike the transient toast that caused HR to
+        # believe a rejected booking had saved.
+        context['interview_error'] = self.request.GET.get('interview_error', '')
         # Badge for pending reschedule requests on this candidate's
         # applications (interviewer-initiated, HR acts on
         # /accounts/reschedule-requests/). One aggregate query.
@@ -966,13 +973,17 @@ class InterviewDetailsView(LoginRequiredMixin, View):
             # Well-formedness and "not in the past" are validated regardless
             # of whether an interviewer is assigned yet — there's no reason
             # to accept a nonsense or already-elapsed time even for a
-            # placeholder booking.
+            # placeholder booking. Errors surface INLINE at the interview
+            # control group (redirect with ?interview_error=…) rather than
+            # as a transient toast: a toast flashing at the top of a long
+            # page was missed by HR, who then believed the booking saved.
             if scheduled < timezone.now():
-                messages.error(
-                    request,
-                    'The interview time cannot be in the past.',
+                messages.error(request, 'The interview time cannot be in the past.')
+                return redirect(
+                    f'{reverse("candidates:detail", args=[app.candidate_id])}'
+                    f'?{urlencode({"interview_error": "The interview time cannot be in the past."})}'
+                    f'#interview-group-{app.pk}'
                 )
-                return redirect('candidates:detail', pk=app.candidate_id)
 
             if scheduled.hour == 0 and scheduled.minute == 0:
                 messages.warning(
@@ -1011,7 +1022,16 @@ class InterviewDetailsView(LoginRequiredMixin, View):
                         f'is not available at that time. Check their availability '
                         f'and pick a slot inside a weekly window.',
                     )
-                    return redirect('candidates:detail', pk=app.candidate_id)
+                    error_msg = (
+                        f'{interviewer.get_full_name() or interviewer.username} is not '
+                        f'available at that time — pick one of their free slots below '
+                        f'(or ask them to widen their weekly windows).'
+                    )
+                    return redirect(
+                        f'{reverse("candidates:detail", args=[app.candidate_id])}'
+                        f'?{urlencode({"interview_error": error_msg})}'
+                        f'#interview-group-{app.pk}'
+                    )
 
                 if interviewer.has_booking_clash(scheduled, exclude_pk=app.pk):
                     buffer_note = (
@@ -1025,7 +1045,16 @@ class InterviewDetailsView(LoginRequiredMixin, View):
                         f'already has an interview scheduled too close to that '
                         f'time{buffer_note}.',
                     )
-                    return redirect('candidates:detail', pk=app.candidate_id)
+                    error_msg = (
+                        f'{interviewer.get_full_name() or interviewer.username} already '
+                        f'has an interview scheduled too close to that time'
+                        f'{buffer_note} — pick a different slot.'
+                    )
+                    return redirect(
+                        f'{reverse("candidates:detail", args=[app.candidate_id])}'
+                        f'?{urlencode({"interview_error": error_msg})}'
+                        f'#interview-group-{app.pk}'
+                    )
 
             if scheduled:
                 messages.success(

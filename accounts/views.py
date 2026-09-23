@@ -919,6 +919,20 @@ class InterviewerDashboardView(LoginRequiredMixin, TemplateView):
             .order_by('interview_at')[:5]
         )
 
+        # Past-due interviews: the scheduled time has passed, feedback is
+        # still outstanding, and the candidate is still in play. These are
+        # "the interview happened — log it" prompts on the dashboard.
+        past_due = list(
+            assigned_qs.filter(
+                interview_at__isnull=False,
+                interview_at__lt=timezone.now(),
+                feedback_submitted=False,
+                current_round__isnull=False,
+            ).exclude(status__in=['hired', 'rejected'])
+            .order_by('-interview_at')[:5]
+        )
+        context['past_due_interviews'] = past_due
+
         # The interviewer's own weekly availability, grouped by weekday order.
         context['availability_windows'] = (
             user.availability_windows.all()
@@ -1200,6 +1214,56 @@ class MyAvailabilityView(LoginRequiredMixin, TemplateView):
             return self.render_to_response(
                 self.get_context_data(exception_form=exception_form)
             )
+        # Bulk mode: 'bulk_weekdays' carries a comma list of weekday numbers
+        # (from the quick-preset buttons). The same start/end window is
+        # created for each listed weekday in one submission — "Weekdays 9–5"
+        # becomes 5 windows with one click instead of 5 separate form fills
+        # (user-reported flexibility gap). Handled BEFORE the single-window
+        # form validation: the bulk POST intentionally omits the 'weekday'
+        # field, so running the ModelForm first would always fail.
+        raw_bulk = request.POST.get('bulk_weekdays', '').strip()
+        if raw_bulk:
+            try:
+                weekdays = [int(x) for x in raw_bulk.split(',') if x.strip()]
+            except ValueError:
+                weekdays = []
+            if not weekdays or any(w < 0 or w > 6 for w in weekdays):
+                messages.error(request, 'Invalid weekdays for bulk add.')
+                return redirect('accounts:my_availability')
+            from datetime import time as dt_time
+
+            def _parse_time(raw, field):
+                try:
+                    h, m = str(raw).split(':')
+                    return dt_time(int(h), int(m))
+                except (ValueError, AttributeError):
+                    messages.error(request, f'Could not read the {field} time.')
+                    return None
+            start = _parse_time(request.POST.get('start_time', ''), 'start')
+            end = _parse_time(request.POST.get('end_time', ''), 'end')
+            if start is None or end is None:
+                return redirect('accounts:my_availability')
+            if start >= end:
+                messages.error(request, 'End time must be after the start time.')
+                return redirect('accounts:my_availability')
+            created = 0
+            for weekday in weekdays:
+                _, was_created = InterviewerAvailability.objects.get_or_create(
+                    interviewer=request.user,
+                    weekday=weekday,
+                    start_time=start,
+                    defaults={'end_time': end},
+                )
+                if was_created:
+                    created += 1
+            if created:
+                messages.success(
+                    request,
+                    f'Added {created} availability window{"s" if created != 1 else ""}.',
+                )
+            else:
+                messages.info(request, 'Those windows already exist.')
+            return redirect('accounts:my_availability')
         form = AvailabilityWindowForm(request.POST)
         if form.is_valid():
             saved = form.save_for(request.user)
@@ -1236,6 +1300,7 @@ class MyCalendarView(LoginRequiredMixin, TemplateView):
         for date, apps in groupby(booked, key=lambda app: timezone.localdate(app.interview_at)):
             days.append({'date': date, 'apps': list(apps)})
         context['calendar_days'] = days
+        context['now'] = timezone.now()
         # Assigned but not yet scheduled: these still need HR to book a
         # time, so the calendar answers 'what's on my plate' completely.
         awaiting = (

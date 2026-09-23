@@ -49,9 +49,14 @@
 
     <!-- Expanded body: full control set, grouped into labeled sections -->
     <div class="app-card-body">
-      <!-- Meeting Link / Interview Details -->
+      <!-- Interview Link / Interview Details -->
       <div class="app-card-control-group" id="interview-group-{{ app.pk }}">
         <label class="app-card-control-label">Interview Link / Notes</label>
+        {% if interview_error and app.assigned_to %}
+        <div class="alert alert-error" role="alert" style="margin:0 0 var(--sp-2)">
+          {{ interview_error }}
+        </div>
+        {% endif %}
         {% if is_hr %}
         <form method="post" action="{% url 'candidates:interview_details' app.pk %}" class="cd-control-form">
           {% csrf_token %}
@@ -72,6 +77,11 @@
         </div>
         {% else %}
         <span class="text-xs text-muted">No meeting details added</span>
+        {% endif %}
+        {% if is_hr and app.assigned_to %}
+        <div class="slot-preview" aria-live="polite" style="margin-top:var(--sp-2)">
+          {% include 'candidates/_slot_preview.html' with preview=app.slot_preview_context app=app %}
+        </div>
         {% endif %}
       </div>
 

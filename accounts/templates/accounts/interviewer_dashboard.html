@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load accounts_extras %}
+{% load accounts_extras notification_extras %}
 {% block title %}My Candidates | Altrium Tracker{% endblock %}
 {% block page_title %}My Candidates{% endblock %}
 {% block head %}<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>{% endblock %}
@@ -12,17 +12,42 @@
 </div>
 
 {% if upcoming_interviews %}
-<!-- Upcoming Interviews -->
+<!-- Upcoming / Recent Interviews: lifecycle surface, not just links.
+     Past-due interviews (time passed, feedback not yet submitted) surface
+     a "Submit feedback" CTA — the interviewer's natural "interview done,
+     now log it" flow. Future ones link to the candidate and show the
+     meeting link so they can join directly. -->
 <div class="panel panel-pad glass-panel" style="margin-bottom:var(--sp-5)">
-  <h2 class="panel-heading">Upcoming Interviews</h2>
+  <h2 class="panel-heading">Interviews</h2>
   <div class="flex gap-3" style="flex-wrap:wrap">
     {% for app in upcoming_interviews %}
-    <a href="{% url 'candidates:detail' app.candidate.pk %}" class="upcoming-card glass-panel" style="min-width:220px;text-decoration:none">
-      <div class="upcoming-card-meta">
-        <span class="upcoming-card-name">{{ app.candidate.full_name }}</span>
-        <span class="upcoming-card-time">{{ app.interview_at|date:'M j, H:i' }} <small class="upcoming-card-time-unit">UTC</small></span>
-        <span class="upcoming-card-sub">{{ app.job.title }}{% if app.current_round %} &middot; {{ app.current_round.name }}{% endif %}</span>
-      </div>
+    <div class="upcoming-card glass-panel" style="min-width:240px;display:flex;flex-direction:column;gap:var(--sp-2)">
+      <a href="{% url 'candidates:detail' app.candidate.pk %}" style="text-decoration:none;color:inherit;display:block">
+        <div class="upcoming-card-meta">
+          <span class="upcoming-card-name">{{ app.candidate.full_name }}</span>
+          <span class="upcoming-card-time">{{ app.interview_at|date:'M j, H:i' }} <small class="upcoming-card-time-unit">UTC</small></span>
+          <span class="upcoming-card-sub">{{ app.job.title }}{% if app.current_round %} &middot; {{ app.current_round.name }}{% endif %}</span>
+        </div>
+      </a>
+      {% if app.interview_details and 'http' in app.interview_details %}
+      <a href="{{ app.interview_details|safe_link }}" target="_blank" rel="noopener" class="btn btn-secondary btn-xs" style="align-self:flex-start">Join meeting ↗</a>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if past_due_interviews %}
+<!-- Interviews that happened but have no feedback yet: the "mark done"
+     flow the interviewer asked for. Surfaced above the queue so it reads
+     as the follow-up step to a completed interview. -->
+<div class="callout-pending" style="margin-bottom:var(--sp-5)">
+  <p class="text-xs" style="margin:0 0 var(--sp-2) 0"><strong>{{ past_due_interviews|length }} interview{{ past_due_interviews|length|pluralize }} completed but not logged.</strong> Submit feedback to unlock the candidate's next round.</p>
+  <div class="flex gap-2" style="flex-wrap:wrap">
+    {% for app in past_due_interviews %}
+    <a href="{% url 'feedback:form' app.pk app.current_round.pk %}?next={% url 'accounts:interviewer_dashboard' %}" class="btn btn-primary btn-sm">
+      {{ app.candidate.full_name }} &middot; {{ app.current_round.name|default:app.job.title|truncatechars:24 }}
     </a>
     {% endfor %}
   </div>

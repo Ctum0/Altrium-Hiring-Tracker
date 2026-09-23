@@ -18,8 +18,24 @@
 
 <div class="panel panel-pad glass-panel" style="margin-bottom:var(--sp-5)">
   <h2 class="panel-heading">Add a window</h2>
-  <form method="post" novalidate>
+  <!-- Quick presets: one click creates the same window for every listed
+       weekday via bulk_weekdays — covers the 90% case (weekday office
+       hours) without five separate form fills, the flexibility gap
+       reported during rehearsal. -->
+  <div class="flex gap-2" style="flex-wrap:wrap;margin-bottom:var(--sp-3)" id="availability-presets">
+    <span class="text-xs text-muted" style="align-self:center">Quick add:</span>
+    <button type="button" class="btn btn-secondary btn-xs availability-preset"
+            data-weekdays="0,1,2,3,4" data-start="09:00" data-end="17:00">Weekdays 9–5</button>
+    <button type="button" class="btn btn-secondary btn-xs availability-preset"
+            data-weekdays="0,1,2,3,4" data-start="10:00" data-end="16:00">Weekdays 10–4</button>
+    <button type="button" class="btn btn-secondary btn-xs availability-preset"
+            data-weekdays="0,1,2,3,4" data-start="14:00" data-end="18:00">Weekdays 2–6 PM</button>
+    <button type="button" class="btn btn-secondary btn-xs availability-preset"
+            data-weekdays="5" data-start="10:00" data-end="14:00">Saturdays 10–2</button>
+  </div>
+  <form method="post" novalidate id="availability-add-form">
     {% csrf_token %}
+    <input type="hidden" name="bulk_weekdays" id="bulk-weekdays-input" value="">
     {% if form.non_field_errors %}
     <div class="alert alert-error">{{ form.non_field_errors }}</div>
     {% endif %}
@@ -48,6 +64,17 @@
 
 {% if weekday_groups %}
 <div class="panel panel-pad glass-panel">
+  <h2 class="panel-heading">Your week at a glance</h2>
+  <div class="consensus-rounds-grid" style="margin-bottom:var(--sp-4)">
+    {% for label, windows in weekday_groups %}
+    <div class="consensus-round-card">
+      <div class="consensus-round-name">{{ label }}</div>
+      {% for w in windows %}
+      <div class="text-xs" style="margin-top:var(--sp-1)">{{ w.start_time|time:"H:i" }}&ndash;{{ w.end_time|time:"H:i" }}</div>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
   <h2 class="panel-heading">Declared windows</h2>
   {% for label, windows in weekday_groups %}
   <div style="margin-bottom:var(--sp-3)">
@@ -132,4 +159,26 @@
   <p class="text-xs text-muted" style="margin:var(--sp-3) 0 0">No exceptions on file.</p>
   {% endif %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Quick presets: set the bulk-weekdays hidden input + the visible
+// start/end pickers (so the user sees what will be created), then submit.
+// The server creates one window per weekday, skipping duplicates.
+document.querySelectorAll('.availability-preset').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    var form = document.getElementById('availability-add-form');
+    if (!form) return;
+    document.getElementById('bulk-weekdays-input').value = btn.dataset.weekdays;
+    var start = form.querySelector('input[name="start_time"]');
+    var end = form.querySelector('input[name="end_time"]');
+    if (start) start.value = btn.dataset.start;
+    if (end) end.value = btn.dataset.end;
+    form.submit();
+    btn.disabled = true;
+    btn.style.opacity = '0.5';
+  });
+});
+</script>
 {% endblock %}

@@ -711,6 +711,27 @@ class MyCalendarTests(AuthAndRoleTestBase):
         self.assertContains(r, 'Cara Cand')
         self.assertContains(r, 'https://meet.example.com/abc')
 
+    def test_past_due_interview_shows_submit_feedback_cta(self):
+        """A booked interview whose time has passed with no feedback yet
+        must surface the 'Interview done — submit feedback' CTA on the
+        calendar card (user-reported: nothing told the interviewer the
+        interview was over and needed logging)."""
+        job = _make_job(self.hr)
+        candidate = Candidate.objects.create(
+            first_name='Dana', last_name='Past', email='dana@example.com',
+        )
+        app = JobApplication.objects.create(
+            candidate=candidate, job=job, status='in_progress',
+            assigned_to=self.interviewer,
+            interview_at=timezone.now() - timedelta(days=1),
+        )
+        app.current_round = app.job.rounds.first()
+        app.save(update_fields=['current_round'])
+        c = Client()
+        assert c.login(username='iv', password='pass12345')
+        r = c.get(reverse('accounts:my_calendar'))
+        self.assertContains(r, 'Interview done — submit feedback')
+
     def test_empty_state(self):
         c = Client()
         assert c.login(username='iv', password='pass12345')
@@ -2615,3 +2636,61 @@ class BootstrapAdminCommandTests(TestCase):
         self.assertTrue(user.check_password('newknownpassword'))
         self.assertEqual(user.role, Role.ADMIN)
         self.assertTrue(user.is_staff)
+
+
+class MyAvailabilityBulkAddTests(AuthAndRoleTestBase):
+    """Quick presets create the same window across multiple weekdays in
+    one submission (user-reported flexibility gap)."""
+
+    def _post_bulk(self, weekdays, start='09:00', end='17:00'):
+        c = Client()
+        assert c.login(username='iv', password='pass12345')
+        return c.post(
+            reverse('accounts:my_availability'),
+            {
+                'bulk_weekdays': weekdays,
+                'start_time': start,
+                'end_time': end,
+            },
+        )
+
+    def test_bulk_add_creates_all_weekdays(self):
+        self._post_bulk('0,1,2,3,4')
+        self.assertEqual(
+            InterviewerAvailability.objects.filter(interviewer=self.interviewer).count(), 5,
+        )
+        self.assertTrue(
+            InterviewerAvailability.objects.filter(
+                interviewer=self.interviewer, weekday=3,
+                start_time=strftime_time('09:00'),
+            ).exists()
+        )
+
+    def test_bulk_add_is_idempotent(self):
+        self._post_bulk('0,1,2')
+        r = self._post_bulk('0,1,2')
+        # Re-running the same preset must not duplicate windows.
+        self.assertEqual(
+            InterviewerAvailability.objects.filter(interviewer=self.interviewer).count(), 3,
+        )
+        self.assertEqual(r.status_code, 302)
+
+    def test_bulk_add_rejects_invalid_weekdays(self):
+        self._post_bulk('0,9,x')
+        self.assertEqual(
+            InterviewerAvailability.objects.filter(interviewer=self.interviewer).count(), 0,
+        )
+
+    def test_bulk_add_is_interviewer_only(self):
+        c = Client()
+        assert c.login(username='hr', password='pass12345')
+        r = c.post(reverse('accounts:my_availability'), {'bulk_weekdays': '0'})
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(r.url, reverse('accounts:home'))
+
+
+def strftime_time(hhmm):
+    """'09:00' -> time object (helper for the tests above)."""
+    from datetime import time as dt_time
+    h, m = hhmm.split(':')
+    return dt_time(int(h), int(m))
