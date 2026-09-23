@@ -246,8 +246,9 @@ class PanelConsensusUpgradeTests(SimpleTestCase):
         result = synthesize_panel_consensus(self._app_with([fb1, fb2]))
         avgs = {c['criterion']: c['avg_10'] for c in result['criteria_averages']}
         self.assertEqual(avgs['Technical Skill'], 7.0)
-        # 1 hire + 1 reject = split: confidence 100 - 12 = 88
-        self.assertEqual(result['confidence_pct'], 88)
+        # 1 hire + 1 reject = maximally split panel: LOW confidence.
+        # agreement 0.5, spread 4.0 -> penalty 0.4 -> (0.5-0.4)*100 = 10 -> floor 20
+        self.assertEqual(result['confidence_pct'], 20)
         self.assertIsNotNone(result['last_updated'])
 
 

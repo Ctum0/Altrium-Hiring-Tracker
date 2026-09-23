@@ -111,7 +111,22 @@ class FeedbackFormView(LoginRequiredMixin, View):
         # Assigned interviewer OR a panel member may submit. Panel members
         # are added by HR at assignment time and share the feedback duty.
         is_panel = self.application.panel_interviewers.filter(pk=request.user.pk).exists()
-        if self.application.assigned_to != request.user and not is_panel:
+        # Feedback AUTHOR exception: an interviewer who already submitted
+        # feedback for this exact application+round keeps view/edit access
+        # even after HR reassigns the candidate — their authored record is
+        # theirs, and the Edit button on the feedback list must not dead-end
+        # into a 403 (user-reported P0 during audit: 'Edit on my own
+        # feedback errors out' after rehearsal reassignment churn).
+        is_author = InterviewFeedback.objects.filter(
+            application=self.application,
+            round=self.round_obj,
+            interviewer=request.user,
+        ).exists()
+        if (
+            self.application.assigned_to != request.user
+            and not is_panel
+            and not is_author
+        ):
             return HttpResponseForbidden(
                 'You can only provide feedback for candidates assigned to you.'
             )

@@ -1297,6 +1297,12 @@ class CandidateDeleteView(LoginRequiredMixin, View):
         if candidate.resume_file:
             candidate.resume_file.delete(save=False)
         candidate.delete()
+        # Purge notifications that link to this candidate's page — they
+        # would otherwise render as clickable dead links (404s) in every
+        # interviewer's bell popover indefinitely (user-reported P0: stale
+        # rehearsal notifications pointed at a deleted candidate).
+        from notifications.models import Notification as _N
+        _N.objects.filter(link=f'/candidates/{candidate.pk}/').delete()
         messages.success(request, f'Candidate profile for "{name}" has been permanently removed.')
         return redirect('candidates:list')
 

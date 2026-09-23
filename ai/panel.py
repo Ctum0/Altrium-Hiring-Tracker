@@ -221,11 +221,16 @@ def synthesize_panel_consensus(application):
     criteria_averages.sort(key=lambda c: c['avg_10'])
 
     # Confidence: unanimous panels are high-confidence; divergence lowers
-    # it. Scale: 100 - 12 per split vote beyond the majority, floored at 55.
+    # it sharply. The old formula (100 - 12 per non-majority vote) produced
+    # absurd values like 88% on a maximally split 1-Hire/1-Reject panel —
+    # user-reported as reading plainly wrong. New scale: agreement share of
+    # the majority vote, penalized by score spread, floored at 20.
     total_votes = hire_votes + hold_votes + reject_votes
     if total_votes:
         majority = max(hire_votes, hold_votes, reject_votes)
-        confidence_pct = max(55, 100 - 12 * (total_votes - majority))
+        agreement = majority / total_votes                    # 1.0 unanimous .. 0.5 split
+        spread_penalty = min(score_spread / 10.0, 0.5)        # 0 .. 0.5
+        confidence_pct = max(20, int(round((agreement - spread_penalty) * 100)))
     else:
         confidence_pct = 50
 
