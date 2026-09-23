@@ -754,7 +754,6 @@ a:hover {
 }
 .ref-card-link:hover { text-decoration: underline; }
 .main-content.dashboard-single-screen .ref-card-stack { display: flex; flex-direction: column; }
-.main-content.dashboard-single-screen .ref-card-stretch { display: flex; flex-direction: column; flex: 1; }
 .main-content.dashboard-single-screen .ref-metric-duo > .ref-card { display: flex; flex-direction: column; }
 .main-content.dashboard-single-screen .ref-metric-duo > .ref-card > .ref-card-header { margin-bottom: var(--sp-2); }
 .main-content.dashboard-single-screen .ref-bar-list { display: flex; flex-direction: column; gap: var(--sp-2); flex: 1; justify-content: center; }
@@ -3531,6 +3530,15 @@ a.ref-kpi-card.kpi-card-link:focus-visible {
   flex-direction: column;
   gap: 12px;
   min-width: 0;
+}
+/* Each panel must render at its natural content height. Without this,
+   default flex-shrink lets the flex column silently compress every
+   panel proportionally to fit the viewport-pinned column instead of
+   overflowing into the column's own internal scroll (see .ref-dash-col
+   overflow-y: auto above) — collapsing panels like Recent Activity to
+   a sliver instead of showing their content. */
+.ref-dash-col > * {
+  flex-shrink: 0;
 }
 
 /* Dual metric cards: side-by-side, stack on small screens */

@@ -423,7 +423,7 @@
   <div class="ref-dash-col">
 
     <!-- Recent Activity Timeline -->
-    <div class="panel panel-pad ref-card ref-card-stretch">
+    <div class="panel panel-pad ref-card">
       <div class="ref-card-header">
         <h2 class="ref-card-title">Recent Activity</h2>
         <a href="{% url 'candidates:list' %}" class="text-xs ref-card-link">View all &rarr;</a>
@@ -779,6 +779,9 @@ function switchMainChart(mode) {
     chart.options.scales.y.ticks.color = t.tick;
     chart.options.plugins.tooltip.backgroundColor = t.tooltipBg;
     chart.options.plugins.tooltip.borderColor = t.tooltipBorder;
+    chart.options.plugins.tooltip.titleColor = t.tooltipColor;
+    chart.options.plugins.tooltip.bodyColor = t.tooltipColor;
+    chart.update();
   });
 })();
 
