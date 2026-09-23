@@ -52,11 +52,12 @@ class Command(BaseCommand):
                 return
             user, created = User.objects.get_or_create(
                 username=username,
-                defaults={'role': Role.ADMIN, 'is_staff': True},
+                defaults={'role': Role.ADMIN, 'is_staff': True, 'is_superuser': True},
             )
             user.set_password(password)
             user.role = Role.ADMIN
             user.is_staff = True
+            user.is_superuser = True
             user.is_active = True
             user.force_password_change = True
             user.save()
@@ -141,8 +142,9 @@ class Command(BaseCommand):
             )
             user.role = Role.ADMIN
             user.is_staff = True
+            user.is_superuser = True
             user.force_password_change = True
-            user.save(update_fields=['role', 'is_staff', 'force_password_change'])
+            user.save(update_fields=['role', 'is_staff', 'is_superuser', 'force_password_change'])
             AuditLog.record(
                 None, AuditLog.Action.CREATE,
                 object_type='User', object_id=user.pk,
