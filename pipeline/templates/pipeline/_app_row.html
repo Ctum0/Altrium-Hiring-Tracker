@@ -138,13 +138,12 @@
           <button type="submit" class="btn btn-primary btn-sm"
                   data-confirm-action="assign" data-app-pk="{{ app.pk }}">Assign</button>
         </form>
-        <!-- Slot preview: server-rendered for the current assignee, refreshed
-             via HTMX whenever HR picks another interviewer -->
-        <div id="slot-preview-{{ app.pk }}" class="slot-preview" aria-live="polite">
-          {% if app.assigned_to %}
-            {% include 'candidates/_slot_preview.html' with preview=app.slot_preview_context app=app %}
-          {% endif %}
-        </div>
+        <!-- Slot preview target: the HTMX partial renders here while HR is
+             CHOOSING an interviewer (pre-assignment preview). Once assigned,
+             the live slots + booking picker live in the Interview group
+             above, next to the datetime field they fill — rendered once,
+             no duplicate. -->
+        <div id="slot-preview-{{ app.pk }}" class="slot-preview" aria-live="polite"></div>
         {% else %}
         <span class="text-xs text-muted">
           {% if app.assigned_to %}<a href="{% url 'accounts:interviewer_profile' pk=app.assigned_to.pk %}" style="color:inherit">{{ app.assigned_to.get_full_name|default:app.assigned_to.username }}</a>{% else %}Unassigned{% endif %}
