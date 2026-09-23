@@ -933,6 +933,21 @@ class InterviewerDashboardView(LoginRequiredMixin, TemplateView):
         )
         context['past_due_interviews'] = past_due
 
+        # Awaiting scheduling: the candidate advanced into a new round but
+        # HR has not booked the next interview yet (interview_at empty).
+        # Surfaced so the state machine reads: round advanced -> HR books ->
+        # interview happens -> feedback -> next round. Without this, an
+        # unscheduled round rendered only a bare "Give feedback" button and
+        # the user read the flow as broken (user-reported during rehearsal).
+        context['awaiting_scheduling'] = list(
+            assigned_qs.filter(
+                interview_at__isnull=True,
+                current_round__isnull=False,
+            ).exclude(status__in=['hired', 'rejected'])
+            .select_related('candidate', 'job', 'current_round')
+            .order_by('-updated_at')[:5]
+        )
+
         # The interviewer's own weekly availability, grouped by weekday order.
         context['availability_windows'] = (
             user.availability_windows.all()

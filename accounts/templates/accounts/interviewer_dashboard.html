@@ -61,6 +61,23 @@
 </div>
 {% endif %}
 
+{% if awaiting_scheduling %}
+<!-- Awaiting scheduling: candidate advanced into a round but HR hasn't
+     booked the next interview. Tells the interviewer the ball is in
+     HR's court (and tells HR via the notification) instead of rendering
+     a bare Give-feedback button with no context. -->
+<div class="callout-pending" style="margin-bottom:var(--sp-5)">
+  <p class="text-xs" style="margin:0 0 var(--sp-2) 0"><strong>{{ awaiting_scheduling|length }} candidate{{ awaiting_scheduling|length|pluralize }} in a round with no interview booked yet.</strong> HR books the slot — the schedule field is on the candidate page.</p>
+  <div class="flex gap-2" style="flex-wrap:wrap">
+    {% for app in awaiting_scheduling %}
+    <a href="{% url 'candidates:detail' app.candidate.pk %}" class="btn btn-secondary btn-sm">
+      {{ app.candidate.full_name }} &middot; {{ app.current_round.name|truncatechars:24 }}
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
 {% if pending_feedback %}
 <!-- Pending Feedback Action Queue: the interviewer's #1 daily action,
      surfaced as one-click CTAs instead of requiring navigation into
