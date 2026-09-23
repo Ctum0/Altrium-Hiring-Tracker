@@ -140,7 +140,7 @@
           </table>
         </div>
         <div role="tabpanel" id="panel-trends" aria-labelledby="tab-btn-trends" tabindex="0" hidden>
-          <div class="trend-delta-grid">
+          <div class="trend-delta-grid trend-delta-compact">
             {% include 'accounts/_trend_delta.html' with label='Applications' this=trend_apps_this_week last=trend_apps_last_week only %}
             {% include 'accounts/_trend_delta.html' with label='Hired' this=trend_hires_this_week last=trend_hires_last_week only %}
             {% include 'accounts/_trend_delta.html' with label='Rejections' this=trend_rejections_this_week last=trend_rejections_last_week only %}
@@ -152,7 +152,7 @@
               </span>
             </div>
           </div>
-          <div class="trend-chart-block">
+          <div class="trend-chart-block trend-chart-block-secondary">
             <div class="ref-card-header" style="margin-top:var(--sp-3)">
               <h3 class="text-sm" style="font-weight:600">Hires per Week</h3>
               <span class="text-xs text-muted">last 8 weeks</span>

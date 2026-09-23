@@ -5830,6 +5830,26 @@ select option:disabled {
   gap: var(--sp-3);
 }
 
+/* HR dashboard Trends tab: the panel shares the analytics card's fixed
+   192px canvas wrap, so the 4 delta cards are compacted (tighter padding
+   + gap) and the Hires-per-Week mini chart below them is hidden — the
+   user asked for exactly the 4 cards, moved up so their bottom edges
+   don't clip. Other pages using this grid are unaffected. */
+.trend-delta-compact {
+  gap: var(--sp-2);
+  align-content: start;
+}
+.trend-delta-compact .trend-delta-item {
+  padding: var(--sp-2) var(--sp-3);
+  gap: 2px;
+}
+.trend-delta-compact .trend-delta-value {
+  font-size: var(--text-lg);
+}
+.trend-chart-block-secondary {
+  display: none;
+}
+
 .trend-delta-item {
   display: flex;
   flex-direction: column;
