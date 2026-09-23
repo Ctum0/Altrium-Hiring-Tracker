@@ -868,19 +868,15 @@ a:hover {
   color: var(--ink-secondary);
 }
 
-.main-content.dashboard-single-screen .ai-insights { flex: 1; min-height: 0; padding: var(--sp-1) var(--sp-4); container-type: inline-size; }
+.main-content.dashboard-single-screen .ai-insights { flex: 0 0 auto; padding: var(--sp-1) var(--sp-4); container-type: inline-size; }
 .main-content.dashboard-single-screen .ai-insights .ref-card-header { margin-bottom: var(--sp-1); }
 .main-content.dashboard-single-screen .ai-insights-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: var(--sp-3);
-  flex: 1;
-  min-height: 0;
-  /* Cards size to their content and align to the top: stretching every
-     card to the tallest sibling (or the flexed panel height) produced
-     huge empty voids inside cards with little content. */
-  align-content: start;
-  align-items: start;
+  /* Cards stretch to equal height within the row (uniform look), but the
+     row itself is content-sized — no giant voids. */
+  align-items: stretch;
 }
 .main-content.dashboard-single-screen .ai-insight-card {
   height: auto;
@@ -3518,6 +3514,16 @@ a.ref-kpi-card.kpi-card-link:focus-visible {
   grid-template-columns: minmax(0, 1.75fr) minmax(0, 1fr);
   gap: 12px;
   align-items: stretch;
+  min-height: 0;
+}
+/* Both columns scroll internally (original single-screen design): column
+   content varies in length and must never drive the page height or get
+   clipped by the viewport-pinned grid. */
+.ref-dash-grid > .ref-dash-col {
+  overflow-y: auto;
+  min-height: 0;
+  max-height: 100%;
+  padding-right: 2px;
 }
 
 .ref-dash-col {

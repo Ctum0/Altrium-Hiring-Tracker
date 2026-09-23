@@ -113,6 +113,7 @@
         <div class="seg-control" role="tablist" aria-label="Analytics view" id="analytics-tablist">
           <button type="button" role="tab" aria-selected="true" aria-controls="panel-trend" id="tab-btn-trend" class="seg-btn active" tabindex="0" onclick="switchMainChart('trend')">By Stage</button>
           <button type="button" role="tab" aria-selected="false" aria-controls="panel-score" id="tab-btn-score" class="seg-btn" tabindex="-1" onclick="switchMainChart('score')">Scores</button>
+          <button type="button" role="tab" aria-selected="false" aria-controls="panel-activity" id="tab-btn-activity" class="seg-btn" tabindex="-1" onclick="switchMainChart('activity')">Activity</button>
         </div>
       </div>
 
@@ -138,6 +139,38 @@
             </tbody>
           </table>
         </div>
+        <div role="tabpanel" id="panel-activity" aria-labelledby="tab-btn-activity" tabindex="0" hidden>
+          {% if recent_applications %}
+          <div class="activity-timeline activity-timeline-inpanel">
+            {% for app in recent_applications|slice:":5" %}
+            <a href="{% url 'candidates:detail' app.candidate_id %}" class="activity-item">
+              <div class="activity-dot-col">
+                <div class="activity-dot status-dot-{{ app.status }}"></div>
+                <div class="activity-dot-line"></div>
+              </div>
+              <div class="activity-content">
+                <div class="activity-name-row">
+                  <span class="activity-name">{{ app.candidate.full_name }}</span>
+                  <span class="activity-time">{{ app.updated_at|timesince }} ago</span>
+                </div>
+                <div class="activity-action-line">
+                  <span class="activity-action-text">
+                    {% if app.status == 'hired' %}Hired for{% elif app.status == 'rejected' %}Rejected from{% elif app.status == 'in_progress' %}Interviewing at{% elif app.status == 'shortlisted' %}Shortlisted for{% elif app.status == 'on_hold' %}On hold for{% else %}Applied to{% endif %}
+                    {{ app.job.title|truncatechars:22 }}
+                  </span>
+                </div>
+                <div class="activity-meta-row">
+                  <span class="activity-assignee">{% if app.assigned_to %}{{ app.assigned_to.get_full_name|default:app.assigned_to.username }}{% else %}Unassigned{% endif %}</span>
+                  <span class="badge badge-{{ app.status }}">{{ app.get_status_display }}</span>
+                </div>
+              </div>
+            </a>
+            {% endfor %}
+          </div>
+          <a href="{% url 'candidates:list' %}" class="text-xs ref-card-link" style="display:inline-block;margin-top:var(--sp-2)">View all activity &rarr;</a>
+        {% else %}
+          <p class="text-xs text-muted" style="padding:var(--sp-4)">No activity recorded yet.</p>
+        {% endif %}
       </div>
     </div>
 
@@ -394,69 +427,10 @@
 
   </div>
 
+  </div>
+
   <!-- Right Column: Recent Activity & Open Roles -->
   <div class="ref-dash-col">
-
-    <!-- Recent Activity Timeline -->
-    <div class="panel panel-pad ref-card ref-card-stretch">
-      <div class="ref-card-header">
-        <h2 class="ref-card-title">Recent Activity</h2>
-        <a href="{% url 'candidates:list' %}" class="text-xs ref-card-link">View all &rarr;</a>
-      </div>
-      {% if recent_applications %}
-      <div class="activity-timeline">
-        {% for app in recent_applications|slice:":3" %}
-        <a href="{% url 'candidates:detail' app.candidate_id %}" class="activity-item">
-          <div class="activity-dot-col">
-            <div class="activity-dot status-dot-{{ app.status }}"></div>
-            <div class="activity-dot-line"></div>
-          </div>
-          <div class="activity-content">
-            <div class="activity-name-row">
-              <span class="activity-name">{{ app.candidate.full_name }}</span>
-              <span class="activity-time">{{ app.updated_at|timesince }} ago</span>
-            </div>
-            <div class="activity-action-line">
-              <span class="activity-action-text">
-                {% if app.status == 'hired' %}Hired for{% elif app.status == 'rejected' %}Rejected from{% elif app.status == 'in_progress' %}Interviewing at{% elif app.status == 'shortlisted' %}Shortlisted for{% elif app.status == 'on_hold' %}On hold for{% else %}Applied to{% endif %}
-                {{ app.job.title|truncatechars:22 }}
-              </span>
-            </div>
-            <div class="activity-meta-row">
-              <span class="activity-assignee">{% if app.assigned_to %}{{ app.assigned_to.get_full_name|default:app.assigned_to.username }}{% else %}Unassigned{% endif %}</span>
-              <span class="badge badge-{{ app.status }}">{{ app.get_status_display }}</span>
-            </div>
-          </div>
-        </a>
-        {% endfor %}
-      </div>
-      {% else %}
-      <p class="text-xs text-muted">No activity recorded.</p>
-      {% endif %}
-    </div>
-
-    <!-- Escalation: Stalled Candidates (>7 days no movement) -->
-    {% if stalled_applications %}
-    <div class="panel panel-pad ref-card">
-      <div class="ref-card-header">
-        <h2 class="ref-card-title">Escalations: Stalled &gt; 7 Days</h2>
-        <span class="badge badge-secondary">{{ stalled_count }} stalled</span>
-      </div>
-      <div class="ref-jobs-list">
-        {% for app in stalled_applications %}
-        <div class="ref-job-item">
-          <div class="ref-job-main">
-            <div class="ref-job-title">
-              <a href="{% url 'candidates:detail' app.candidate_id %}" style="color:inherit;text-decoration:none">{{ app.candidate.full_name }}</a>
-            </div>
-            <div class="ref-job-meta">{{ app.job.title }} &middot; idle {{ app.stage_entered_at|timesince }} &middot; {% if app.assigned_to %}{{ app.assigned_to.get_full_name|default:app.assigned_to.username }}{% else %}unassigned{% endif %}</div>
-          </div>
-          <span class="badge badge-{{ app.status }}">{{ app.get_status_display }}</span>
-        </div>
-        {% endfor %}
-      </div>
-    </div>
-    {% endif %}
 
     <!-- Active Open Roles -->
     <div class="panel panel-pad ref-card">
@@ -512,34 +486,29 @@
       {% endif %}
     </div>
 
-    <!-- This Week vs Last Week: management trend panel -->
+    <!-- Escalation: Stalled Candidates (>7 days no movement) -->
+    {% if stalled_applications %}
     <div class="panel panel-pad ref-card">
       <div class="ref-card-header">
-        <h2 class="ref-card-title">This Week vs Last Week</h2>
-        <span class="text-xs text-muted">week-over-week deltas</span>
+        <h2 class="ref-card-title">Escalations: Stalled &gt; 7 Days</h2>
+        <span class="badge badge-secondary">{{ stalled_count }} stalled</span>
       </div>
-      <div class="trend-delta-grid">
-        {% include 'accounts/_trend_delta.html' with label='Applications' this=trend_apps_this_week last=trend_apps_last_week only %}
-        {% include 'accounts/_trend_delta.html' with label='Hired' this=trend_hires_this_week last=trend_hires_last_week only %}
-        {% include 'accounts/_trend_delta.html' with label='Rejections' this=trend_rejections_this_week last=trend_rejections_last_week only %}
-        <div class="trend-delta-item">
-          <span class="trend-delta-label">Pending Feedback</span>
-          <span class="trend-delta-value">{{ trend_feedback_pending }}</span>
-          <span class="kpi-trend {% if trend_feedback_pending > 0 %}kpi-trend-pending{% else %}kpi-trend-up{% endif %}">
-            {% if trend_feedback_pending > 0 %}Action needed{% else %}All clear{% endif %}
-          </span>
+      <div class="ref-jobs-list">
+        {% for app in stalled_applications %}
+        <div class="ref-job-item">
+          <div class="ref-job-main">
+            <div class="ref-job-title">
+              <a href="{% url 'candidates:detail' app.candidate_id %}" style="color:inherit;text-decoration:none">{{ app.candidate.full_name }}</a>
+            </div>
+            <div class="ref-job-meta">{{ app.job.title }} &middot; idle {{ app.stage_entered_at|timesince }} &middot; {% if app.assigned_to %}{{ app.assigned_to.get_full_name|default:app.assigned_to.username }}{% else %}unassigned{% endif %}</div>
+          </div>
+          <span class="badge badge-{{ app.status }}">{{ app.get_status_display }}</span>
         </div>
-      </div>
-      <div class="trend-chart-block">
-        <div class="ref-card-header" style="margin-top:var(--sp-3)">
-          <h2 class="ref-card-title" style="font-size:var(--text-sm)">Hires per Week</h2>
-          <span class="text-xs text-muted">last 8 weeks</span>
-        </div>
-        <div style="position:relative;height:150px">
-          <canvas id="hiresPerWeekChart" aria-label="Hires per week over the last 8 weeks" role="img"></canvas>
-        </div>
+        {% endfor %}
       </div>
     </div>
+    {% endif %}
+
 
   </div>
 
@@ -696,31 +665,29 @@ function chartTheme() {
 })();
 
 function switchMainChart(mode) {
-  var panelTrend = document.getElementById('panel-trend');
-  var panelScore = document.getElementById('panel-score');
-  var title = document.getElementById('analytics-chart-title');
-  var sub = document.getElementById('analytics-chart-sub');
-
-  var btnTrend = document.getElementById('tab-btn-trend');
-  var btnScore = document.getElementById('tab-btn-score');
-
-  if (mode === 'trend') {
-    panelScore.hidden = true;
-    panelTrend.hidden = false;
-    title.textContent = 'Candidates by Stage';
-    sub.textContent = 'Current candidates at each pipeline stage';
-    btnTrend.classList.add('active'); btnTrend.setAttribute('aria-selected', 'true'); btnTrend.tabIndex = 0;
-    btnScore.classList.remove('active'); btnScore.setAttribute('aria-selected', 'false'); btnScore.tabIndex = -1;
-    if (window.trendChartObj) window.trendChartObj.resize();
-  } else {
-    panelTrend.hidden = true;
-    panelScore.hidden = false;
-    title.textContent = 'Score Distribution';
-    sub.textContent = 'AI qualification score buckets';
-    btnScore.classList.add('active'); btnScore.setAttribute('aria-selected', 'true'); btnScore.tabIndex = 0;
-    btnTrend.classList.remove('active'); btnTrend.setAttribute('aria-selected', 'false'); btnTrend.tabIndex = -1;
-    if (window.scoreChartObj) window.scoreChartObj.resize();
+  var panels = { trend: 'panel-trend', score: 'panel-score', activity: 'panel-activity' };
+  var titles = {
+    trend: ['Candidates by Stage', 'Current candidates at each pipeline stage'],
+    score: ['Score Distribution', 'AI qualification score buckets'],
+    activity: ['Recent Activity', 'Latest pipeline movement'],
+  };
+  var btnIds = { trend: 'tab-btn-trend', score: 'tab-btn-score', activity: 'tab-btn-activity' };
+  Object.keys(panels).forEach(function(key) {
+    var panel = document.getElementById(panels[key]);
+    var btn = document.getElementById(btnIds[key]);
+    if (!panel || !btn) return;
+    var active = key === mode;
+    panel.hidden = !active;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-selected', active ? 'true' : 'false');
+    btn.tabIndex = active ? 0 : -1;
+  });
+  if (titles[mode]) {
+    document.getElementById('analytics-chart-title').textContent = titles[mode][0];
+    document.getElementById('analytics-chart-sub').textContent = titles[mode][1];
   }
+  if (mode === 'trend' && window.trendChartObj) window.trendChartObj.resize();
+  if (mode === 'score' && window.scoreChartObj) window.scoreChartObj.resize();
 }
 
 (function() {
@@ -728,7 +695,7 @@ function switchMainChart(mode) {
   if (!tablist) return;
   var tabs = Array.prototype.slice.call(tablist.querySelectorAll('[role="tab"]'));
   if (!tabs.length) return;
-  var modeFor = function(btn) { return btn.id === 'tab-btn-score' ? 'score' : 'trend'; };
+  var modeFor = function(btn) { return btn.id === 'tab-btn-score' ? 'score' : btn.id === 'tab-btn-activity' ? 'activity' : 'trend'; };
   tablist.addEventListener('keydown', function(e) {
     var idx = tabs.indexOf(document.activeElement);
     if (idx === -1) return;
@@ -744,71 +711,5 @@ function switchMainChart(mode) {
   });
 })();
 
-/* Hires-per-week mini chart (management trend panel) */
-(function() {
-  var canvas = document.getElementById('hiresPerWeekChart');
-  if (!canvas || typeof Chart === 'undefined') return;
-
-  var labels = [{% for w in hires_per_week %}'{{ w.label }}'{% if not forloop.last %},{% endif %}{% endfor %}];
-  var counts = [{% for w in hires_per_week %}{{ w.count }}{% if not forloop.last %},{% endif %}{% endfor %}];
-
-  var theme = chartTheme();
-  var brandColor = getComputedStyle(document.documentElement).getPropertyValue('--brand').trim() || '#22D3EE';
-
-  window.hiresPerWeekChartObj = new Chart(canvas, {
-    type: 'bar',
-    data: {
-      labels: labels,
-      datasets: [{
-        label: 'Hires',
-        data: counts,
-        backgroundColor: brandColor,
-        borderWidth: 0,
-        borderRadius: 6,
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: { duration: 600 },
-      layout: { padding: { top: 8, bottom: 0, left: 6, right: 12 } },
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          backgroundColor: theme.tooltipBg,
-          borderColor: theme.tooltipBorder,
-          borderWidth: 1,
-          padding: 8,
-          cornerRadius: 8,
-          titleColor: theme.tooltipColor,
-          bodyColor: theme.tooltipColor,
-        }
-      },
-      scales: {
-        x: { grid: { display: false }, ticks: { color: theme.tick, font: { size: 11, weight: '600' } } },
-        y: {
-          beginAtZero: true,
-          suggestedMax: Math.max.apply(null, counts) + 1,
-          grid: { color: theme.grid },
-          ticks: { color: theme.tick, font: { size: 11, weight: '600' }, precision: 0 }
-        }
-      }
-    }
-  });
-
-  document.addEventListener('themechange', function() {
-    var chart = window.hiresPerWeekChartObj;
-    if (!chart) return;
-    var t = chartTheme();
-    chart.options.scales.x.ticks.color = t.tick;
-    chart.options.scales.y.grid.color = t.grid;
-    chart.options.scales.y.ticks.color = t.tick;
-    chart.options.plugins.tooltip.backgroundColor = t.tooltipBg;
-    chart.options.plugins.tooltip.borderColor = t.tooltipBorder;
-    chart.options.plugins.tooltip.titleColor = t.tooltipColor;
-    chart.options.plugins.tooltip.bodyColor = t.tooltipColor;
-    chart.update();
-  });
-})();
 </script>
 {% endblock %}
