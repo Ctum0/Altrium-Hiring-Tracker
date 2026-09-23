@@ -249,3 +249,38 @@ class PanelConsensusUpgradeTests(SimpleTestCase):
         # 1 hire + 1 reject = split: confidence 100 - 12 = 88
         self.assertEqual(result['confidence_pct'], 88)
         self.assertIsNotNone(result['last_updated'])
+
+
+class FallbackSkillExtractionTests(SimpleTestCase):
+    """The fallback CV parser's skill dictionary must cover security/ops
+    tooling vocabulary — a pentest CV previously extracted only 'Python'
+    and 'Linux' while its Key Highlights showed Burp Suite, Nmap, etc.
+    (user-reported during demo rehearsal)."""
+
+    def test_pentest_cv_extracts_security_tooling(self):
+        text = (
+            'Sithum Sasmitha Ranasinghe sithumsryt@gmail.com 076 383 7623\n'
+            'OWASP Top 10, Burp Suite, SQLmap, ffuf, wfuzz, Gobuster, Feroxbuster '
+            'Nmap, Metasploit, Hydra, Wireshark, Active Directory basics\n'
+            'theHarvester, Shodan, recon-ng, Postman (Certified) '
+            'Python (requests, automation), C, OOP\n'
+            'Parrot OS, Kali Linux, Windows Server/10/11, Proxmox VE\n'
+            'Windows/Linux log analysis, SIEM fundamentals (SOC Level 1)\n'
+        )
+        result = services._fallback_parse_cv(text)
+        skills = result['skills']
+        for expected in (
+            'Python', 'Linux', 'Burp Suite', 'Nmap', 'Metasploit', 'Wireshark',
+            'SQLmap', 'Hydra', 'Gobuster', 'Feroxbuster', 'theHarvester',
+            'Shodan', 'recon-ng', 'Postman', 'OWASP', 'Kali Linux', 'Parrot OS',
+            'Proxmox', 'Active Directory', 'SIEM',
+        ):
+            self.assertIn(expected, skills, f'missing {expected!r} in {skills}')
+
+    def test_common_dev_skills_still_extract(self):
+        """The extended dictionary must not regress the original dev-skill
+        coverage."""
+        text = 'Built with Python, Django, PostgreSQL and Docker on AWS.'
+        result = services._fallback_parse_cv(text)
+        for expected in ('Python', 'Django', 'PostgreSQL', 'Docker', 'AWS'):
+            self.assertIn(expected, result['skills'])

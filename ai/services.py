@@ -109,7 +109,15 @@ COMMON_SKILLS = [
     'Swift', 'Kotlin', 'Flutter', 'React Native', 'PyTorch', 'TensorFlow',
     'Pandas', 'NumPy', 'Scikit-learn', 'Machine Learning', 'AI', 'NLP',
     'Agile', 'Scrum', 'Jira', 'Figma', 'UI/UX', 'Automated Testing', 'Selenium',
-    'Pytest', 'Playwright', 'JUnit', 'System Design', 'Cybersecurity'
+    'Pytest', 'Playwright', 'JUnit', 'System Design', 'Cybersecurity',
+    # Security / offensive tooling & ops (pentest CV vocabulary)
+    'Burp Suite', 'Nmap', 'Metasploit', 'Wireshark', 'SQLmap', 'Hydra',
+    'Gobuster', 'ffuf', 'wfuzz', 'Feroxbuster', 'theHarvester', 'Shodan',
+    'recon-ng', 'Postman', 'OWASP', 'Kali Linux', 'Parrot OS', 'Proxmox',
+    'Active Directory', 'SIEM', 'Digital Forensics', 'Ethical Hacking',
+    'Penetration Testing', 'Vulnerability Assessment', 'Network Security',
+    'Terraform', 'Ansible', 'Jenkins', 'Prometheus', 'Grafana',
+    'Elasticsearch', 'Kafka', 'RabbitMQ', 'Celery', 'WebSockets',
 ]
 
 SYSTEM_SCORE = (
