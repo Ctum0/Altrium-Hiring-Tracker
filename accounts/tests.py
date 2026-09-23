@@ -903,14 +903,15 @@ class SeniorityEligibilityTests(AuthAndRoleTestBase):
     def test_fully_eligible_combines_domain_and_seniority(self):
         """Seniority floor combines with the domain rule.
 
-        NOTE: the jobs here have a BLANK domain (unclassified job). Per the
-        documented rule, a blank or 'other' job domain imposes NO domain
-        constraint — so the design job differs only by seniority, and the
+        NOTE: updated for the department-fallback rule — a job with a
+        blank domain falls back to matching the interviewer's
+        domain/specialty against the job's DEPARTMENT, so an
+        Engineering-specialty interviewer is NOT eligible for a
+        Design-department job (user-reported: unrelated interviewers
+        were offered on department-classified jobs). The eng job here
+        has a blank domain too but its department matches, so the
         senior interviewer passes both. The old expectation (design job
-        ineligible via specialty-vs-department) contradicted the documented
-        rule and blocked legacy interviewers off unclassified jobs; see the
-        is_eligible_interviewer_for docstring.
-        """
+        eligible) contradicted the demo finding."""
         eng_job = self._job('mid')
         design_job = _make_job(self.hr, title='Product Designer', department='Design')
         design_job.seniority = 'mid'
@@ -919,7 +920,7 @@ class SeniorityEligibilityTests(AuthAndRoleTestBase):
         self.interviewer.specialty = 'Engineering'
         self.interviewer.save()
         self.assertTrue(self.interviewer.is_fully_eligible_for(eng_job))
-        self.assertTrue(self.interviewer.is_fully_eligible_for(design_job))
+        self.assertFalse(self.interviewer.is_fully_eligible_for(design_job))
 
     def test_structured_domain_still_blocks_mismatch(self):
         """When the JOB has a structured domain, a mismatching interviewer

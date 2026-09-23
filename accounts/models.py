@@ -222,33 +222,41 @@ class User(AbstractUser):
     def is_eligible_interviewer_for(self, job) -> bool:
         """Role-match rule for interviewer assignment.
 
-        Two-tier rule. If this interviewer has a structured `domain`
-        classification (non-blank), it is authoritative: a blank or
-        'other' job domain (nobody classified this job) imposes no
-        constraint, otherwise the interviewer's domain must exactly
-        match the job's domain (case-insensitive). If the interviewer
-        has no structured domain (legacy/generalist account), fall back
-        to the legacy rule: the interviewer's specialty overlapping the
-        job's department (case-insensitive containment), with a blank
-        specialty or blank department imposing no constraint.
+        Domain-first rule. If this interviewer has a structured `domain`
+        classification (non-blank), it is authoritative: the interviewer's
+        domain must match the job's domain. When the job's domain is blank
+        or 'other' (no functional classification), fall back to comparing
+        the interviewer's domain/specialty against the job's DEPARTMENT —
+        an Engineering-department job should not offer Infrastructure or
+        QA interviewers just because nobody classified its domain
+        (user-reported during demo rehearsal: an Engineering job with
+        domain=other listed Infrastructure and QA interviewers as valid).
+
+        A job with BOTH blank domain and blank department imposes no
+        constraint (nothing to match against). Interviewers without a
+        structured domain fall back to the legacy rule: specialty
+        overlapping the job's department.
         """
         if self.role != Role.INTERVIEWER:
             return False
-        # A blank or 'other' job domain imposes no constraint AT ALL —
-        # including for legacy interviewers without a structured domain.
-        # The old code only honored the bypass inside the structured-domain
-        # branch, so a domain-blank interviewer fell through to the legacy
-        # specialty-vs-department check and got wrongly filtered off jobs
-        # whose domain was 'other' (their specialty rarely matches the
-        # department slug — 'quality assurance' vs 'engineering').
         job_domain = (job.domain or '').strip().lower()
+        department = (job.department or '').strip().lower()
         if not job_domain or job_domain == Job.Domain.OTHER:
-            return True
+            # No functional classification: match on department when the
+            # job has one, else impose no constraint.
+            if not department:
+                return True
+            domain = (self.domain or '').strip().lower()
+            if domain:
+                return domain == department or department in domain or domain in department
+            specialty = (self.specialty or '').strip().lower()
+            if not specialty:
+                return True
+            return specialty in department or department in specialty
         domain = (self.domain or '').strip().lower()
         if domain:
             return domain == job_domain
         specialty = (self.specialty or '').strip().lower()
-        department = (job.department or '').strip().lower()
         if not specialty or not department:
             return True
         return specialty in department or department in specialty

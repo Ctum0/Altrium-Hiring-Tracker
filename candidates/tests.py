@@ -592,17 +592,24 @@ class InterviewerSelectionTests(CandidatesBaseTestCase):
         self.assertIn('iv_eng', eligible)
         self.assertNotIn('iv_des', eligible)
 
-    def test_unclassified_job_domain_imposes_no_specialty_filter(self):
-        """A blank job domain means 'nobody classified this job' — the
-        documented rule imposes NO specialty constraint, even for legacy
-        (domain-blank) interviewers. Pins the fix for the bug where the
-        bypass only applied to structured-domain interviewers."""
+    def test_unclassified_job_domain_falls_back_to_department(self):
+        """A blank/'other' job domain no longer imposes NO constraint: the
+        interviewer's domain/specialty is matched against the job's
+        DEPARTMENT instead (user-reported: an Engineering-department job
+        with domain=other offered Infrastructure and QA interviewers).
+        A generalist (blank domain AND blank specialty) still passes, and
+        the Engineering specialist matches the Engineering department."""
         backend = self._create_specialist('Engineering', username='iv_eng')
         designer = self._create_specialist('Design', username='iv_des')
+        infra = self._create_specialist('Infrastructure', username='iv_infra')
+        generalist = self._create_specialist('', username='iv_generalist')
         self.job.department = 'Engineering'
         # self.job.domain stays blank (unclassified)
         eligible = [u.username for u in self.application.eligible_interviewers]
-        self.assertIn('iv_des', eligible)
+        self.assertIn('iv_eng', eligible)
+        self.assertIn('iv_generalist', eligible)
+        self.assertNotIn('iv_des', eligible)
+        self.assertNotIn('iv_infra', eligible)
 
     def test_assign_rejects_specialty_mismatch(self):
         designer = self._create_specialist('Design', username='iv_des')
