@@ -2437,3 +2437,89 @@ class CleanupDemoCruftCommandTests(AuthAndRoleTestBase):
         j2.refresh_from_db()
         self.assertTrue(j1.is_active)
         self.assertFalse(j2.is_active)
+
+    def test_never_deactivates_last_admin_capable_account(self):
+        """Real production incident: audit_admin_01 was the ONLY
+        is_superuser account on the deploy. Deactivating it locked the
+        entire admin console out with no way back in. The command must
+        skip deactivation when doing so would leave zero active
+        admin-capable accounts."""
+        import os
+        sole_admin = User.objects.create_user(
+            username='audit_admin_01', password='x', role=Role.ADMIN,
+            is_staff=True, is_superuser=True,
+        )
+        os.environ['CLEANUP_DEMO_CRUFT'] = 'true'
+        try:
+            call_command('cleanup_demo_cruft')
+        finally:
+            del os.environ['CLEANUP_DEMO_CRUFT']
+        sole_admin.refresh_from_db()
+        self.assertTrue(sole_admin.is_active)
+
+    def test_deactivates_audit_admin_when_another_admin_exists(self):
+        import os
+        User.objects.create_user(
+            username='real_admin', password='x', role=Role.ADMIN, is_staff=True,
+        )
+        audit_admin = User.objects.create_user(
+            username='audit_admin_01', password='x', role=Role.ADMIN,
+            is_staff=True, is_superuser=True,
+        )
+        os.environ['CLEANUP_DEMO_CRUFT'] = 'true'
+        try:
+            call_command('cleanup_demo_cruft')
+        finally:
+            del os.environ['CLEANUP_DEMO_CRUFT']
+        audit_admin.refresh_from_db()
+        self.assertFalse(audit_admin.is_active)
+
+
+class BootstrapAdminCommandTests(TestCase):
+    """Real production incident: a deactivated is_superuser account
+    permanently blocked bootstrap_admin from ever creating a working
+    replacement, because the old existence check ignored is_active on
+    the is_superuser branch."""
+
+    def test_deactivated_superuser_does_not_block_bootstrap(self):
+        import os
+        User.objects.create_user(
+            username='stale_admin', password='x', is_superuser=True,
+            is_active=False,
+        )
+        env = {
+            'BOOTSTRAP_ADMIN': 'true', 'ADMIN_USERNAME': 'admin',
+            'ADMIN_PASSWORD': 'testpass123',
+        }
+        old = {k: os.environ.get(k) for k in env}
+        os.environ.update(env)
+        try:
+            call_command('bootstrap_admin')
+        finally:
+            for k, v in old.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+        self.assertTrue(User.objects.filter(username='admin', role=Role.ADMIN).exists())
+
+    def test_active_admin_blocks_bootstrap(self):
+        import os
+        User.objects.create_user(
+            username='active_admin', password='x', role=Role.ADMIN, is_staff=True,
+        )
+        env = {
+            'BOOTSTRAP_ADMIN': 'true', 'ADMIN_USERNAME': 'admin',
+            'ADMIN_PASSWORD': 'testpass123',
+        }
+        old = {k: os.environ.get(k) for k in env}
+        os.environ.update(env)
+        try:
+            call_command('bootstrap_admin')
+        finally:
+            for k, v in old.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+        self.assertFalse(User.objects.filter(username='admin').exists())

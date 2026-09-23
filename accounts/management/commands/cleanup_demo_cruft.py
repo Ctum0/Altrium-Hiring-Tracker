@@ -32,10 +32,10 @@ import os
 
 from django.core.management.base import BaseCommand
 from django.db import IntegrityError
-from django.db.models import ProtectedError
+from django.db.models import ProtectedError, Q
 from django.utils import timezone
 
-from accounts.models import AuditLog, User
+from accounts.models import AuditLog, Role, User
 from candidates.models import Candidate
 from jobs.models import Job
 
@@ -69,6 +69,23 @@ class Command(BaseCommand):
             user = User.objects.filter(username=username, is_active=True).first()
             if not user:
                 continue
+            # Never deactivate the last remaining admin-capable account —
+            # doing so locks the whole team out of the admin console with
+            # no way back in short of direct database access. (Real
+            # incident: this exact scenario happened when the only
+            # is_superuser account on a deploy was an audit-test user.)
+            is_admin_capable = user.is_staff and (user.role == Role.ADMIN or user.is_superuser)
+            if is_admin_capable:
+                other_admins = User.objects.filter(is_active=True).exclude(pk=user.pk).filter(
+                    Q(is_superuser=True) | Q(is_staff=True, role=Role.ADMIN)
+                )
+                if not other_admins.exists():
+                    self.stdout.write(self.style.WARNING(
+                        f'Skipped deactivating {username}: it is the only '
+                        f'active admin-capable account. Deactivating it '
+                        f'would lock out the admin console entirely.'
+                    ))
+                    continue
             user.is_active = False
             user.save(update_fields=['is_active'])
             AuditLog.record(
