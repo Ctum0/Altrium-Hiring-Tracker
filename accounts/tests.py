@@ -4,6 +4,7 @@ from datetime import timedelta
 from datetime import time as dt_time
 
 from django.contrib.auth import get_user_model
+from django.core.management import call_command
 from django.db import models
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
@@ -1526,6 +1527,72 @@ class AdminUserManagementAccessTests(AuthAndRoleTestBase):
         self.assertEqual(c.get(reverse('accounts:admin_user_create')).status_code, 200)
 
 
+class AuditLogViewerAccessTests(AuthAndRoleTestBase):
+    """Only admins reach the audit log viewer; entries are filterable."""
+
+    def _admin(self):
+        return User.objects.create_user(
+            username='adm_audit', password='pass12345', role=Role.ADMIN, is_staff=True,
+        )
+
+    def test_hr_bounced(self):
+        c = Client()
+        assert c.login(username='hr', password='pass12345')
+        r = c.get(reverse('accounts:audit_log'))
+        self.assertEqual(r.status_code, 302)
+
+    def test_admin_reaches_list(self):
+        self._admin()
+        AuditLog.record(self.hr, AuditLog.Action.LOGIN)
+        c = Client()
+        assert c.login(username='adm_audit', password='pass12345')
+        r = c.get(reverse('accounts:audit_log'))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'hr')
+
+    def test_action_filter(self):
+        admin = self._admin()
+        AuditLog.record(self.hr, AuditLog.Action.LOGIN)
+        AuditLog.record(admin, AuditLog.Action.CREATE, object_type='User', object_id=self.hr.pk)
+        c = Client()
+        assert c.login(username='adm_audit', password='pass12345')
+        r = c.get(reverse('accounts:audit_log'), {'action': AuditLog.Action.CREATE})
+        entries = list(r.context['entries'])
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(entries[0].action, AuditLog.Action.CREATE)
+
+
+class DeactivateInterviewerRoleTests(AuthAndRoleTestBase):
+    """HR and Management can offboard interviewers; nobody else can."""
+
+    def _url(self):
+        return reverse('accounts:deactivate_interviewer', kwargs={'pk': self.interviewer.pk})
+
+    def test_hr_can_deactivate(self):
+        c = Client()
+        assert c.login(username='hr', password='pass12345')
+        r = c.post(self._url())
+        self.assertEqual(r.status_code, 302)
+        self.interviewer.refresh_from_db()
+        self.assertFalse(self.interviewer.is_active)
+
+    def test_management_can_deactivate(self):
+        c = Client()
+        assert c.login(username='mgmt', password='pass12345')
+        r = c.post(self._url())
+        self.assertEqual(r.status_code, 302)
+        self.interviewer.refresh_from_db()
+        self.assertFalse(self.interviewer.is_active)
+
+    def test_interviewer_forbidden(self):
+        c = Client()
+        assert c.login(username='iv', password='pass12345')
+        r = c.post(self._url())
+        self.assertEqual(r.status_code, 403)
+        self.interviewer.refresh_from_db()
+        self.assertTrue(self.interviewer.is_active)
+
+
 class AdminUserSearchFilterTests(AuthAndRoleTestBase):
     def setUp(self):
         super().setUp()
@@ -2241,3 +2308,78 @@ class LocaltimeFilterTests(AuthAndRoleTestBase):
     def test_none_passthrough(self):
         from accounts.templatetags.accounts_extras import localtime
         self.assertIsNone(localtime(None, self._user_with_tz('UTC')))
+
+
+class CleanupDemoCruftCommandTests(AuthAndRoleTestBase):
+    """Guards the exact bug this command previously had: an @example.com
+    signal that also matched the realistic seeded demo dataset. Only the
+    narrow, verified-safe criteria may ever match."""
+
+    def test_noop_without_env_gate(self):
+        Candidate.objects.create(first_name='', last_name='', email='')
+        call_command('cleanup_demo_cruft')
+        self.assertEqual(Candidate.objects.count(), 1)
+
+    def test_realistic_seeded_candidates_are_never_touched(self):
+        import os
+        real = Candidate.objects.create(
+            first_name='Claire', last_name='Dupont', email='claire.dupont@example.com',
+        )
+        os.environ['CLEANUP_DEMO_CRUFT'] = 'true'
+        try:
+            call_command('cleanup_demo_cruft')
+        finally:
+            del os.environ['CLEANUP_DEMO_CRUFT']
+        self.assertTrue(Candidate.objects.filter(pk=real.pk).exists())
+
+    def test_nameless_emailless_candidate_deleted(self):
+        import os
+        junk = Candidate.objects.create(first_name='', last_name='', email='')
+        os.environ['CLEANUP_DEMO_CRUFT'] = 'true'
+        try:
+            call_command('cleanup_demo_cruft')
+        finally:
+            del os.environ['CLEANUP_DEMO_CRUFT']
+        self.assertFalse(Candidate.objects.filter(pk=junk.pk).exists())
+
+    def test_exact_named_test_candidate_deleted(self):
+        import os
+        junk = Candidate.objects.create(
+            first_name='Mgmt Audit', last_name='Applicant', email='mgmt.audit@example.com',
+        )
+        os.environ['CLEANUP_DEMO_CRUFT'] = 'true'
+        try:
+            call_command('cleanup_demo_cruft')
+        finally:
+            del os.environ['CLEANUP_DEMO_CRUFT']
+        self.assertFalse(Candidate.objects.filter(pk=junk.pk).exists())
+
+    def test_audit_users_deactivated_not_deleted(self):
+        import os
+        user = User.objects.create_user(username='audit_hr_01', password='x', role=Role.HR)
+        os.environ['CLEANUP_DEMO_CRUFT'] = 'true'
+        try:
+            call_command('cleanup_demo_cruft')
+        finally:
+            del os.environ['CLEANUP_DEMO_CRUFT']
+        user.refresh_from_db()
+        self.assertFalse(user.is_active)
+
+    def test_duplicate_jobs_closed_keeping_earliest(self):
+        import os
+        from jobs.models import Job as JobModel
+        j1 = JobModel.objects.create(
+            title='E2E QA Senior Backend Engineer', is_active=True, created_by=self.hr,
+        )
+        j2 = JobModel.objects.create(
+            title='E2E QA Senior Backend Engineer', is_active=True, created_by=self.hr,
+        )
+        os.environ['CLEANUP_DEMO_CRUFT'] = 'true'
+        try:
+            call_command('cleanup_demo_cruft')
+        finally:
+            del os.environ['CLEANUP_DEMO_CRUFT']
+        j1.refresh_from_db()
+        j2.refresh_from_db()
+        self.assertTrue(j1.is_active)
+        self.assertFalse(j2.is_active)

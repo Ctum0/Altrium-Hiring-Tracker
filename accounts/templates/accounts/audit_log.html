@@ -1,0 +1,98 @@
+{% extends 'base.html' %}
+{% block title %}Audit Log | Altrium Tracker{% endblock %}
+{% block page_title %}Audit Log{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Audit log</h1>
+    <p class="page-sub">Every security-relevant and workflow action recorded server-side. Append-only — nothing here can be edited or deleted.</p>
+  </div>
+</div>
+
+<div class="app-card">
+  <form method="get" class="admin-users-filter" role="search">
+    <div class="admin-users-search">
+      <label for="audit-search" class="sr-only">Search the audit log</label>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="search" id="audit-search" name="q" value="{{ search_query }}" placeholder="Search actor, object, or detail" class="form-input">
+    </div>
+    <div>
+      <label for="action-filter" class="sr-only">Filter by action</label>
+      <select id="action-filter" name="action" class="form-select">
+        <option value="">All actions</option>
+        {% for value, label in action_choices %}
+        <option value="{{ value }}" {% if action_filter == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="actor-filter" class="sr-only">Filter by actor</label>
+      <select id="actor-filter" name="actor" class="form-select">
+        <option value="">All users</option>
+        {% for u in actor_choices %}
+        <option value="{{ u.pk }}" {% if actor_filter == u.pk|stringformat:'s' %}selected{% endif %}>{{ u.get_full_name|default:u.username }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button type="submit" class="btn btn-secondary">Filter</button>
+    {% if search_query or action_filter or actor_filter %}
+    <a href="{% url 'accounts:audit_log' %}" class="btn btn-ghost">Clear</a>
+    {% endif %}
+  </form>
+
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th scope="col">When</th>
+          <th scope="col">Actor</th>
+          <th scope="col">Action</th>
+          <th scope="col">Object</th>
+          <th scope="col">Detail</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in entries %}
+        <tr>
+          <td class="text-sm text-muted" style="white-space:nowrap">{{ entry.created_at|date:'M j, Y H:i:s' }}</td>
+          <td>
+            {% if entry.actor %}
+            <div class="admin-user-cell">
+              <span class="user-avatar" aria-hidden="true">{{ entry.actor.first_name|first|default:entry.actor.username|first|upper }}</span>
+              <span class="admin-user-name">{{ entry.actor.get_full_name|default:entry.actor.username }}</span>
+            </div>
+            {% else %}
+            <span class="text-muted">System</span>
+            {% endif %}
+          </td>
+          <td><span class="badge">{{ entry.get_action_display }}</span></td>
+          <td class="text-sm">
+            {% if entry.object_type %}{{ entry.object_type }}{% if entry.object_id %}&nbsp;#{{ entry.object_id }}{% endif %}{% else %}&mdash;{% endif %}
+          </td>
+          <td class="text-sm text-muted">{{ entry.detail|default:'—' }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="5" class="text-muted" style="text-align:center;padding:var(--sp-6)">
+            No audit entries match this search.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if is_paginated %}
+  <div class="pagination">
+    {% if page_obj.has_previous %}
+    <a class="btn btn-ghost btn-sm" href="?q={{ search_query|urlencode }}&amp;action={{ action_filter|urlencode }}&amp;actor={{ actor_filter|urlencode }}&amp;page={{ page_obj.previous_page_number }}">&larr; Previous</a>
+    {% endif %}
+    <span class="text-muted text-sm">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}
+    <a class="btn btn-ghost btn-sm" href="?q={{ search_query|urlencode }}&amp;action={{ action_filter|urlencode }}&amp;actor={{ actor_filter|urlencode }}&amp;page={{ page_obj.next_page_number }}">Next &rarr;</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

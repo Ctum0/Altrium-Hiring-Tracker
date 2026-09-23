@@ -16,9 +16,15 @@ services:
     # SEED_DEMO_DATA=true additionally runs clean_and_seed_db, which WIPES
     # all jobs/candidates/applications/feedback and seeds the enterprise
     # demo scenario. WARNING: destructive to business data -- opt-in only.
-    startCommand: python manage.py collectstatic --noinput && python manage.py migrate --noinput && python manage.py axes_reset; if [ "$SEED_DEMO_USERS" = "true" ]; then python manage.py seed_users --noinput; fi && if [ "$SEED_DEMO_DATA" = "true" ]; then python manage.py clean_and_seed_db; fi && python manage.py bootstrap_admin && python manage.py cleanup_photos && gunicorn altrium_tracker.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120
+    startCommand: python manage.py collectstatic --noinput && python manage.py migrate --noinput && python manage.py axes_reset; if [ "$SEED_DEMO_USERS" = "true" ]; then python manage.py seed_users --noinput; fi && if [ "$SEED_DEMO_DATA" = "true" ]; then python manage.py clean_and_seed_db; fi && python manage.py bootstrap_admin && python manage.py cleanup_photos && if [ "$CLEANUP_DEMO_CRUFT" = "true" ]; then python manage.py cleanup_demo_cruft; fi && gunicorn altrium_tracker.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120
     envVars:
       - key: SEED_DEMO_DATA
+        sync: false
+      # One-shot, idempotent test/audit-artifact cleanup ahead of a client
+      # demo (accounts/management/commands/cleanup_demo_cruft.py). Toggle
+      # true for one deploy, confirm the log output, then toggle back off —
+      # same pattern as SEED_DEMO_DATA.
+      - key: CLEANUP_DEMO_CRUFT
         sync: false
       - key: DATABASE_URL
         fromDatabase:

@@ -27,7 +27,7 @@
         <th scope="col">Availability</th>
         <th scope="col">Active Load</th>
         <th scope="col">Pending Feedback</th>
-        {% if user.is_hr %}<th scope="col">Action</th>{% endif %}
+        {% if user.is_hr or user.is_management %}<th scope="col">Action</th>{% endif %}
       </tr>
     </thead>
     <tbody>
@@ -77,7 +77,8 @@
           <span class="text-xs text-muted">All submitted</span>
           {% endif %}
         </td>
-        {% if user.is_hr and iv.is_active %}
+        {% if user.is_hr or user.is_management %}
+        {% if iv.is_active %}
         <td>
           <form method="post" action="{% url 'accounts:deactivate_interviewer' iv.pk %}" style="display:inline"
                 onsubmit="event.preventDefault();confirmAction(this,'Deactivate {{ iv.get_full_name|default:iv.username }}?','This will exclude them from future assignments. Their existing feedback stays attributed. Active assignments will need reassignment.','danger')">
@@ -85,8 +86,9 @@
             <button type="submit" class="btn btn-danger btn-xs" style="font-size:var(--text-micro);padding:2px 8px">Deactivate</button>
           </form>
         </td>
-        {% elif user.is_hr and not iv.is_active %}
+        {% else %}
         <td><span class="badge badge-rejected">Deactivated</span></td>
+        {% endif %}
         {% endif %}
       </tr>
       {% endfor %}

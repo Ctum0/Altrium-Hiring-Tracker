@@ -38,6 +38,7 @@ urlpatterns = [
     ),
     path('password-change/', views.PasswordChangeView.as_view(), name='password_change'),
     path('user-admin/', views.AdminUserListView.as_view(), name='admin_users'),
+    path('audit-log/', views.AuditLogListView.as_view(), name='audit_log'),
     path('user-admin/create/', views.AdminUserCreateView.as_view(), name='admin_user_create'),
     path(
         'user-admin/<int:pk>/toggle-active/',

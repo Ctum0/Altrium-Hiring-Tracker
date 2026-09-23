@@ -870,24 +870,28 @@ a:hover {
 .main-content.dashboard-single-screen .ai-insights { flex: 0 0 auto; padding: var(--sp-1) var(--sp-4); container-type: inline-size; }
 .main-content.dashboard-single-screen .ai-insights .ref-card-header { margin-bottom: var(--sp-1); }
 .main-content.dashboard-single-screen .ai-insights-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  display: flex;
+  flex-wrap: wrap;
   gap: var(--sp-3);
   /* Cards stretch to equal height within the row (uniform look), but the
-     row itself is content-sized — no giant voids. */
+     row itself is content-sized — no giant voids. Flex-basis (not a fixed
+     grid-column count) means the actual card count always divides evenly
+     across the row: 3 cards form 3 equal columns, not 3 cards + one empty
+     grid track. */
   align-items: stretch;
 }
 .main-content.dashboard-single-screen .ai-insight-card {
   height: auto;
+  flex: 1 1 280px;
 }
 @container (max-width: 680px) {
-  .main-content.dashboard-single-screen .ai-insights-grid {
-    grid-template-columns: repeat(2, 1fr);
+  .main-content.dashboard-single-screen .ai-insight-card {
+    flex-basis: calc(50% - var(--sp-3) / 2);
   }
 }
 @container (max-width: 380px) {
-  .main-content.dashboard-single-screen .ai-insights-grid {
-    grid-template-columns: 1fr;
+  .main-content.dashboard-single-screen .ai-insight-card {
+    flex-basis: 100%;
   }
 }
 /* AI Insights — Compact AI Analysis Panels.
@@ -3706,8 +3710,8 @@ a.ref-kpi-card.kpi-card-link:focus-visible {
   .ref-dash-grid {
     gap: 16px;
   }
-  .main-content.dashboard-single-screen .ai-insights-grid {
-    grid-template-columns: 1fr;
+  .main-content.dashboard-single-screen .ai-insight-card {
+    flex-basis: 100%;
   }
 }
 
@@ -4629,6 +4633,7 @@ body.no-scroll {
 /* Keyboard move menu (a11y): Enter/Space on a focused card lists the
    destination columns; mirrors the drag drop contract. */
 .kanban-kb-menu {
+  margin: auto;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);

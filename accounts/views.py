@@ -1052,15 +1052,18 @@ class InterviewerRosterView(LoginRequiredMixin, ListView):
 
 
 class DeactivateInterviewerView(LoginRequiredMixin, View):
-    """HR only: deactivate an interviewer account (is_active=False).
+    """HR and Management can deactivate an interviewer account (is_active=False).
 
     Does NOT delete the user — historical feedback stays attributed.
     Active assignments surface on the offboarding page for HR to reassign.
+    Mirrors the read/write split already used elsewhere for this role pair:
+    Management has the same operational reach as HR for staffing actions,
+    while matching-profile edits (InterviewerProfileView) stay HR-only.
     """
 
     def post(self, request, pk):
-        if not request.user.is_hr():
-            return HttpResponse('Only HR can deactivate interviewers.', status=403)
+        if not (request.user.is_hr() or request.user.is_management()):
+            return HttpResponse('Only HR or Management can deactivate interviewers.', status=403)
         user = get_object_or_404(User, pk=pk, role=Role.INTERVIEWER)
         if user == request.user:
             messages.error(request, 'You cannot deactivate your own account.')
@@ -1420,6 +1423,52 @@ class AdminUserListView(LoginRequiredMixin, AdminRequiredMixin, ListView):
         context['search_query'] = (self.request.GET.get('q') or '').strip()
         context['role_filter'] = self.request.GET.get('role') or ''
         context['role_choices'] = Role.choices
+        return context
+
+
+class AuditLogListView(LoginRequiredMixin, AdminRequiredMixin, ListView):
+    """Admin-only, read-only viewer of the append-only audit trail.
+
+    Filterable by actor and action; free-text search covers object type,
+    object id, and the detail note. Newest first (model default ordering).
+    """
+
+    template_name = 'accounts/audit_log.html'
+    context_object_name = 'entries'
+    paginate_by = 50
+
+    def get_queryset(self):
+        qs = AuditLog.objects.select_related('actor')
+        query = (self.request.GET.get('q') or '').strip()
+        if query:
+            qs = qs.filter(
+                Q(object_type__icontains=query)
+                | Q(object_id__icontains=query)
+                | Q(detail__icontains=query)
+                | Q(actor__username__icontains=query)
+            )
+        action = self.request.GET.get('action') or ''
+        if action:
+            qs = qs.filter(action=action)
+        actor_id = self.request.GET.get('actor') or ''
+        if actor_id:
+            qs = qs.filter(actor_id=actor_id)
+        return qs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['active_nav'] = 'audit_log'
+        context['search_query'] = (self.request.GET.get('q') or '').strip()
+        context['action_filter'] = self.request.GET.get('action') or ''
+        context['actor_filter'] = self.request.GET.get('actor') or ''
+        context['action_choices'] = AuditLog.Action.choices
+        # Actors who actually have entries, not every user in the system —
+        # an admin filtering by actor only wants names that produce results.
+        context['actor_choices'] = (
+            User.objects.filter(audit_entries__isnull=False)
+            .distinct()
+            .order_by('username')
+        )
         return context
 
 
