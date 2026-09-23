@@ -1,0 +1,24 @@
+{
+  "name": "altrium-playwright",
+  "version": "1.0.0",
+  "description": "Automated Playwright tests for Altrium Hiring Tracker \u2014 maps 1:1 to the Sprint 1 NFR + Sprint 2 manual test case documents",
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug",
+    "test:scorecards": "playwright test tests/scorecards.spec.ts",
+    "test:portal": "playwright test tests/candidate-portal.spec.ts",
+    "test:emails": "playwright test tests/emails-notifications.spec.ts tests/notifications-delays.spec.ts",
+    "test:pipeline": "playwright test tests/pipeline-reporting.spec.ts",
+    "test:closure": "playwright test tests/job-closure.spec.ts",
+    "test:nfr": "playwright test tests/nfr-rbac.spec.ts tests/nfr-core.spec.ts"
+  },
+  "keywords": [],
+  "type": "commonjs",
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "@types/node": "^24.3.0",
+    "typescript": "^5.9.2"
+  }
+}
