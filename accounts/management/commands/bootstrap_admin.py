@@ -31,6 +31,52 @@ class Command(BaseCommand):
         except Exception:
             pass
 
+        username = os.environ.get('ADMIN_USERNAME', '').strip()
+
+        # Credential-recovery escape hatch: an admin account can exist
+        # with a password nobody currently has (lost, rotated outside
+        # this command, or created by some other one-off process). This
+        # command is otherwise create-only and never touches an existing
+        # account's password, so recovery would otherwise require direct
+        # database access. RESET_ADMIN_PASSWORD=true force-sets
+        # ADMIN_USERNAME's password to ADMIN_PASSWORD, reactivating and
+        # re-staffing it if needed, WITHOUT the "no admin exists" guard
+        # below (the whole point is this runs even though one exists).
+        if os.environ.get('RESET_ADMIN_PASSWORD', '') == 'true':
+            password = os.environ.get('ADMIN_PASSWORD', '')
+            if not username or not password:
+                self.stderr.write(
+                    'RESET_ADMIN_PASSWORD=true requires ADMIN_USERNAME '
+                    'and ADMIN_PASSWORD to both be set.'
+                )
+                return
+            user, created = User.objects.get_or_create(
+                username=username,
+                defaults={'role': Role.ADMIN, 'is_staff': True},
+            )
+            user.set_password(password)
+            user.role = Role.ADMIN
+            user.is_staff = True
+            user.is_active = True
+            user.force_password_change = True
+            user.save()
+            AuditLog.record(
+                None, AuditLog.Action.PASSWORD_RESET,
+                object_type='User', object_id=user.pk,
+                detail=f'Admin password reset via RESET_ADMIN_PASSWORD env gate '
+                       f'({"created" if created else "existing"} account).',
+            )
+            try:
+                from django.core.management import call_command
+                call_command('axes_reset')
+            except Exception:
+                pass
+            self.stderr.write(self.style.SUCCESS(
+                f'Password reset for "{username}" '
+                f'({"created" if created else "existing account updated"}).'
+            ))
+            return
+
         # Both branches require is_active=True: a deactivated admin or
         # superuser must never permanently block bootstrapping a working
         # replacement. (Real incident: an audit-test account had

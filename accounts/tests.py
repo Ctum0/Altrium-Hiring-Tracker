@@ -2523,3 +2523,52 @@ class BootstrapAdminCommandTests(TestCase):
                 else:
                     os.environ[k] = v
         self.assertFalse(User.objects.filter(username='admin').exists())
+
+    def test_reset_admin_password_recovers_lost_credentials(self):
+        """Credential-recovery scenario: an admin account exists (e.g.
+        created outside this command) but nobody has its password.
+        RESET_ADMIN_PASSWORD=true must force-set it, bypassing the
+        normal 'an admin already exists' guard entirely."""
+        import os
+        existing = User.objects.create_user(
+            username='admin', password='some-lost-password',
+            role=Role.ADMIN, is_staff=True,
+        )
+        env = {
+            'RESET_ADMIN_PASSWORD': 'true', 'ADMIN_USERNAME': 'admin',
+            'ADMIN_PASSWORD': 'newknownpassword',
+        }
+        old = {k: os.environ.get(k) for k in env}
+        os.environ.update(env)
+        try:
+            call_command('bootstrap_admin')
+        finally:
+            for k, v in old.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+        existing.refresh_from_db()
+        self.assertTrue(existing.check_password('newknownpassword'))
+        self.assertTrue(existing.is_active)
+
+    def test_reset_admin_password_creates_if_missing(self):
+        import os
+        env = {
+            'RESET_ADMIN_PASSWORD': 'true', 'ADMIN_USERNAME': 'admin',
+            'ADMIN_PASSWORD': 'newknownpassword',
+        }
+        old = {k: os.environ.get(k) for k in env}
+        os.environ.update(env)
+        try:
+            call_command('bootstrap_admin')
+        finally:
+            for k, v in old.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+        user = User.objects.get(username='admin')
+        self.assertTrue(user.check_password('newknownpassword'))
+        self.assertEqual(user.role, Role.ADMIN)
+        self.assertTrue(user.is_staff)
