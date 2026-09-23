@@ -16,7 +16,13 @@ services:
     # SEED_DEMO_DATA=true additionally runs clean_and_seed_db, which WIPES
     # all jobs/candidates/applications/feedback and seeds the enterprise
     # demo scenario. WARNING: destructive to business data -- opt-in only.
-    startCommand: python manage.py collectstatic --noinput && python manage.py migrate --noinput && python manage.py axes_reset; if [ "$SEED_DEMO_USERS" = "true" ]; then python manage.py seed_users --noinput; fi && if [ "$SEED_DEMO_DATA" = "true" ]; then python manage.py clean_and_seed_db; fi && python manage.py bootstrap_admin && python manage.py cleanup_photos && if [ "$CLEANUP_DEMO_CRUFT" = "true" ]; then python manage.py cleanup_demo_cruft; fi && gunicorn altrium_tracker.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120
+    # NOTE: this MUST be `dockerCommand`, not `startCommand` -- the latter
+    # is silently ignored for `runtime: docker` services (Render still ran
+    # the Dockerfile's own CMD instead). Confirmed as a real prod bug: this
+    # field's SEED_DEMO_USERS/SEED_DEMO_DATA/bootstrap_admin/cleanup_photos
+    # wiring never took effect; the Dockerfile CMD is now updated to match
+    # and is kept in sync with this line -- change both together.
+    dockerCommand: python manage.py collectstatic --noinput && python manage.py migrate --noinput && python manage.py axes_reset; if [ "$SEED_DEMO_USERS" = "true" ]; then python manage.py seed_users --noinput; fi && if [ "$SEED_DEMO_DATA" = "true" ]; then python manage.py clean_and_seed_db; fi && python manage.py bootstrap_admin && python manage.py cleanup_photos && if [ "$CLEANUP_DEMO_CRUFT" = "true" ]; then python manage.py cleanup_demo_cruft; fi && gunicorn altrium_tracker.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120
     envVars:
       - key: SEED_DEMO_DATA
         sync: false

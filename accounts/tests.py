@@ -435,6 +435,42 @@ class DeploySeedUsersGatingTest(TestCase):
             )
             self.assertIn('seed_users --noinput', content)
 
+    def test_docker_runtime_service_uses_dockerCommand_not_startCommand(self):
+        """Render silently ignores `startCommand` for `runtime: docker`
+        services -- it runs the Dockerfile's own CMD instead. This bit
+        production for real: bootstrap_admin/cleanup_photos/
+        cleanup_demo_cruft were wired into render.yaml's `startCommand`
+        and never executed on any deploy. The web service must use
+        `dockerCommand`, and its command list must match the Dockerfile's
+        CMD so neither one silently drifts out of sync again."""
+        import re as re_module
+        import yaml
+        from pathlib import Path
+        base = Path(__file__).resolve().parent.parent
+        config = yaml.safe_load((base / 'render.yaml').read_text())
+        docker_services = [
+            svc for svc in config.get('services', [])
+            if svc.get('runtime') == 'docker'
+        ]
+        self.assertTrue(docker_services, 'expected at least one runtime: docker service')
+        for svc in docker_services:
+            self.assertNotIn(
+                'startCommand', svc,
+                f'{svc.get("name")}: runtime: docker services must use '
+                f'dockerCommand -- startCommand is silently ignored',
+            )
+            self.assertIn('dockerCommand', svc)
+
+        dockerfile = (base / 'Dockerfile').read_text()
+        cmd_match = re_module.search(r'^CMD sh -c "(.+)"$', dockerfile, re_module.MULTILINE)
+        self.assertIsNotNone(cmd_match, 'Dockerfile must define a shell CMD')
+        # Same one-shot commands must appear in both places (order-independent
+        # check is enough here -- the point is neither list silently drops one).
+        for step in ('bootstrap_admin', 'cleanup_photos', 'cleanup_demo_cruft', 'gunicorn'):
+            self.assertIn(step, cmd_match.group(1), f'Dockerfile CMD missing {step}')
+            self.assertIn(step, docker_services[0]['dockerCommand'], f'render.yaml dockerCommand missing {step}')
+
+
 def _make_job(hr, title='Backend Engineer', department='Engineering', seniority='mid'):
     from jobs.models import Job
     return Job.objects.create(
