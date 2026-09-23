@@ -206,6 +206,14 @@ def ingest_cv(f, job, *, source='upload'):
         # held (never auto-rejected) until a human confirms.
         if job.requirements.strip() and candidate.skills.strip():
             app.shortlist_score = auto_apply(candidate, job)
+            # Seed the HR-owned global score from the computed match so the
+            # SCORE column / candidate Shortlist Score box shows a value the
+            # moment a candidate applies (user-reported demo gap: the box
+            # sat empty even with a 100% match). Never clobbers an HR-set
+            # value: only fills when the field is still unset.
+            if candidate.score is None and app.shortlist_score is not None:
+                candidate.score = app.shortlist_score
+                candidate.save(update_fields=['score', 'updated_at'])
 
         if apply_auto_reject(app, job, needs_review):
             result['auto_rejected'] = True

@@ -2416,6 +2416,31 @@ class IntakeHelperTests(CandidatesBaseTestCase):
         self.assertEqual(outcome['candidate'].source, 'portal')
         self.assertEqual(outcome['application'].job, self.job)
 
+    def test_ingest_cv_seeds_global_score_from_match(self):
+        """User-reported demo gap: the candidate SCORE column and the
+        Shortlist Score box stayed empty even with a computed match. The
+        global score must be seeded from the per-job match on a fresh
+        candidate (never clobbering an HR-set value)."""
+        from candidates.intake import ingest_cv
+        self.job.requirements = 'Python, Django'
+        self.job.save(update_fields=['requirements'])
+        outcome = ingest_cv(self._docx_file(), self.job, source='portal')
+        candidate = outcome['candidate']
+        self.assertIsNotNone(candidate.score, 'global score must be seeded')
+        self.assertEqual(outcome['application'].shortlist_score, candidate.score)
+
+    def test_ingest_cv_never_clobbers_hr_set_global_score(self):
+        """An existing candidate re-applying to a new job keeps the score
+        HR already set."""
+        from candidates.intake import ingest_cv
+        existing = Candidate.objects.create(
+            email='jane@example.com', first_name='Jane', score=77,
+        )
+        outcome = ingest_cv(self._docx_file(), self.job, source='portal')
+        self.assertFalse(outcome['created'])
+        existing.refresh_from_db()
+        self.assertEqual(existing.score, 77)
+
     def test_ingest_cv_unreadable_file_reports_failure_no_crash(self):
         from candidates.intake import ingest_cv
         garbage = SimpleUploadedFile(
