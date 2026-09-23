@@ -888,6 +888,13 @@ a:hover {
   .main-content.dashboard-single-screen .ai-insight-card {
     flex-basis: calc(50% - var(--sp-3) / 2);
   }
+  /* An odd card count leaves exactly one card alone on the final row;
+     without this it stretches to fill the full row width, leaving a
+     hollow, disproportionately wide card. Keep it at the natural
+     column width instead — a short ragged last row, not an outlier. */
+  .main-content.dashboard-single-screen .ai-insight-card:last-child:nth-child(odd) {
+    flex-grow: 0;
+  }
 }
 @container (max-width: 380px) {
   .main-content.dashboard-single-screen .ai-insight-card {
