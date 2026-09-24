@@ -93,8 +93,15 @@ class JobForm(forms.ModelForm):
         baseline = cleaned.get('auto_reject_score')
         # A separators-only requirements string (" , ") would score every
         # candidate 0 and mass-reject; require a real token when a baseline
-        # is set, and warn-free pass when it is not.
+        # is set. Also reject it outright when it is the ONLY content —
+        # otherwise a job publishes with a silently empty public skills
+        # list (audit F1: ' , ,' accepted when no baseline was set).
         tokens = [t for t in requirements.replace(',', ' ').split() if t.strip()]
+        if requirements and not tokens:
+            raise forms.ValidationError(
+                'Requirements contains no actual skills — enter at least '
+                'one comma-separated skill, or leave the field empty.'
+            )
         if baseline is not None and not tokens:
             raise forms.ValidationError(
                 'Auto-reject baseline requires at least one requirement '
