@@ -1227,6 +1227,10 @@ class SlotPreviewClashWindowTests(CandidatesBaseTestCase):
     def test_interviewer_slots_view_excludes_near_miss_slot(self):
         near_miss = self.booked_at + timedelta(hours=1)
         self.login('hr')
+        # Unassign the target app so the slots view renders the chooser
+        # preview (same-assignee requests are suppressed by design).
+        self.other_app.assigned_to = None
+        self.other_app.save(update_fields=['assigned_to', 'updated_at'])
         response = self.client.get(
             reverse('candidates:interviewer_slots', args=[self.other_app.pk]),
             {'interviewer': self.interviewer.pk},
@@ -1238,6 +1242,10 @@ class SlotPreviewClashWindowTests(CandidatesBaseTestCase):
     def test_interviewer_slots_view_offers_slot_outside_clash_window(self):
         clear = self.booked_at + timedelta(hours=2)
         self.login('hr')
+        # Unassign the target app so the slots view renders the chooser
+        # preview (same-assignee requests are suppressed by design).
+        self.other_app.assigned_to = None
+        self.other_app.save(update_fields=['assigned_to', 'updated_at'])
         response = self.client.get(
             reverse('candidates:interviewer_slots', args=[self.other_app.pk]),
             {'interviewer': self.interviewer.pk},

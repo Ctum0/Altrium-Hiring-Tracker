@@ -2188,6 +2188,13 @@ class InterviewBufferTests(AuthAndRoleTestBase):
     def test_preview_honors_buffer(self):
         self._booked_app(self._monday_at(10, 0), 'buf5@example.com')
         app = self._target_app()
+        # The slots view suppresses the chooser preview when the requested
+        # interviewer is already the app's assignee (duplicate-panel fix).
+        # Exercise the buffer math through a SECOND app that has no
+        # assignee yet — the preview for the same interviewer still applies
+        # the same clash/buffer rules.
+        app.assigned_to = None
+        app.save(update_fields=['assigned_to', 'updated_at'])
         c = Client()
         assert c.login(username='hr', password='pass12345')
         r = c.get(
@@ -2199,6 +2206,21 @@ class InterviewBufferTests(AuthAndRoleTestBase):
         for slot in slots:
             delta = abs((slot - booked_start).total_seconds()) / 60
             self.assertGreaterEqual(delta, 75)  # 60 slot + 15 buffer
+
+    def test_preview_suppressed_for_current_assignee(self):
+        """Picking the already-assigned interviewer renders the
+        'Currently assigned' placeholder, not a chooser preview
+        (duplicate-panel fix)."""
+        self._booked_app(self._monday_at(10, 0), 'buf6@example.com')
+        app = self._target_app()
+        c = Client()
+        assert c.login(username='hr', password='pass12345')
+        r = c.get(
+            reverse('candidates:interviewer_slots', kwargs={'pk': app.pk}),
+            {'interviewer': self.interviewer.pk},
+        )
+        self.assertTrue(r.context['preview'].get('already_assigned'))
+        self.assertNotIn('free_slots', r.context['preview'])
 
 
 def datetime_from(date, t):
